@@ -16,7 +16,7 @@
     "start": "electron-forge start",
     "package": "electron-forge package",
     "package:e2e": "node scripts/package-e2e.mjs",
-    "make": "electron-forge make",
+    "make": "node scripts/make.mjs",
     "publish": "electron-forge publish",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",

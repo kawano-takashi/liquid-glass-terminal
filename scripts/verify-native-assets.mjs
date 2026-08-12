@@ -28,7 +28,7 @@ const nativeModule = await firstExisting([
   path.join('prebuilds', platformArch, 'pty.node'),
 ]);
 
-if (process.platform !== 'win32') {
+if (process.platform === 'darwin') {
   const helper = await firstExisting([
     path.join('build', 'Release', 'spawn-helper'),
     path.join('prebuilds', platformArch, 'spawn-helper'),
