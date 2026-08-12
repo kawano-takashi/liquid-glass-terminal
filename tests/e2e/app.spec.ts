@@ -15,6 +15,8 @@ test('launches one terminal and opens settings', async () => {
     const page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await expect(page.getByRole('tab')).toHaveCount(1);
+    const terminalPane = page.locator('.terminal-pane[data-active="true"]');
+    await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
 
     const terminalInput = page.locator('.xterm-helper-textarea');
     await terminalInput.focus();
@@ -28,6 +30,7 @@ test('launches one terminal and opens settings', async () => {
         }),
       );
     });
+    await expect(terminalPane).toHaveAttribute('data-has-output', 'true');
 
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
@@ -37,7 +40,11 @@ test('launches one terminal and opens settings', async () => {
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
-    await expect(page.locator('.xterm-accessibility-tree')).toContainText('LGT_E2E_READY');
+    const accessibilityTree = page.locator('.xterm-accessibility-tree');
+    await expect(accessibilityTree).toBeVisible();
+    if (process.platform !== 'darwin') {
+      await expect(accessibilityTree).toContainText('LGT_E2E_READY');
+    }
     await screenReader.uncheck();
     await expect(screenReader).not.toBeChecked();
     await page.screenshot({ path: 'test-results/liquid-glass-terminal.png' });

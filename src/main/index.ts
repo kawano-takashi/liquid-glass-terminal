@@ -166,8 +166,8 @@ function installIpc(): void {
     const request = value;
     const { port1, port2 } = new MessageChannelMain();
     const requestedCwd = cwdTokens.consume(request.cwdToken);
-    void ptyManager
-      .create(
+    try {
+      const { sessionId, profile } = ptyManager.create(
         event.sender.id,
         port1,
         request.profileId,
@@ -175,28 +175,27 @@ function installIpc(): void {
         request.inheritFromSessionId,
         request.cols,
         request.rows,
-      )
-      .then(({ sessionId, profile }) => {
-        senderFrame.postMessage(
-          IPC_CHANNELS.sessionPort,
-          {
-            source: 'liquid-glass-preload',
-            requestId: request.requestId,
-            sessionId,
-            profile,
-          },
-          [port2],
-        );
-      })
-      .catch((error: unknown) => {
-        port1.close();
-        port2.close();
-        senderFrame.postMessage(IPC_CHANNELS.sessionPort, {
+      );
+      senderFrame.postMessage(
+        IPC_CHANNELS.sessionPort,
+        {
           source: 'liquid-glass-preload',
           requestId: request.requestId,
-          error: error instanceof Error ? error.message : 'sessionFailed',
-        });
+          sessionId,
+          profile,
+        },
+        [port2],
+      );
+      void ptyManager.start(sessionId);
+    } catch (error: unknown) {
+      port1.close();
+      port2.close();
+      senderFrame.postMessage(IPC_CHANNELS.sessionPort, {
+        source: 'liquid-glass-preload',
+        requestId: request.requestId,
+        error: error instanceof Error ? error.message : 'sessionFailed',
       });
+    }
   });
 
   ipcMain.handle(

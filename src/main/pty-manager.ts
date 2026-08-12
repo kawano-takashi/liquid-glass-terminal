@@ -47,7 +47,7 @@ export class PtyManager {
     private readonly countChanged: (ownerId: number, count: number) => void,
   ) {}
 
-  async create(
+  create(
     ownerId: number,
     port: MessagePortMain,
     profileId: string | undefined,
@@ -55,7 +55,7 @@ export class PtyManager {
     inheritedSessionId: string | undefined,
     cols: number,
     rows: number,
-  ): Promise<CreatedSession> {
+  ): CreatedSession {
     const profile = this.profiles.get(profileId, this.getSettings());
     if (!profile) throw new Error('profileUnavailable');
 
@@ -85,9 +85,15 @@ export class PtyManager {
     };
     this.#sessions.set(id, session);
     this.bindPort(session);
-    await this.startPty(session, cols, rows);
     this.onCountChanged(ownerId);
     return { sessionId: id, profile: this.publicProfile(profile) };
+  }
+
+  async start(sessionId: string): Promise<void> {
+    const session = this.#sessions.get(sessionId);
+    if (!session || session.pty) return;
+    await this.startPty(session, session.cols, session.rows);
+    if (this.#sessions.has(sessionId)) session.port.start();
   }
 
   count(ownerId: number): number {
@@ -121,7 +127,6 @@ export class PtyManager {
       void this.handleMessage(session, message);
     });
     session.port.on('close', () => this.close(session));
-    session.port.start();
   }
 
   private async handleMessage(session: PtySession, message: RendererToPtyMessage): Promise<void> {
@@ -190,6 +195,7 @@ export class PtyManager {
         session.pty = undefined;
         this.send(session, { type: 'exit', code: exitCode, signal });
       });
+      this.send(session, { type: 'ready' });
     } catch {
       session.exited = true;
       this.send(session, { type: 'error', messageKey: 'sessionFailed' });

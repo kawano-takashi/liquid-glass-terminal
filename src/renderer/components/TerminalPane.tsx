@@ -10,6 +10,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
   type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
 import type {
@@ -82,6 +83,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
   const terminalRef = useRef<Terminal | undefined>(undefined);
   const fitRef = useRef<FitAddon | undefined>(undefined);
   const searchRef = useRef<SearchAddon | undefined>(undefined);
+  const [ready, setReady] = useState(false);
+  const [hasOutput, setHasOutput] = useState(false);
   const callbacksRef = useRef({ onTitle, onExit, onRestarted, onBell, onLinkHover, onError });
   callbacksRef.current = { onTitle, onExit, onRestarted, onBell, onLinkHover, onError };
 
@@ -171,7 +174,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
 
     port.onmessage = (event: MessageEvent<PtyToRendererMessage>) => {
       const message = event.data;
-      if (message.type === 'data') {
+      if (message.type === 'ready') {
+        setReady(true);
+      } else if (message.type === 'data') {
+        setHasOutput(true);
         terminal.write(message.data, () => {
           port.postMessage({
             type: 'ack',
@@ -180,6 +186,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
           } satisfies RendererToPtyMessage);
         });
       } else if (message.type === 'exit') {
+        setReady(false);
         callbacksRef.current.onExit(message.code);
       } else if (message.type === 'restarted') {
         callbacksRef.current.onRestarted();
@@ -250,6 +257,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       className="terminal-pane"
       data-active={active}
       data-session-id={sessionId}
+      data-session-ready={ready}
+      data-has-output={hasOutput}
       aria-hidden={!active}
       onPasteCapture={blockNativePaste}
     >

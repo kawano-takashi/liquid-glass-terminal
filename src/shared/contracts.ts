@@ -90,6 +90,7 @@ export type RendererToPtyMessage =
   | { type: 'close' };
 
 export type PtyToRendererMessage =
+  | { type: 'ready' }
   | { type: 'data'; seq: number; bytes: number; data: string }
   | { type: 'exit'; code: number; signal?: number }
   | { type: 'restarted' }
