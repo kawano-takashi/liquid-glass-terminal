@@ -92,6 +92,7 @@ export function App() {
   const [linkHover, setLinkHover] = useState<string>();
   const [bellFlash, setBellFlash] = useState(false);
   const terminalRefs = useRef(new Map<string, TerminalPaneHandle>());
+  const settingsRef = useRef<SettingsV1 | undefined>(undefined);
   const tabsRef = useRef<TabState[]>([]);
   const activeIdRef = useRef<string | undefined>(undefined);
   const initialized = useRef(false);
@@ -106,6 +107,9 @@ export function App() {
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const locale = useMemo(
     () => resolveLocale(settings?.locale ?? 'system', navigator.language),
@@ -260,10 +264,21 @@ export function App() {
 
   const updateSettings = useCallback(
     async (patch: SettingsPatch) => {
+      const previous = settingsRef.current;
+      if (previous) {
+        const optimistic = { ...previous, ...patch };
+        settingsRef.current = optimistic;
+        setSettings(optimistic);
+      }
       try {
         const next = await window.liquidGlass.updateSettings(patch);
+        settingsRef.current = next;
         setSettings(next);
       } catch {
+        if (previous) {
+          settingsRef.current = previous;
+          setSettings(previous);
+        }
         toast(locale === 'ja' ? '設定を保存できませんでした。' : 'Could not save settings.');
       }
     },

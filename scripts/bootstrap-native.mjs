@@ -9,10 +9,24 @@ function run(command, args) {
   }
 }
 
+async function runWithRetries(command, args, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      run(command, args);
+      return;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      const delay = attempt * 2_000;
+      console.warn(`Attempt ${attempt}/${attempts} failed; retrying in ${delay}ms.`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('npm_execpath is unavailable; run this script through npm.');
 
-run(process.execPath, [path.resolve('node_modules/electron/install.js')]);
+await runWithRetries(process.execPath, [path.resolve('node_modules/electron/install.js')]);
 
 if (process.platform === 'win32') {
   run(process.execPath, [npmCli, 'rebuild', 'electron-winstaller', '--ignore-scripts=false']);
