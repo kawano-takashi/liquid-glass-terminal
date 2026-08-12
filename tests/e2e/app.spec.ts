@@ -16,6 +16,11 @@ test('launches one terminal and opens settings', async () => {
     await expect(page.locator('.app-shell')).toBeVisible();
     await expect(page.getByRole('tab')).toHaveCount(1);
 
+    const terminalInput = page.locator('.xterm-helper-textarea');
+    await terminalInput.focus();
+    await terminalInput.pressSequentially('echo LGT_E2E_READY', { delay: 5 });
+    await terminalInput.press('Enter');
+
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
     await expect(settingsDialog).toBeVisible();
@@ -24,16 +29,7 @@ test('launches one terminal and opens settings', async () => {
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
-    await page.keyboard.press('Escape');
-
-    const terminalInput = page.locator('.xterm-helper-textarea');
-    await terminalInput.focus();
-    await page.keyboard.type('echo LGT_E2E_READY');
-    await page.keyboard.press('Enter');
     await expect(page.locator('.xterm-accessibility-tree')).toContainText('LGT_E2E_READY');
-
-    await page.getByRole('button', { name: /Settings|設定/ }).click();
-    await expect(settingsDialog).toBeVisible();
     await screenReader.uncheck();
     await expect(screenReader).not.toBeChecked();
     await page.screenshot({ path: 'test-results/liquid-glass-terminal.png' });

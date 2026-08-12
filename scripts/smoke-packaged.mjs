@@ -2,7 +2,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { findPackagedExecutable } from './packaged-executable.mjs';
 
 const executable = await findPackagedExecutable();
-const child = spawn(executable, ['--cwd', process.cwd()], {
+const args = ['--cwd', process.cwd()];
+// GitHub-hosted Linux workspaces cannot preserve chrome-sandbox's root/4755 ownership.
+// This flag is limited to the disposable CI smoke process; packaged defaults remain sandboxed.
+if (process.platform === 'linux' && process.env.CI) args.unshift('--no-sandbox');
+const child = spawn(executable, args, {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, LGT_SMOKE_TEST: '1' },
 });
