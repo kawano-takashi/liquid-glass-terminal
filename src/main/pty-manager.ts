@@ -196,8 +196,15 @@ export class PtyManager {
         this.send(session, { type: 'exit', code: exitCode, signal });
       });
       this.send(session, { type: 'ready' });
-    } catch {
+    } catch (error: unknown) {
       session.exited = true;
+      const code =
+        error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+          ? error.code
+          : error instanceof Error
+            ? error.name
+            : 'unknown';
+      console.error(`[pty] spawn failed (${session.profile.kind}, ${code})`);
       this.send(session, { type: 'error', messageKey: 'sessionFailed' });
     }
   }

@@ -11,6 +11,10 @@ test('launches one terminal and opens settings', async () => {
     executablePath,
     args: [`--user-data-dir=${userData}`, '--cwd', process.cwd()],
   });
+  let electronStderr = '';
+  application.process().stderr?.on('data', (chunk: Buffer) => {
+    electronStderr = `${electronStderr}${String(chunk)}`.slice(-32_768);
+  });
   try {
     const page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
@@ -48,6 +52,9 @@ test('launches one terminal and opens settings', async () => {
     await screenReader.uncheck();
     await expect(screenReader).not.toBeChecked();
     await page.screenshot({ path: 'test-results/liquid-glass-terminal.png' });
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    throw new Error(`${detail}\nPackaged Electron stderr:\n${electronStderr || '(empty)'}`);
   } finally {
     await application.close();
     await rm(userData, { recursive: true, force: true });

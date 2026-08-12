@@ -31,7 +31,8 @@ const fuseConfig = {
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: { unpack: 'node_modules/node-pty/**/*' },
+    // Unix node-pty loads both pty.node and its sibling spawn-helper from the real filesystem.
+    asar: { unpackDir: path.join('node_modules', 'node-pty') },
     executableName: 'liquid-glass-terminal',
     appBundleId: process.env.APP_BUNDLE_ID ?? 'dev.liquidglass.terminal',
     appCategoryType: 'public.app-category.developer-tools',

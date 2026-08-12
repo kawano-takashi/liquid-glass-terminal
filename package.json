@@ -33,6 +33,7 @@
     "verify:toolchain": "node scripts/verify-toolchain.mjs",
     "verify:release-tag": "node scripts/verify-release-tag.mjs",
     "verify:fuses": "node scripts/verify-fuses.mjs",
+    "verify:native-assets": "node scripts/verify-native-assets.mjs",
     "smoke:package": "node scripts/smoke-packaged.mjs",
     "bootstrap:native": "node scripts/bootstrap-native.mjs",
     "rebuild:native": "electron-rebuild --force --which-module node-pty"
