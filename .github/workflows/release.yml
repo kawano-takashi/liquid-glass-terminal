@@ -131,6 +131,7 @@ jobs:
         run: |
           mapfile -d '' files < <(find upload-assets -type f -print0 | sort -z)
           gh release create "$GITHUB_REF_NAME" "${files[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
             --draft \
             --verify-tag \
             --title "Liquid Glass Terminal $GITHUB_REF_NAME" \
