@@ -1,0 +1,128 @@
+name: Draft release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2025
+            artifact: release-windows-x64
+          - name: Linux x64
+            os: ubuntu-24.04
+            artifact: release-linux-x64
+          - name: macOS arm64
+            os: macos-26
+            artifact: release-macos-arm64
+          - name: macOS x64
+            os: macos-26-intel
+            artifact: release-macos-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes fakeroot rpm
+
+      - name: Install and verify dependencies
+        run: npm ci && npm run verify:toolchain && npm run audit:install-scripts
+
+      - name: Audit production dependencies
+        run: npm run audit:production
+
+      - name: Prepare Electron and native modules
+        run: npm run bootstrap:native
+
+      - name: Verify release tag
+        run: npm run verify:release-tag
+
+      - name: Run quality gates
+        run: npm run check
+
+      - name: Run real PTY integration test
+        run: npm run test:run
+        env:
+          LGT_NATIVE_TESTS: '1'
+
+      - name: Build E2E-instrumented package
+        run: npm run package:e2e
+
+      - name: Electron launch smoke
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+
+      - name: Electron launch smoke on Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:e2e
+
+      - name: Build hardened distributable artifacts
+        run: npm run make
+
+      - name: Verify final Electron Fuses
+        run: npm run verify:fuses
+
+      - name: Final package process smoke
+        if: runner.os != 'Linux'
+        run: npm run smoke:package
+
+      - name: Final package process smoke on Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run smoke:package
+
+      - name: Upload distributables
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: out/make/**/*
+          if-no-files-found: error
+          retention-days: 14
+
+  draft:
+    name: Create draft release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all distributables
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          cd release-assets
+          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+
+      - name: Create GitHub draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' files < <(find release-assets -type f -print0 | sort -z)
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" \
+            --draft \
+            --verify-tag \
+            --title "Liquid Glass Terminal $GITHUB_REF_NAME" \
+            --notes "Unsigned preview artifacts. Review SHA256SUMS.txt and the native QA status before publishing."
