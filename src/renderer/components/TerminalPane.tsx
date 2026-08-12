@@ -240,7 +240,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
     }
   }, [active, reducedMotion, resolvedTheme, settings]);
 
-  const blockNativePaste = (event: ReactClipboardEvent) => event.preventDefault();
+  const blockNativePaste = (event: ReactClipboardEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <div
@@ -248,7 +251,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       data-active={active}
       data-session-id={sessionId}
       aria-hidden={!active}
-      onPaste={blockNativePaste}
+      onPasteCapture={blockNativePaste}
     >
       <div ref={containerRef} className="terminal-mount" aria-label={profile.label} />
     </div>

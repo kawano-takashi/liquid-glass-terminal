@@ -18,8 +18,16 @@ test('launches one terminal and opens settings', async () => {
 
     const terminalInput = page.locator('.xterm-helper-textarea');
     await terminalInput.focus();
-    await terminalInput.pressSequentially('echo LGT_E2E_READY', { delay: 5 });
-    await terminalInput.press('Enter');
+    await terminalInput.evaluate((element) => {
+      element.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          data: 'echo LGT_E2E_READY\r',
+          inputType: 'insertText',
+        }),
+      );
+    });
 
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
