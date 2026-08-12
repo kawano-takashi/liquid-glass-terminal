@@ -34,7 +34,7 @@
     "verify:release-tag": "node scripts/verify-release-tag.mjs",
     "verify:fuses": "node scripts/verify-fuses.mjs",
     "smoke:package": "node scripts/smoke-packaged.mjs",
-    "bootstrap:native": "node node_modules/electron/install.js && npm rebuild electron-winstaller --ignore-scripts=false && electron-rebuild --force --which-module node-pty",
+    "bootstrap:native": "node scripts/bootstrap-native.mjs",
     "rebuild:native": "electron-rebuild --force --which-module node-pty"
   },
   "dependencies": {
@@ -85,6 +85,12 @@
   },
   "allowScripts": {
     "electron-winstaller@5.4.4": true,
+    "fs-xattr@0.3.1": [
+      "darwin"
+    ],
+    "macos-alias@0.2.12": [
+      "darwin"
+    ],
     "node-pty@1.1.0": true
   }
 }

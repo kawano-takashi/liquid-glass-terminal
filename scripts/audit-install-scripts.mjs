@@ -5,7 +5,9 @@ const root = process.cwd();
 const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const allowed = new Set(
   Object.entries(manifest.allowScripts ?? {})
-    .filter(([, value]) => value === true)
+    .filter(
+      ([, value]) => value === true || (Array.isArray(value) && value.includes(process.platform)),
+    )
     .map(([name]) => name),
 );
 const discovered = new Set();

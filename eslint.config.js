@@ -7,7 +7,17 @@ const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
 }));
 
 export default tseslint.config(
-  { ignores: ['**/.vite/**', 'out/**', 'coverage/**', 'node_modules/**'] },
+  {
+    ignores: [
+      '**/.vite/**',
+      '.tools/**',
+      'coverage/**',
+      'node_modules/**',
+      'out/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
+  },
   {
     ...js.configs.recommended,
     files: ['**/*.{js,mjs}'],

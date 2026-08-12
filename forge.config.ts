@@ -11,7 +11,6 @@ import { flipFuses, FuseV1Options, FuseVersion } from '@electron/fuses';
 import type { FuseConfig } from '@electron/fuses';
 
 const iconPath = 'assets/icons/icon';
-const skipNativeRebuild = process.env.LGT_SKIP_NATIVE_REBUILD === '1';
 const e2eBuild = process.env.LGT_E2E_BUILD === '1';
 
 const fuseConfig = {
@@ -47,9 +46,8 @@ const config: ForgeConfig = {
       );
     },
   },
-  rebuildConfig: skipNativeRebuild
-    ? { ignoreModules: ['node-pty'] }
-    : { force: true, onlyModules: ['node-pty'], useCache: true },
+  // Native modules are rebuilt once by scripts/bootstrap-native.mjs before Forge runs.
+  rebuildConfig: { ignoreModules: ['node-pty'] },
   hooks: {
     packageAfterCopy: async (resolvedConfig, resourcesPath, _electronVersion, platform, arch) => {
       const applePlatform = platform === 'darwin' || platform === 'mas';
