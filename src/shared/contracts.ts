@@ -1,6 +1,7 @@
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
   updateSettings: 'settings:update',
+  previewGlassOpacity: 'appearance:preview-glass-opacity',
   requestSession: 'terminal:request-session',
   sessionPort: 'terminal:session-port',
   prepareDroppedPath: 'terminal:prepare-dropped-path',
@@ -20,9 +21,12 @@ export const IPC_CHANNELS = {
 export type LocaleMode = 'system' | 'en' | 'ja';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
-export type GlassPreset = 'clear' | 'balanced' | 'dense';
+export type LegacyGlassPreset = 'clear' | 'balanced' | 'dense';
 export type CursorStyle = 'block' | 'bar' | 'underline';
 export type GlassMode = 'acrylic' | 'vibrancy' | 'pseudo';
+export type GlassAvailability =
+  'active' | 'accessibility-disabled' | 'unsupported' | 'system-fallback';
+export type WindowsGlassState = 'active' | 'fallback' | 'high-contrast';
 export type ShellProfileKind =
   'powershell' | 'windows-powershell' | 'cmd' | 'git-bash' | 'wsl' | 'zsh' | 'bash' | 'posix';
 
@@ -30,7 +34,7 @@ export interface SettingsV1 {
   schemaVersion: 1;
   locale: LocaleMode;
   theme: ThemeMode;
-  glass: GlassPreset;
+  glass: LegacyGlassPreset;
   defaultProfileId: string;
   fontSize: number;
   cursorStyle: CursorStyle;
@@ -42,7 +46,23 @@ export interface SettingsV1 {
   firstRunHintsSeen: boolean;
 }
 
-export type SettingsPatch = Partial<Omit<SettingsV1, 'schemaVersion'>>;
+export interface SettingsV2 {
+  schemaVersion: 2;
+  locale: LocaleMode;
+  theme: ThemeMode;
+  glassOpacity: number;
+  defaultProfileId: string;
+  fontSize: number;
+  cursorStyle: CursorStyle;
+  cursorBlink: boolean;
+  bellSound: boolean;
+  scrollback: number;
+  warnMultilinePaste: boolean;
+  screenReaderMode: boolean;
+  firstRunHintsSeen: boolean;
+}
+
+export type SettingsPatch = Partial<Omit<SettingsV2, 'schemaVersion'>>;
 
 export interface ShellProfileDescriptor {
   id: string;
@@ -59,12 +79,13 @@ export interface SystemAppearance {
 
 export interface WindowAppearance extends SystemAppearance {
   glassMode: GlassMode;
+  glassAvailability: GlassAvailability;
 }
 
 export interface BootstrapState {
   appVersion: string;
   platform: NodeJS.Platform;
-  settings: SettingsV1;
+  settings: SettingsV2;
   profiles: ShellProfileDescriptor[];
   windowAppearance: WindowAppearance;
   launchCwdToken?: string;
@@ -123,7 +144,8 @@ export interface ContextMenuState {
 
 export interface PreloadApi {
   bootstrap(): Promise<BootstrapState>;
-  updateSettings(patch: SettingsPatch): Promise<SettingsV1>;
+  updateSettings(patch: SettingsPatch): Promise<SettingsV2>;
+  previewGlassOpacity(opacity: number): void;
   requestSession(request: SessionCreateRequest): void;
   prepareDroppedPath(sessionId: string, path: string): Promise<string | null>;
   openExternal(url: string): Promise<boolean>;

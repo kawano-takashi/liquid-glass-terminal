@@ -19,10 +19,13 @@ export const messages = {
     system: 'System',
     light: 'Light',
     dark: 'Dark',
-    glass: 'Glass density',
-    clearGlass: 'Clear',
-    balanced: 'Balanced',
-    dense: 'Dense',
+    glassOpacity: 'Glass opacity',
+    glassUnavailableAccessibility:
+      'Transparency is disabled by an accessibility preference. Your saved value is kept.',
+    glassUnavailableUnsupported:
+      'Adjustable transparency is unavailable on this platform. An opaque neutral surface is used.',
+    glassUnavailableSystemFallback:
+      'Windows is temporarily using the safe opaque backdrop. Your saved value is kept.',
     defaultShell: 'Default shell',
     automatic: 'Automatic',
     fontSize: 'Font size',
@@ -78,10 +81,13 @@ export const messages = {
     system: 'システム',
     light: 'ライト',
     dark: 'ダーク',
-    glass: 'ガラスの濃さ',
-    clearGlass: 'クリア',
-    balanced: 'バランス',
-    dense: '高密度',
+    glassOpacity: 'ガラスの不透明度',
+    glassUnavailableAccessibility:
+      'アクセシビリティ設定により透明効果を無効化しています。保存値は維持されます。',
+    glassUnavailableUnsupported:
+      'この環境では透明度を調整できません。不透明な中性色の表示を使用します。',
+    glassUnavailableSystemFallback:
+      'Windowsが一時的に安全な不透明背景へ切り替えています。保存値は維持されます。',
     defaultShell: '既定のシェル',
     automatic: '自動',
     fontSize: 'フォントサイズ',

@@ -4,7 +4,7 @@
 
 # Liquid Glass Terminal
 
-静かなリキッドグラス表現を備えた、ローカル完結型のElectronターミナルです。対応するWindows 11では公式Windows App SDKのAcrylic controller、macOSではVibrancyを利用し、Linuxと古いWindowsでは安定した疑似グラスへ切り替えます。
+中性のフロステッドグラス表現を備えた、ローカル完結型のElectronターミナルです。対応するWindows 11では調整済みのWindows App SDK Desktop Acrylic controller、macOSではVibrancyを利用し、Linuxと古いWindowsでは安定した不透明表示へ切り替えます。
 
 > **プレビュー版:** v0.1.0の成果物は未署名・未notarizeです。実行前にソースとリリースのchecksumを確認してください。
 
@@ -16,19 +16,21 @@
 - ドラッグ可能な複数タブ、シェル自動検出、検索、終了したシェルの再起動。
 - WindowsではPowerShell 7／Windows PowerShell／cmd／Git Bash／WSL、macOS/Linuxでは`$SHELL`／zsh／bashを検出。
 - 複数行paste確認、1 MiB超の必須確認、安全な外部リンク、実行しないファイル／フォルダーdrop。
-- 日本語・英語、システム／ライト／ダーク、3段階のグラス濃度、設定とウィンドウ位置の保存。
+- 日本語・英語、システム／ライト／ダーク、35〜85%をライブ調整できるガラス不透明度、設定とウィンドウ位置の保存。
 - 透明度低減、高コントラスト、動きの低減、任意のスクリーンリーダーモードへの対応。
 - telemetry、リモートコンテンツ、更新確認、crash upload、shell profileへのコード注入は一切なし。
 
 ## 対応環境
 
-| 環境    | 最低要件                   | 外観                                               | アーキテクチャ                 |
-| ------- | -------------------------- | -------------------------------------------------- | ------------------------------ |
-| Windows | Windows 10 x64             | Windows 11 22H2以降はAcrylic、それ以外は疑似グラス | x64                            |
-| macOS   | macOS 12                   | native Vibrancy                                    | Intel x64、Apple Silicon arm64 |
-| Linux   | Ubuntu 22.04以降／Fedora系 | 疑似グラス。GNOMEを主対象、KDEはbest effort        | x64                            |
+| 環境    | 最低要件                   | 外観                                                         | アーキテクチャ                 |
+| ------- | -------------------------- | ------------------------------------------------------------ | ------------------------------ |
+| Windows | Windows 10 x64             | Windows 11 22H2以降は調整可能なAcrylic、それ以外は不透明表示 | x64                            |
+| macOS   | macOS 12                   | 調整可能なnative Vibrancy                                    | Intel x64、Apple Silicon arm64 |
+| Linux   | Ubuntu 22.04以降／Fedora系 | 安定した中性色の不透明表示                                   | x64                            |
 
 LinuxとWindows 10では、背後のアプリが実際に透けることを保証しません。native実装はdesktop captureではなくcompositor backdropを使うため、画面収録の許可を要求せず、他windowのpixelも保持しません。全環境で通常のリサイズ可能なウィンドウを維持します。
+
+ガラス不透明度の既定値は60%で、1%刻みでライブ変更できます。高コントラスト、透明効果の低減、スクリーンリーダーモード、未対応環境、Windows compositorのfallbackでは安全な不透明表示へ切り替え、理由を表示してsliderを無効化します。保存値は維持され、条件が戻ると復元されます。
 
 ## ローカル開発
 

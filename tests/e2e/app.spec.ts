@@ -109,11 +109,32 @@ test('launches one terminal and opens settings', async () => {
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
     await expect(settingsDialog).toBeVisible();
+    const glassOpacity = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    await expect(glassOpacity).toHaveValue('60');
+    const overlayStyles = await page.evaluate(() => {
+      const drawerBackdrop = document.querySelector('.drawer-backdrop');
+      const settingsDrawer = document.querySelector('.settings-drawer');
+      if (!drawerBackdrop || !settingsDrawer) throw new Error('Glass overlays not found');
+      const backdrop = getComputedStyle(drawerBackdrop);
+      const drawer = getComputedStyle(settingsDrawer);
+      return {
+        backdrop: backdrop.backgroundColor,
+        drawerBorder: drawer.borderTopWidth,
+        drawerShadow: drawer.boxShadow,
+      };
+    });
+    expect(overlayStyles).toEqual({
+      backdrop: 'rgba(0, 0, 0, 0)',
+      drawerBorder: '0px',
+      drawerShadow: 'none',
+    });
     const screenReader = page.getByRole('checkbox', {
       name: /Screen reader mode|スクリーンリーダーモード/,
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
+    await expect(glassOpacity).toBeDisabled();
+    await expect(settingsDialog).toContainText(/accessibility preference|アクセシビリティ設定/);
     const accessibilityTree = page.locator('.xterm-accessibility-tree');
     await expect(accessibilityTree).toBeVisible();
     if (process.platform !== 'darwin') {
@@ -127,6 +148,45 @@ test('launches one terminal and opens settings', async () => {
     throw new Error(`${detail}\nPackaged Electron stderr:\n${electronStderr || '(empty)'}`);
   } finally {
     await application.close();
+    await removeTemporaryUserData(userData);
+  }
+});
+
+test('previews and persists Windows glass opacity', async () => {
+  test.skip(process.platform !== 'win32', 'Adjustable native Acrylic is Windows 11 specific.');
+
+  const executablePath = await findPackagedExecutable(path.resolve('out'));
+  const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-opacity-e2e-'));
+  let application: LaunchedApplication | undefined;
+  try {
+    application = await electron.launch({
+      executablePath,
+      args: [`--user-data-dir=${userData}`, '--cwd', process.cwd()],
+    });
+    let page = await application.firstWindow();
+    await expect(page.locator('.app-shell')).toBeVisible();
+    await page.getByRole('button', { name: /Settings|設定/ }).click();
+    let slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    test.skip(await slider.isDisabled(), 'The current Windows session is using a system fallback.');
+
+    await slider.fill('35');
+    await slider.dispatchEvent('pointerup');
+    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.35');
+    await page.waitForTimeout(250);
+    await application.close();
+
+    application = await electron.launch({
+      executablePath,
+      args: [`--user-data-dir=${userData}`, '--cwd', process.cwd()],
+    });
+    page = await application.firstWindow();
+    await expect(page.locator('.app-shell')).toBeVisible();
+    await page.getByRole('button', { name: /Settings|設定/ }).click();
+    slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    await expect(slider).toHaveValue('35');
+    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.35');
+  } finally {
+    if (application) await application.close().catch(() => undefined);
     await removeTemporaryUserData(userData);
   }
 });

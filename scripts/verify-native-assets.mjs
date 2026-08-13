@@ -62,7 +62,11 @@ if (process.platform === 'win32') {
     throw new Error('Packaged Windows Acrylic runtime manifest is invalid.');
   }
   const names = new Set(runtimeManifest.files.map((entry) => entry.name));
-  for (const required of ['Microsoft.WindowsAppRuntime.dll', 'Microsoft.UI.dll']) {
+  for (const required of [
+    'Microsoft.WindowsAppRuntime.dll',
+    'Microsoft.UI.dll',
+    'Microsoft.UI.Composition.SystemBackdrops.dll',
+  ]) {
     if (!names.has(required)) throw new Error(`Windows Acrylic runtime is missing ${required}.`);
   }
   for (const entry of runtimeManifest.files) {

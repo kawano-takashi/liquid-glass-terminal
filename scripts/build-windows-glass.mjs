@@ -7,6 +7,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nativeRoot = path.join(root, 'native', 'windows-glass');
 const distRoot = path.join(nativeRoot, 'dist');
 const runtimeRoot = path.join(distRoot, 'runtime');
+const runtimeAliases = [
+  {
+    source: 'wuceffectsi.dll',
+    target: 'Microsoft.UI.Composition.SystemBackdrops.dll',
+  },
+];
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -67,13 +73,22 @@ async function stageRuntime(arch) {
     for (const file of files) {
       const key = file.toLowerCase();
       if (staged.has(key)) throw new Error(`Duplicate Windows App SDK runtime file: ${file}`);
-      staged.set(key, { file, source });
+      staged.set(key, { file, source, sourceFile: file });
     }
   }
 
+  for (const alias of runtimeAliases) {
+    const source = staged.get(alias.source.toLowerCase());
+    if (!source)
+      throw new Error(`Windows App SDK runtime alias source is missing: ${alias.source}`);
+    const key = alias.target.toLowerCase();
+    if (staged.has(key)) throw new Error(`Duplicate Windows App SDK runtime file: ${alias.target}`);
+    staged.set(key, { file: alias.target, source: source.source, sourceFile: source.sourceFile });
+  }
+
   await mkdir(runtimeRoot, { recursive: true });
-  for (const { file, source } of staged.values()) {
-    await copyFile(path.join(source, file), path.join(runtimeRoot, file));
+  for (const { file, source, sourceFile } of staged.values()) {
+    await copyFile(path.join(source, sourceFile), path.join(runtimeRoot, file));
   }
 
   const files = [];

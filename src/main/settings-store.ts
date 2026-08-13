@@ -2,11 +2,12 @@ import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import Store from 'electron-store';
-import type { SettingsPatch, SettingsV1 } from '../shared/contracts';
+import type { SettingsPatch, SettingsV2 } from '../shared/contracts';
+import { migrateSettingsRecord } from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
 
 export class SettingsStore {
-  readonly #store: Store<SettingsV1>;
+  readonly #store: Store<Record<string, unknown>>;
   readonly recovered: boolean;
 
   constructor() {
@@ -27,22 +28,42 @@ export class SettingsStore {
     }
   }
 
-  private createStore(): Store<SettingsV1> {
-    return new Store<SettingsV1>({
+  private createStore(): Store<Record<string, unknown>> {
+    return new Store<Record<string, unknown>>({
       name: 'settings',
-      defaults: DEFAULT_SETTINGS,
+      defaults: { ...DEFAULT_SETTINGS },
       schema: SETTINGS_SCHEMA,
       clearInvalidConfig: false,
+      migrations: {
+        '0.1.0': (store) => {
+          store.store = migrateSettingsRecord(store.store);
+        },
+      },
     });
   }
 
-  get value(): SettingsV1 {
-    return { ...DEFAULT_SETTINGS, ...this.#store.store, schemaVersion: 1 };
+  get value(): SettingsV2 {
+    const stored = this.#store.store as unknown as SettingsV2;
+    return {
+      schemaVersion: 2,
+      locale: stored.locale,
+      theme: stored.theme,
+      glassOpacity: stored.glassOpacity,
+      defaultProfileId: stored.defaultProfileId,
+      fontSize: stored.fontSize,
+      cursorStyle: stored.cursorStyle,
+      cursorBlink: stored.cursorBlink,
+      bellSound: stored.bellSound,
+      scrollback: stored.scrollback,
+      warnMultilinePaste: stored.warnMultilinePaste,
+      screenReaderMode: stored.screenReaderMode,
+      firstRunHintsSeen: stored.firstRunHintsSeen,
+    };
   }
 
-  update(patch: SettingsPatch): SettingsV1 {
+  update(patch: SettingsPatch): SettingsV2 {
     for (const [key, value] of Object.entries(patch)) {
-      if (value !== undefined) this.#store.set(key as keyof SettingsV1, value);
+      if (value !== undefined) this.#store.set(key, value);
     }
     return this.value;
   }

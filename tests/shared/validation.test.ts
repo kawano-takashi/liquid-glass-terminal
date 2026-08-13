@@ -33,6 +33,16 @@ describe('IPC validation', () => {
     });
     expect(validateSettingsPatch({ nodeIntegration: true })).toBeNull();
   });
+
+  it('accepts only integer glass opacity values in the supported range', () => {
+    expect(validateSettingsPatch({ glassOpacity: 35 })).toEqual({ glassOpacity: 35 });
+    expect(validateSettingsPatch({ glassOpacity: 85 })).toEqual({ glassOpacity: 85 });
+    expect(validateSettingsPatch({ glassOpacity: 34 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 86 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 60.5 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: Number.NaN })).toBeNull();
+    expect(validateSettingsPatch({ glass: 'balanced' })).toBeNull();
+  });
 });
 
 describe('terminal input safety', () => {

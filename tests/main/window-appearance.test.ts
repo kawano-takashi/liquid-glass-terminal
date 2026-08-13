@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveGlassMode } from '../../src/main/window-appearance';
+import { resolveGlassAppearance } from '../../src/main/window-appearance';
 
 const normalAppearance = {
   resolvedTheme: 'dark' as const,
@@ -7,43 +7,58 @@ const normalAppearance = {
   reducedTransparency: false,
 };
 
-describe('resolveGlassMode', () => {
+describe('resolveGlassAppearance', () => {
   it('uses official Acrylic only on a supported Windows host', () => {
     expect(
-      resolveGlassMode({
+      resolveGlassAppearance({
         platform: 'win32',
         windowsAcrylicAvailable: true,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toBe('acrylic');
+    ).toEqual({ glassMode: 'acrylic', glassAvailability: 'active' });
     expect(
-      resolveGlassMode({
+      resolveGlassAppearance({
         platform: 'win32',
         windowsAcrylicAvailable: false,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toBe('pseudo');
+    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'unsupported' });
   });
 
   it('uses under-window Vibrancy on macOS and pseudo glass on Linux', () => {
     expect(
-      resolveGlassMode({
+      resolveGlassAppearance({
         platform: 'darwin',
         windowsAcrylicAvailable: false,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toBe('vibrancy');
+    ).toEqual({ glassMode: 'vibrancy', glassAvailability: 'active' });
     expect(
-      resolveGlassMode({
+      resolveGlassAppearance({
         platform: 'linux',
         windowsAcrylicAvailable: false,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toBe('pseudo');
+    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'unsupported' });
+  });
+
+  it.each([
+    ['fallback', 'system-fallback'],
+    ['high-contrast', 'accessibility-disabled'],
+  ] as const)('reports Windows controller state %s', (windowsGlassState, availability) => {
+    expect(
+      resolveGlassAppearance({
+        platform: 'win32',
+        windowsAcrylicAvailable: true,
+        windowsGlassState,
+        systemAppearance: normalAppearance,
+        screenReaderMode: false,
+      }),
+    ).toEqual({ glassMode: 'acrylic', glassAvailability: availability });
   });
 
   it.each([
@@ -52,7 +67,7 @@ describe('resolveGlassMode', () => {
     { highContrast: false, reducedTransparency: false, screenReaderMode: true },
   ])('forces an opaque fallback for accessibility: %o', (accessibility) => {
     expect(
-      resolveGlassMode({
+      resolveGlassAppearance({
         platform: 'win32',
         windowsAcrylicAvailable: true,
         systemAppearance: {
@@ -62,6 +77,6 @@ describe('resolveGlassMode', () => {
         },
         screenReaderMode: accessibility.screenReaderMode,
       }),
-    ).toBe('pseudo');
+    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' });
   });
 });

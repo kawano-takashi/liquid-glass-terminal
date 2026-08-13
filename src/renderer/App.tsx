@@ -10,11 +10,12 @@ import type {
   AppCommand,
   BootstrapState,
   SettingsPatch,
-  SettingsV1,
+  SettingsV2,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../shared/contracts';
 import { formatMessage, isMessageKey, messages, resolveLocale } from '../shared/i18n';
+import { GLASS_OPACITY_DEFAULT } from '../shared/settings';
 import { detectPasteRisk } from '../shared/validation';
 import { Dialog } from './components/Dialog';
 import { SearchBar } from './components/SearchBar';
@@ -106,8 +107,9 @@ function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState>();
-  const [settings, setSettings] = useState<SettingsV1>();
+  const [settings, setSettings] = useState<SettingsV2>();
   const [windowAppearance, setWindowAppearance] = useState<WindowAppearance>();
+  const [glassPreview, setGlassPreview] = useState(GLASS_OPACITY_DEFAULT);
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -121,12 +123,14 @@ export function App() {
   const [linkHover, setLinkHover] = useState<string>();
   const [bellFlash, setBellFlash] = useState(false);
   const terminalRefs = useRef(new Map<string, TerminalPaneHandle>());
-  const settingsRef = useRef<SettingsV1 | undefined>(undefined);
+  const settingsRef = useRef<SettingsV2 | undefined>(undefined);
   const tabsRef = useRef<TabState[]>([]);
   const activeIdRef = useRef<string | undefined>(undefined);
   const initialized = useRef(false);
   const toastSequence = useRef(1);
-  const pointerFrame = useRef<number | undefined>(undefined);
+  const glassPreviewRef = useRef(GLASS_OPACITY_DEFAULT);
+  const glassPreviewFrame = useRef<number | undefined>(undefined);
+  const glassPersistTimer = useRef<number | undefined>(undefined);
   const commandHandler = useRef<(command: AppCommand) => void>(() => undefined);
   const reducedMotion = useReducedMotion();
 
@@ -324,11 +328,49 @@ export function App() {
         if (previous) {
           settingsRef.current = previous;
           setSettings(previous);
+          if (patch.glassOpacity !== undefined) {
+            glassPreviewRef.current = previous.glassOpacity;
+            setGlassPreview(previous.glassOpacity);
+            window.liquidGlass.previewGlassOpacity(previous.glassOpacity);
+          }
         }
         toast(locale === 'ja' ? '設定を保存できませんでした。' : 'Could not save settings.');
       }
     },
     [locale, toast],
+  );
+
+  const commitGlassOpacity = useCallback(
+    (opacity = glassPreviewRef.current) => {
+      if (glassPersistTimer.current !== undefined) {
+        window.clearTimeout(glassPersistTimer.current);
+        glassPersistTimer.current = undefined;
+      }
+      if (settingsRef.current?.glassOpacity === opacity) return;
+      void updateSettings({ glassOpacity: opacity });
+    },
+    [updateSettings],
+  );
+
+  const previewGlassOpacity = useCallback(
+    (opacity: number) => {
+      glassPreviewRef.current = opacity;
+      setGlassPreview(opacity);
+      if (glassPreviewFrame.current === undefined) {
+        glassPreviewFrame.current = requestAnimationFrame(() => {
+          glassPreviewFrame.current = undefined;
+          window.liquidGlass.previewGlassOpacity(glassPreviewRef.current);
+        });
+      }
+      if (glassPersistTimer.current !== undefined) {
+        window.clearTimeout(glassPersistTimer.current);
+      }
+      glassPersistTimer.current = window.setTimeout(() => {
+        glassPersistTimer.current = undefined;
+        commitGlassOpacity();
+      }, 150);
+    },
+    [commitGlassOpacity],
   );
 
   useEffect(() => {
@@ -337,6 +379,9 @@ export function App() {
       if (!alive) return;
       setBootstrap(state);
       setSettings(state.settings);
+      settingsRef.current = state.settings;
+      glassPreviewRef.current = state.settings.glassOpacity;
+      setGlassPreview(state.settings.glassOpacity);
       setWindowAppearance(state.windowAppearance);
       if (state.startupNotice) toast(state.startupNotice);
       window.liquidGlass.rendererReady();
@@ -347,6 +392,18 @@ export function App() {
       offAppearance();
     };
   }, [toast]);
+
+  useEffect(
+    () => () => {
+      if (glassPreviewFrame.current !== undefined) {
+        cancelAnimationFrame(glassPreviewFrame.current);
+      }
+      if (glassPersistTimer.current !== undefined) {
+        window.clearTimeout(glassPersistTimer.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!bootstrap || !settings || initialized.current) return;
@@ -476,11 +533,6 @@ export function App() {
   }
 
   const activeTab = tabs.find((tab) => tab.id === activeId);
-  const highReadability =
-    windowAppearance.highContrast ||
-    windowAppearance.reducedTransparency ||
-    settings.screenReaderMode;
-
   const handleBell = (id: string) => {
     if (id === activeIdRef.current) {
       setBellFlash(true);
@@ -519,29 +571,19 @@ export function App() {
     activeTerminal()?.paste(quoted);
   };
 
-  const pointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    if (reducedMotion) return;
-    const { clientX, clientY } = event;
-    if (pointerFrame.current) cancelAnimationFrame(pointerFrame.current);
-    pointerFrame.current = requestAnimationFrame(() => {
-      document.documentElement.style.setProperty('--pointer-x', `${clientX}px`);
-      document.documentElement.style.setProperty('--pointer-y', `${clientY}px`);
-    });
-  };
-
   return (
     <main
       className="app-shell"
       data-theme={resolvedTheme}
-      data-glass={highReadability ? 'dense' : settings.glass}
       data-native-glass={windowAppearance.glassMode}
+      data-glass-availability={windowAppearance.glassAvailability}
       data-high-contrast={windowAppearance.highContrast}
       data-screen-reader={settings.screenReaderMode}
       data-platform={bootstrap.platform}
       data-bell={bellFlash}
-      onPointerMove={pointerMove}
+      style={{ '--glass-opacity': glassPreview / 100 } as React.CSSProperties}
     >
-      <div className="glass-light" aria-hidden="true" />
+      <div className="glass-tint" aria-hidden="true" />
       <div className="glass-noise" aria-hidden="true" />
       <TabBar
         tabs={tabs.map((tab) => ({
@@ -674,13 +716,18 @@ export function App() {
       <SettingsDrawer
         open={settingsOpen}
         settings={settings}
+        windowAppearance={windowAppearance}
+        glassOpacity={glassPreview}
         profiles={bootstrap.profiles}
         labels={t}
         onClose={() => {
+          commitGlassOpacity();
           setSettingsOpen(false);
           activeTerminal()?.focus();
         }}
         onChange={(patch) => void updateSettings(patch)}
+        onGlassPreview={previewGlassOpacity}
+        onGlassCommit={commitGlassOpacity}
       />
 
       {dialog?.kind === 'paste' && (

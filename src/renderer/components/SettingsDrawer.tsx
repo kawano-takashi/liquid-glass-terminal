@@ -1,6 +1,12 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import type { SettingsPatch, SettingsV1, ShellProfileDescriptor } from '../../shared/contracts';
+import type {
+  SettingsPatch,
+  SettingsV2,
+  ShellProfileDescriptor,
+  WindowAppearance,
+} from '../../shared/contracts';
+import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from '../../shared/settings';
 
 interface SettingsLabels {
   settings: string;
@@ -9,10 +15,10 @@ interface SettingsLabels {
   system: string;
   light: string;
   dark: string;
-  glass: string;
-  clearGlass: string;
-  balanced: string;
-  dense: string;
+  glassOpacity: string;
+  glassUnavailableAccessibility: string;
+  glassUnavailableUnsupported: string;
+  glassUnavailableSystemFallback: string;
   defaultShell: string;
   automatic: string;
   fontSize: string;
@@ -27,22 +33,39 @@ interface SettingsLabels {
 
 interface SettingsDrawerProps {
   open: boolean;
-  settings: SettingsV1;
+  settings: SettingsV2;
+  windowAppearance: WindowAppearance;
+  glassOpacity: number;
   profiles: ShellProfileDescriptor[];
   labels: SettingsLabels;
   onClose(): void;
   onChange(patch: SettingsPatch): void;
+  onGlassPreview(opacity: number): void;
+  onGlassCommit(opacity?: number): void;
 }
 
 export function SettingsDrawer({
   open,
   settings,
+  windowAppearance,
+  glassOpacity,
   profiles,
   labels,
   onClose,
   onChange,
+  onGlassPreview,
+  onGlassCommit,
 }: SettingsDrawerProps) {
   const panelRef = useRef<HTMLElement>(null);
+  const glassDisabled = windowAppearance.glassAvailability !== 'active';
+  const glassDisabledReason =
+    windowAppearance.glassAvailability === 'accessibility-disabled'
+      ? labels.glassUnavailableAccessibility
+      : windowAppearance.glassAvailability === 'system-fallback'
+        ? labels.glassUnavailableSystemFallback
+        : windowAppearance.glassAvailability === 'unsupported'
+          ? labels.glassUnavailableUnsupported
+          : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -95,7 +118,7 @@ export function SettingsDrawer({
             <span>{labels.language}</span>
             <select
               value={settings.locale}
-              onChange={(event) => onChange({ locale: event.target.value as SettingsV1['locale'] })}
+              onChange={(event) => onChange({ locale: event.target.value as SettingsV2['locale'] })}
             >
               <option value="system">{labels.system}</option>
               <option value="en">English</option>
@@ -123,25 +146,30 @@ export function SettingsDrawer({
             </div>
           </fieldset>
 
-          <fieldset className="segmented-setting">
-            <legend>{labels.glass}</legend>
-            <div className="segmented-control">
-              {(['clear', 'balanced', 'dense'] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  data-active={settings.glass === value}
-                  onClick={() => onChange({ glass: value })}
-                >
-                  {value === 'clear'
-                    ? labels.clearGlass
-                    : value === 'balanced'
-                      ? labels.balanced
-                      : labels.dense}
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <label className="setting-field range-field" data-disabled={glassDisabled}>
+            <span>{labels.glassOpacity}</span>
+            <output>{glassOpacity}%</output>
+            <input
+              type="range"
+              min={GLASS_OPACITY_MIN}
+              max={GLASS_OPACITY_MAX}
+              step="1"
+              value={glassOpacity}
+              disabled={glassDisabled}
+              aria-label={labels.glassOpacity}
+              aria-describedby={glassDisabledReason ? 'glass-opacity-reason' : undefined}
+              onChange={(event) => onGlassPreview(Number(event.target.value))}
+              onPointerUp={() => onGlassCommit()}
+              onPointerCancel={() => onGlassCommit()}
+              onKeyUp={() => onGlassCommit()}
+              onBlur={() => onGlassCommit()}
+            />
+            {glassDisabledReason && (
+              <small id="glass-opacity-reason" className="setting-reason">
+                {glassDisabledReason}
+              </small>
+            )}
+          </label>
 
           <label className="setting-field">
             <span>{labels.defaultShell}</span>
@@ -176,7 +204,7 @@ export function SettingsDrawer({
             <select
               value={settings.cursorStyle}
               onChange={(event) =>
-                onChange({ cursorStyle: event.target.value as SettingsV1['cursorStyle'] })
+                onChange({ cursorStyle: event.target.value as SettingsV2['cursorStyle'] })
               }
             >
               <option value="block">Block</option>

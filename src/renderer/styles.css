@@ -16,26 +16,21 @@
     'Yu Gothic UI',
     sans-serif;
   color-scheme: dark;
-  --pointer-x: 50vw;
-  --pointer-y: 10vh;
   --titlebar-height: 44px;
-  --radius-lg: 17px;
-  --radius-md: 11px;
-  --text: #f6f2ff;
-  --text-muted: #b8acc7;
-  --text-faint: #82758f;
-  --panel: rgba(29, 22, 39, 0.72);
-  --panel-raised: rgba(39, 29, 51, 0.86);
-  --terminal-tint: rgba(20, 15, 29, 0.58);
-  --line: rgba(255, 255, 255, 0.1);
-  --line-strong: rgba(255, 255, 255, 0.18);
-  --accent: #9d78e7;
-  --accent-cyan: #74dae8;
-  --accent-purple: #b683f1;
-  --danger: #ff768d;
-  --shadow: rgba(7, 4, 13, 0.38);
-  --glass-saturation: 1.25;
-  --glass-blur: 24px;
+  --radius-lg: 10px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --text: #f5f5f5;
+  --text-muted: #b9b9b9;
+  --text-faint: #878787;
+  --danger: #dc7880;
+  --glass-rgb: 24 24 24;
+  --glass-opacity: 0.6;
+  --control-fill: rgb(255 255 255 / 0.06);
+  --control-fill-hover: rgb(255 255 255 / 0.1);
+  --control-fill-strong: rgb(255 255 255 / 0.14);
+  --terminal-halo-color: rgb(0 0 0 / 0.72);
+  --glass-blur: 30px;
 }
 
 * {
@@ -63,13 +58,14 @@ select {
 }
 
 button {
+  border: 0;
   color: inherit;
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent-cyan);
+  outline: 2px solid color-mix(in srgb, var(--text) 78%, transparent);
   outline-offset: 2px;
 }
 
@@ -78,100 +74,63 @@ select:focus-visible {
   isolation: isolate;
   width: 100%;
   height: 100%;
-  color: var(--text);
-  background: linear-gradient(145deg, rgba(42, 32, 58, 0.28), rgba(16, 13, 24, 0.4)), var(--panel);
   overflow: hidden;
-}
-
-.app-shell[data-native-glass='pseudo'] {
-  background:
-    radial-gradient(circle at 16% -20%, rgba(80, 215, 231, 0.13), transparent 42%),
-    radial-gradient(circle at 88% 112%, rgba(177, 111, 239, 0.14), transparent 44%),
-    linear-gradient(145deg, #211a2d, #15121c 62%, #1b1425);
+  background: transparent;
+  color: var(--text);
 }
 
 .app-shell[data-theme='light'] {
   color-scheme: light;
-  --text: #211b2b;
-  --text-muted: #5f536b;
-  --text-faint: #897d92;
-  --panel: rgba(243, 239, 248, 0.72);
-  --panel-raised: rgba(255, 252, 255, 0.9);
-  --terminal-tint: rgba(249, 246, 252, 0.67);
-  --line: rgba(45, 32, 59, 0.11);
-  --line-strong: rgba(45, 32, 59, 0.2);
-  --accent: #7448ba;
-  --accent-cyan: #087f8e;
-  --accent-purple: #8150c2;
-  --danger: #b6244b;
-  --shadow: rgba(49, 33, 61, 0.19);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.4), rgba(225, 217, 234, 0.34)), var(--panel);
+  --text: #181818;
+  --text-muted: #4e4e4e;
+  --text-faint: #747474;
+  --danger: #a74850;
+  --glass-rgb: 244 244 244;
+  --control-fill: rgb(0 0 0 / 0.055);
+  --control-fill-hover: rgb(0 0 0 / 0.09);
+  --control-fill-strong: rgb(0 0 0 / 0.13);
+  --terminal-halo-color: rgb(255 255 255 / 0.78);
 }
 
-.app-shell[data-theme='light'][data-native-glass='pseudo'] {
-  background:
-    radial-gradient(circle at 16% -20%, rgba(80, 208, 222, 0.2), transparent 42%),
-    radial-gradient(circle at 88% 112%, rgba(163, 102, 221, 0.16), transparent 44%),
-    linear-gradient(145deg, #f5f1f8, #e8e1ee 62%, #eee8f3);
-}
-
-.app-shell[data-glass='clear'] {
-  --panel: rgba(27, 21, 37, 0.48);
-  --terminal-tint: rgba(18, 14, 26, 0.42);
-  --glass-blur: 18px;
-}
-
-.app-shell[data-theme='light'][data-glass='clear'] {
-  --panel: rgba(248, 245, 251, 0.5);
-  --terminal-tint: rgba(252, 250, 255, 0.48);
-}
-
-.app-shell[data-glass='dense'] {
-  --panel: rgba(27, 21, 37, 0.9);
-  --terminal-tint: rgba(19, 15, 27, 0.86);
-  --glass-blur: 32px;
-}
-
-.app-shell[data-theme='light'][data-glass='dense'] {
-  --panel: rgba(247, 243, 250, 0.94);
-  --terminal-tint: rgba(252, 249, 254, 0.93);
-}
-
-.app-shell[data-high-contrast='true'] {
-  --line: currentColor;
-  --line-strong: currentColor;
-  background: Canvas;
-  color: CanvasText;
-}
-
-.glass-light {
+.glass-tint,
+.glass-noise {
   position: absolute;
-  z-index: -1;
   inset: 0;
+  z-index: -2;
   pointer-events: none;
-  background: radial-gradient(
-    480px circle at var(--pointer-x) var(--pointer-y),
-    rgba(104, 224, 237, 0.12),
-    rgba(177, 121, 239, 0.06) 33%,
-    transparent 68%
-  );
-  transition: opacity 180ms ease;
+}
+
+.glass-tint {
+  background: rgb(var(--glass-rgb) / var(--glass-opacity));
+}
+
+.app-shell[data-native-glass='acrylic'] .glass-tint {
+  background: transparent;
+}
+
+.app-shell[data-native-glass='pseudo'] .glass-tint {
+  background: rgb(var(--glass-rgb));
 }
 
 .glass-noise {
-  position: absolute;
   z-index: -1;
-  inset: 0;
-  opacity: 0.045;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(117deg, transparent 0 3px, rgba(255, 255, 255, 0.32) 4px 4.5px),
-    repeating-linear-gradient(27deg, transparent 0 5px, rgba(0, 0, 0, 0.25) 5.5px 6px);
-  background-size:
-    97px 83px,
-    79px 113px;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
   mix-blend-mode: soft-light;
+}
+
+.app-shell[data-native-glass='acrylic'] .glass-noise {
+  opacity: 0.01;
+}
+
+.app-shell[data-glass-availability='accessibility-disabled'] .glass-noise {
+  display: none;
+}
+
+.app-shell[data-high-contrast='true'] {
+  background: Canvas;
+  color: CanvasText;
 }
 
 .titlebar {
@@ -181,10 +140,7 @@ select:focus-visible {
   align-items: stretch;
   height: var(--titlebar-height);
   padding-left: 8px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 72%, transparent);
-  box-shadow: 0 1px 14px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  background: transparent;
   -webkit-app-region: drag;
 }
 
@@ -222,15 +178,9 @@ select:focus-visible {
   max-width: 230px;
   height: 34px;
   margin: 5px 2px;
-  border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-}
-
-.tab-shell:has(.tab-button[data-active='true']) {
-  border-color: var(--line-strong);
-  background: color-mix(in srgb, var(--panel-raised) 82%, transparent);
-  box-shadow: 0 7px 18px var(--shadow);
+  background: transparent;
 }
 
 .tab-shell[data-dragging='true'] {
@@ -241,11 +191,10 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
   width: 100%;
+  min-width: 0;
   height: 100%;
   padding: 0 30px 0 10px;
-  border: 0;
   background: transparent;
   color: var(--text-muted);
   cursor: default;
@@ -255,18 +204,29 @@ select:focus-visible {
   color: var(--text);
 }
 
-.tab-profile-dot {
+.tab-button[data-active='true'] .tab-title {
+  font-weight: 700;
+}
+
+.tab-profile-dot,
+.tab-bell {
   flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.tab-profile-dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, var(--accent-cyan), var(--accent-purple));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-purple) 60%, transparent);
 }
 
 .tab-profile-dot[data-exited='true'] {
   background: var(--text-faint);
-  box-shadow: none;
+}
+
+.tab-bell {
+  width: 6px;
+  height: 6px;
 }
 
 .tab-title {
@@ -277,14 +237,6 @@ select:focus-visible {
   font-weight: 560;
 }
 
-.tab-bell {
-  flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-cyan);
-}
-
 .tab-close {
   position: absolute;
   right: 5px;
@@ -293,8 +245,7 @@ select:focus-visible {
   width: 21px;
   height: 21px;
   padding: 0;
-  border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-faint);
   opacity: 0;
@@ -308,8 +259,10 @@ select:focus-visible {
 }
 
 .tab-close:hover,
-.icon-button:hover {
-  background: color-mix(in srgb, var(--text) 9%, transparent);
+.icon-button:hover,
+.profile-menu button:hover,
+.first-run-hint button:hover {
+  background: var(--control-fill-hover);
   color: var(--text);
 }
 
@@ -327,8 +280,7 @@ select:focus-visible {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   cursor: default;
@@ -337,8 +289,9 @@ select:focus-visible {
 
 .icon-button[data-active='true'],
 .icon-button[aria-pressed='true'] {
-  color: var(--accent-cyan);
-  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
 }
 
 .new-tab {
@@ -352,16 +305,15 @@ select:focus-visible {
 
 .profile-menu {
   position: absolute;
-  z-index: 80;
   top: 38px;
   left: 0;
+  z-index: 80;
   min-width: 210px;
   padding: 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--panel-raised);
-  box-shadow: 0 18px 48px var(--shadow);
-  backdrop-filter: blur(28px) saturate(1.2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: transparent;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1);
 }
 
 .profile-menu button {
@@ -371,14 +323,9 @@ select:focus-visible {
   gap: 18px;
   width: 100%;
   padding: 9px 10px;
-  border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   text-align: left;
-}
-
-.profile-menu button:hover {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .profile-menu small {
@@ -407,16 +354,7 @@ select:focus-visible {
   position: absolute;
   inset: var(--titlebar-height) 0 0;
   overflow: hidden;
-  background: var(--terminal-tint);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
-}
-
-.terminal-stage::before {
-  position: absolute;
-  inset: 0;
-  content: '';
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 20%);
+  background: transparent;
 }
 
 .terminal-slot,
@@ -458,6 +396,27 @@ select:focus-visible {
   scrollbar-width: thin;
 }
 
+.xterm-screen canvas {
+  filter: drop-shadow(0 0 0.55px var(--terminal-halo-color));
+}
+
+.xterm-rows {
+  text-shadow: 0 0 0.55px var(--terminal-halo-color);
+}
+
+.exit-card,
+.search-bar,
+.link-preview,
+.first-run-hint,
+.settings-drawer,
+.modal-panel,
+.toast {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: transparent;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1);
+}
+
 .exit-card {
   position: absolute;
   right: 20px;
@@ -466,37 +425,29 @@ select:focus-visible {
   align-items: center;
   gap: 14px;
   padding: 9px 10px 9px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 11px;
-  background: var(--panel-raised);
   color: var(--text-muted);
   font-size: 12px;
-  box-shadow: 0 12px 32px var(--shadow);
-  backdrop-filter: blur(24px);
 }
 
 .button {
   min-height: 34px;
   padding: 0 15px;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--panel-raised) 80%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--control-fill);
+  color: var(--text);
   font-weight: 600;
 }
 
 .button:hover {
-  filter: brightness(1.08);
+  background: var(--control-fill-hover);
 }
 
 .button.primary {
-  border-color: color-mix(in srgb, var(--accent-purple) 60%, transparent);
-  background: linear-gradient(135deg, rgba(83, 183, 202, 0.82), rgba(132, 77, 188, 0.88));
-  color: white;
+  background: var(--control-fill-strong);
 }
 
 .button.danger {
-  border-color: color-mix(in srgb, var(--danger) 64%, transparent);
-  background: color-mix(in srgb, var(--danger) 22%, var(--panel-raised));
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
 }
 
@@ -520,7 +471,7 @@ select:focus-visible {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-cyan);
+  background: var(--text-muted);
   animation: opening-pulse 1s ease-in-out infinite;
 }
 
@@ -533,18 +484,13 @@ select:focus-visible {
 
 .search-bar {
   position: absolute;
-  z-index: 35;
   top: calc(var(--titlebar-height) + 10px);
   right: 12px;
+  z-index: 35;
   display: flex;
   align-items: center;
   gap: 3px;
   padding: 5px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--panel-raised);
-  box-shadow: 0 16px 38px var(--shadow);
-  backdrop-filter: blur(28px) saturate(1.2);
 }
 
 .search-bar input {
@@ -552,8 +498,8 @@ select:focus-visible {
   height: 29px;
   padding: 0 9px;
   border: 0;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--control-fill);
   color: var(--text);
   user-select: text;
 }
@@ -566,15 +512,11 @@ select:focus-visible {
 
 .link-preview {
   position: absolute;
-  z-index: 34;
   bottom: 8px;
   left: 10px;
+  z-index: 34;
   max-width: calc(100% - 20px);
   padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--panel-raised);
   color: var(--text-muted);
   font-size: 11px;
   text-overflow: ellipsis;
@@ -583,18 +525,14 @@ select:focus-visible {
 
 .first-run-hint {
   position: absolute;
-  z-index: 30;
   left: 50%;
   bottom: 16px;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 14px;
   max-width: min(620px, calc(100% - 32px));
   padding: 10px 12px 10px 15px;
-  border: 1px solid var(--line-strong);
-  border-radius: 11px;
-  background: var(--panel-raised);
-  box-shadow: 0 14px 40px var(--shadow);
   color: var(--text-muted);
   font-size: 12px;
   transform: translateX(-50%);
@@ -603,17 +541,16 @@ select:focus-visible {
 .first-run-hint button {
   flex: 0 0 auto;
   padding: 5px 9px;
-  border: 0;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: var(--radius-sm);
+  background: transparent;
 }
 
 .drawer-backdrop {
   position: absolute;
-  z-index: 45;
   inset: 0;
+  z-index: 45;
   visibility: hidden;
-  background: rgba(5, 3, 9, 0.2);
+  background: transparent;
   opacity: 0;
   transition: opacity 180ms ease;
 }
@@ -625,17 +562,12 @@ select:focus-visible {
 
 .settings-drawer {
   position: absolute;
-  z-index: 50;
   top: 8px;
   right: 8px;
   bottom: 8px;
+  z-index: 50;
   width: min(370px, calc(100% - 24px));
-  border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: color-mix(in srgb, var(--panel-raised) 94%, transparent);
-  box-shadow: -18px 0 60px var(--shadow);
-  backdrop-filter: blur(36px) saturate(1.25);
   transform: translateX(calc(100% + 18px));
   visibility: hidden;
   transition:
@@ -653,7 +585,6 @@ select:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   padding: 22px 20px 16px;
-  border-bottom: 1px solid var(--line);
 }
 
 .drawer-header h2 {
@@ -662,7 +593,7 @@ select:focus-visible {
 }
 
 .eyebrow {
-  color: var(--accent-cyan);
+  color: var(--text-faint);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.15em;
@@ -693,19 +624,20 @@ select:focus-visible {
   width: 100%;
   height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--control-fill);
   color: var(--text);
+}
+
+.setting-field select:hover,
+.setting-field input:not([type='range']):hover,
+.search-bar input:hover {
+  background: var(--control-fill-hover);
 }
 
 .range-field {
   grid-template-columns: 1fr auto;
-}
-
-.range-field input {
-  grid-column: 1 / -1;
-  accent-color: var(--accent);
 }
 
 .range-field output {
@@ -713,29 +645,61 @@ select:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.range-field input[type='range'] {
+  grid-column: 1 / -1;
+  height: 18px;
+  appearance: none;
+  background: transparent;
+}
+
+.range-field input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--control-fill-strong);
+}
+
+.range-field input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  appearance: none;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+.range-field[data-disabled='true'] {
+  opacity: 0.64;
+}
+
+.setting-reason {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.45;
+}
+
 .segmented-control {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
 }
 
 .segmented-control button {
   height: 31px;
-  border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font-size: 11px;
 }
 
 .segmented-control button[data-active='true'] {
-  background: color-mix(in srgb, var(--accent) 18%, var(--panel-raised));
-  box-shadow: 0 3px 10px var(--shadow);
+  background: transparent;
   color: var(--text);
+  font-weight: 700;
 }
 
 .toggle-setting {
@@ -745,30 +709,46 @@ select:focus-visible {
 }
 
 .toggle-setting input {
+  position: relative;
   width: 34px;
   height: 19px;
   margin: 0;
-  accent-color: var(--accent);
+  appearance: none;
+  border-radius: 10px;
+  background: var(--control-fill-strong);
+}
+
+.toggle-setting input::before {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  content: '';
+  transition: transform 120ms ease;
+}
+
+.toggle-setting input:checked::before {
+  background: var(--text);
+  transform: translateX(15px);
 }
 
 .modal-backdrop {
   position: absolute;
-  z-index: 90;
   inset: 0;
+  z-index: 90;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(5, 3, 9, 0.43);
-  backdrop-filter: blur(7px);
+  background: transparent;
 }
 
 .modal-panel {
   width: min(520px, 100%);
   padding: 22px;
-  border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: var(--panel-raised);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
 }
 
 .modal-panel h2 {
@@ -785,10 +765,10 @@ select:focus-visible {
 .paste-preview {
   max-height: 260px;
   padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  border: 0;
+  border-radius: var(--radius-md);
   overflow: auto;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
+  background: var(--control-fill);
   color: var(--text);
   font-family: 'Cascadia Mono PL', monospace;
   font-size: 11px;
@@ -807,9 +787,9 @@ select:focus-visible {
 
 .toast-region {
   position: absolute;
-  z-index: 100;
   right: 14px;
   bottom: 14px;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -820,10 +800,6 @@ select:focus-visible {
 .toast {
   max-width: min(420px, calc(100vw - 28px));
   padding: 10px 13px;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: var(--panel-raised);
-  box-shadow: 0 12px 34px var(--shadow);
   color: var(--text);
   font-size: 12px;
   animation: toast-in 180ms ease-out;
@@ -843,8 +819,8 @@ select:focus-visible {
   gap: 12px;
   width: 100%;
   height: 100%;
-  background: #17131f;
-  color: #ddd4e9;
+  background: transparent;
+  color: var(--text-muted);
   font:
     600 13px/1 ui-sans-serif,
     sans-serif;
@@ -853,14 +829,12 @@ select:focus-visible {
 .brand-orb {
   width: 20px;
   height: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 58% 42% 55% 45%;
-  background: linear-gradient(145deg, #72dce9, #9e68db);
-  box-shadow: 0 0 18px rgba(128, 204, 232, 0.34);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text) 20%, transparent);
 }
 
 .app-shell[data-bell='true'] .terminal-stage {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-cyan) 75%, transparent);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 @media (max-width: 780px) {
@@ -887,14 +861,13 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-
-  .glass-light {
-    opacity: 0;
-  }
 }
 
 @media (forced-colors: active) {
-  .glass-light,
+  .glass-tint {
+    background: Canvas !important;
+  }
+
   .glass-noise {
     display: none;
   }
@@ -902,9 +875,11 @@ select:focus-visible {
   .titlebar,
   .terminal-stage,
   .settings-drawer,
-  .modal-panel {
-    forced-color-adjust: none;
+  .modal-panel,
+  .profile-menu,
+  .search-bar {
     background: Canvas;
     color: CanvasText;
+    forced-color-adjust: none;
   }
 }

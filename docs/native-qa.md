@@ -6,11 +6,12 @@ Record the application version, OS build, display scale, GPU, compositor/session
 
 ## Common
 
-- [ ] Window opens at 1100×720, honors 720×420 minimum, resizes smoothly, maximizes, restores, and keeps its shadow.
+- [ ] Window opens at 1100×720, honors 720×420 minimum, resizes smoothly, maximizes, and restores without a visible app-drawn border or shadow.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
-- [ ] Terminal remains readable in light/dark and Clear/Balanced/Dense; text is never refracted.
-- [ ] Pointer reflection stops when idle/unfocused and disappears with reduced motion.
-- [ ] High contrast, reduced transparency, and screen-reader mode detach native material, become fully opaque, then restore the chosen preset when disabled.
+- [ ] At the 60% default, large shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable in light and dark themes.
+- [ ] The 35% and 85% endpoints are visibly different; changes preview live in 1% steps and survive restart.
+- [ ] Settings, search, menus, dialogs, and toasts add no backdrop dimming, cumulative tint, visible rim, or shadow.
+- [ ] High contrast, reduced transparency, and screen-reader mode detach native material, become fully opaque, disable the slider with a reason, then restore the saved opacity when disabled.
 - [ ] No screen-capture or screen-recording permission prompt appears.
 - [ ] 100%, 150%, and 200% scale show a sharp icon, titlebar controls, xterm glyphs, and drag targets.
 - [ ] Keyboard, Edit menu, and terminal context menu paste exactly once into the active terminal.
@@ -20,7 +21,10 @@ Record the application version, OS build, display scale, GPU, compositor/session
 ## Windows
 
 - [ ] Windows 11 22H2+ shows Acrylic behind a normal resizable/maximizable window.
-- [ ] Acrylic remains visible when the window loses focus, and light/dark theme changes update without restarting.
+- [ ] Acrylic remains visible when the window loses focus, and light/dark theme changes update neutral tint and luminosity without restarting.
+- [ ] Native Acrylic reports Active/Fallback/HighContrast correctly; Fallback is opaque and preserves the saved slider value.
+- [ ] The DWM colored rim is absent, corners use the small preference, and resize/snap/maximize remain functional.
+- [ ] Battery saver, Remote Desktop, disabled Windows transparency, and insufficient compositor capability use the documented safe fallback.
 - [ ] A package works after uninstalling the machine-wide Windows App Runtime (the self-contained DLLs are beside the executable).
 - [ ] Windows 10 uses the opaque pseudo-glass fallback without broken transparency.
 - [ ] PowerShell 7, Windows PowerShell, cmd, Git Bash, and installed non-system WSL distributions are detected correctly.

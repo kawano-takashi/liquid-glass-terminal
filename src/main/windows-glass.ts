@@ -1,12 +1,42 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { app, type BrowserWindow } from 'electron';
-import type { SystemAppearance } from '../shared/contracts';
+import type { SystemAppearance, WindowsGlassState } from '../shared/contracts';
+
+interface WindowsGlassOptions {
+  theme: 'light' | 'dark';
+  highContrast: boolean;
+  tintOpacity: number;
+  luminosityOpacity: number;
+  neutralTone: number;
+}
+
+export interface WindowsAcrylicValues {
+  tintOpacity: number;
+  luminosityOpacity: number;
+  neutralTone: number;
+}
+
+export function resolveWindowsAcrylicValues(
+  theme: 'light' | 'dark',
+  glassOpacity: number,
+): WindowsAcrylicValues {
+  const tintOpacity = Math.min(0.85, Math.max(0.35, glassOpacity / 100));
+  return {
+    tintOpacity,
+    luminosityOpacity: Math.min(1, Math.max(0, 0.15 + 0.88 * tintOpacity)),
+    neutralTone: theme === 'dark' ? 24 : 244,
+  };
+}
 
 interface WindowsGlassAddon {
   isSupported(): boolean;
-  attach(handle: Buffer, theme: 'light' | 'dark', highContrast: boolean): boolean;
-  update(theme: 'light' | 'dark', highContrast: boolean): boolean;
+  attach(
+    handle: Buffer,
+    options: WindowsGlassOptions,
+    onStateChanged: (state: WindowsGlassState) => void,
+  ): WindowsGlassState | false;
+  update(options: WindowsGlassOptions): WindowsGlassState | false;
   detach(): void;
 }
 
@@ -15,6 +45,8 @@ export class WindowsGlass {
   private supported: boolean | undefined;
   private attachedWindowId: number | undefined;
   private reportedError = false;
+
+  constructor(private readonly onStateChanged: (state: WindowsGlassState) => void) {}
 
   isSupported(): boolean {
     if (process.platform !== 'win32') return false;
@@ -28,23 +60,28 @@ export class WindowsGlass {
     return this.supported;
   }
 
-  apply(window: BrowserWindow, appearance: SystemAppearance): boolean {
-    if (!this.isSupported()) return false;
+  apply(
+    window: BrowserWindow,
+    appearance: SystemAppearance,
+    glassOpacity: number,
+  ): WindowsGlassState | undefined {
+    if (!this.isSupported()) return undefined;
     try {
       const addon = this.loadAddon();
-      if (
-        this.attachedWindowId === window.id &&
-        addon.update(appearance.resolvedTheme, appearance.highContrast)
-      ) {
-        return true;
+      const options: WindowsGlassOptions = {
+        theme: appearance.resolvedTheme,
+        highContrast: appearance.highContrast,
+        ...resolveWindowsAcrylicValues(appearance.resolvedTheme, glassOpacity),
+      };
+      let state: WindowsGlassState | false;
+      if (this.attachedWindowId === window.id && (state = addon.update(options)) !== false) {
+        return state;
       }
-      const attached = addon.attach(
-        window.getNativeWindowHandle(),
-        appearance.resolvedTheme,
-        appearance.highContrast,
+      state = addon.attach(window.getNativeWindowHandle(), options, (nextState) =>
+        this.handleStateChanged(nextState),
       );
-      this.attachedWindowId = attached ? window.id : undefined;
-      return attached;
+      this.attachedWindowId = state === false ? undefined : window.id;
+      return state === false ? undefined : state;
     } catch (error: unknown) {
       this.attachedWindowId = undefined;
       try {
@@ -53,8 +90,13 @@ export class WindowsGlass {
         // The opaque renderer fallback remains safe even if native cleanup also fails.
       }
       this.report(error);
-      return false;
+      return undefined;
     }
+  }
+
+  private handleStateChanged(state: WindowsGlassState): void {
+    if (!['active', 'fallback', 'high-contrast'].includes(state)) return;
+    this.onStateChanged(state);
   }
 
   detach(): void {

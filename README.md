@@ -4,7 +4,7 @@
 
 # Liquid Glass Terminal
 
-A local-first Electron terminal with a quiet liquid-glass interface. It uses the official Windows App SDK Acrylic controller on supported Windows 11 systems, Vibrancy on macOS, and a stable pseudo-glass treatment on Linux and older Windows versions.
+A local-first Electron terminal with a neutral frosted-glass interface. It uses a customized Windows App SDK Desktop Acrylic controller on supported Windows 11 systems, Vibrancy on macOS, and a stable opaque treatment on Linux and older Windows versions.
 
 > **Preview:** v0.1.0 is an unsigned, unnotarized preview. Review the source and release checksums before running packaged artifacts.
 
@@ -16,19 +16,21 @@ A local-first Electron terminal with a quiet liquid-glass interface. It uses the
 - A single window with draggable tabs, shell profile discovery, search, and restartable exited sessions.
 - Windows PowerShell 7/Windows PowerShell/cmd/Git Bash/WSL discovery; `$SHELL`, zsh, and bash discovery on macOS/Linux.
 - Multiline paste confirmation, mandatory confirmation above 1 MiB, safe external links, and insert-only file/folder drop.
-- English and Japanese UI, system/light/dark themes, three glass densities, and persisted settings/window geometry.
+- English and Japanese UI, system/light/dark themes, live 35–85% glass opacity, and persisted settings/window geometry.
 - Reduced-transparency, high-contrast, reduced-motion, and opt-in screen-reader adaptations.
 - No telemetry, remote content, update checks, crash uploads, or shell-profile injection.
 
 ## Platform behavior
 
-| Platform | Minimum                     | Visual material                                               | Architectures                  |
-| -------- | --------------------------- | ------------------------------------------------------------- | ------------------------------ |
-| Windows  | Windows 10 x64              | Acrylic on Windows 11 22H2+; pseudo glass otherwise           | x64                            |
-| macOS    | macOS 12                    | Native Vibrancy                                               | Intel x64, Apple Silicon arm64 |
-| Linux    | Ubuntu 22.04+/Fedora family | Pseudo glass; GNOME is the primary target, KDE is best effort | x64                            |
+| Platform | Minimum                     | Visual material                                          | Architectures                  |
+| -------- | --------------------------- | -------------------------------------------------------- | ------------------------------ |
+| Windows  | Windows 10 x64              | Adjustable Acrylic on Windows 11 22H2+; opaque otherwise | x64                            |
+| macOS    | macOS 12                    | Adjustable native Vibrancy                               | Intel x64, Apple Silicon arm64 |
+| Linux    | Ubuntu 22.04+/Fedora family | Stable opaque neutral surface                            | x64                            |
 
 Linux and Windows 10 intentionally do not promise visibility of applications behind the terminal. The native implementations use compositor backdrops rather than desktop capture, so the app does not request screen-recording permission or retain pixels from other windows. A normal resizable window is preserved on every platform.
+
+Glass opacity defaults to 60% and changes live in 1% steps. High contrast, reduced transparency, screen-reader mode, an unsupported platform, or a Windows compositor fallback switches to a safe opaque surface, disables the slider with an explanation, and preserves the saved value for later restoration.
 
 ## Develop locally
 

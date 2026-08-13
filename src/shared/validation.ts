@@ -1,13 +1,13 @@
 import type {
   ContextMenuState,
   CursorStyle,
-  GlassPreset,
   LocaleMode,
   RendererToPtyMessage,
   SessionCreateRequest,
   SettingsPatch,
   ThemeMode,
 } from './contracts';
+import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from './settings';
 
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,80}$/;
 const SESSION_ID = /^[a-f0-9-]{20,80}$/;
@@ -73,7 +73,7 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   const allowed = new Set([
     'locale',
     'theme',
-    'glass',
+    'glassOpacity',
     'defaultProfileId',
     'fontSize',
     'cursorStyle',
@@ -97,10 +97,10 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
       return null;
     patch.theme = value.theme as ThemeMode;
   }
-  if (value.glass !== undefined) {
-    if (typeof value.glass !== 'string' || !['clear', 'balanced', 'dense'].includes(value.glass))
-      return null;
-    patch.glass = value.glass as GlassPreset;
+  if (value.glassOpacity !== undefined) {
+    const opacity = validateGlassOpacity(value.glassOpacity);
+    if (opacity === null) return null;
+    patch.glassOpacity = opacity;
   }
   if (value.defaultProfileId !== undefined) {
     if (typeof value.defaultProfileId !== 'string' || value.defaultProfileId.length > 200)
@@ -136,6 +136,19 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
     patch.scrollback = Math.min(1_000_000, Math.max(1_000, Math.round(value.scrollback)));
   }
   return patch;
+}
+
+export function validateGlassOpacity(value: unknown): number | null {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < GLASS_OPACITY_MIN ||
+    value > GLASS_OPACITY_MAX
+  ) {
+    return null;
+  }
+  return value;
 }
 
 export function isContextMenuState(value: unknown): value is ContextMenuState {

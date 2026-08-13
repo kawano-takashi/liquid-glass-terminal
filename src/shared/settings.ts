@@ -1,10 +1,14 @@
-import type { SettingsV1 } from './contracts';
+import type { SettingsV2 } from './contracts';
 
-export const DEFAULT_SETTINGS: SettingsV1 = {
-  schemaVersion: 1,
+export const GLASS_OPACITY_MIN = 35;
+export const GLASS_OPACITY_MAX = 85;
+export const GLASS_OPACITY_DEFAULT = 60;
+
+export const DEFAULT_SETTINGS: SettingsV2 = {
+  schemaVersion: 2,
   locale: 'system',
   theme: 'system',
-  glass: 'balanced',
+  glassOpacity: GLASS_OPACITY_DEFAULT,
   defaultProfileId: 'auto',
   fontSize: 14,
   cursorStyle: 'block',
@@ -17,13 +21,15 @@ export const DEFAULT_SETTINGS: SettingsV1 = {
 };
 
 export const SETTINGS_SCHEMA = {
-  schemaVersion: { type: 'number', enum: [1], default: 1 },
+  schemaVersion: { type: 'number', enum: [2], default: 2 },
   locale: { type: 'string', enum: ['system', 'en', 'ja'], default: 'system' },
   theme: { type: 'string', enum: ['system', 'light', 'dark'], default: 'system' },
-  glass: {
-    type: 'string',
-    enum: ['clear', 'balanced', 'dense'],
-    default: 'balanced',
+  glassOpacity: {
+    type: 'number',
+    minimum: GLASS_OPACITY_MIN,
+    maximum: GLASS_OPACITY_MAX,
+    multipleOf: 1,
+    default: GLASS_OPACITY_DEFAULT,
   },
   defaultProfileId: { type: 'string', maxLength: 200, default: 'auto' },
   fontSize: { type: 'number', minimum: 10, maximum: 32, default: 14 },

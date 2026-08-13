@@ -27,27 +27,41 @@ $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::High
 $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
-$graphics.DrawImage($sourceImage, 0, 0, 1024, 1024)
+
+$colorMatrix = New-Object System.Drawing.Imaging.ColorMatrix
+$colorMatrix.Matrix00 = 0.299
+$colorMatrix.Matrix01 = 0.299
+$colorMatrix.Matrix02 = 0.299
+$colorMatrix.Matrix10 = 0.587
+$colorMatrix.Matrix11 = 0.587
+$colorMatrix.Matrix12 = 0.587
+$colorMatrix.Matrix20 = 0.114
+$colorMatrix.Matrix21 = 0.114
+$colorMatrix.Matrix22 = 0.114
+$imageAttributes = New-Object System.Drawing.Imaging.ImageAttributes
+$imageAttributes.SetColorMatrix($colorMatrix)
+$canvasRect = New-Object System.Drawing.Rectangle 0, 0, 1024, 1024
+$graphics.DrawImage(
+  $sourceImage,
+  $canvasRect,
+  0,
+  0,
+  $sourceImage.Width,
+  $sourceImage.Height,
+  [System.Drawing.GraphicsUnit]::Pixel,
+  $imageAttributes
+)
 
 $fontCollection = New-Object System.Drawing.Text.PrivateFontCollection
 $fontCollection.AddFontFile($fontPath)
 $fontFamily = $fontCollection.Families[0]
-$glyphFont = New-Object System.Drawing.Font $fontFamily, 126, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+$glyphFont = New-Object System.Drawing.Font $fontFamily, 170, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
 $format = New-Object System.Drawing.StringFormat ([System.Drawing.StringFormat]::GenericTypographic)
 $format.Alignment = [System.Drawing.StringAlignment]::Center
 $format.LineAlignment = [System.Drawing.StringAlignment]::Center
 
-$glyphRect = New-Object System.Drawing.RectangleF 306, 704, 412, 184
-$shadowRect = New-Object System.Drawing.RectangleF 306, 710, 412, 184
-$shadow = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(126, 8, 6, 14))
-$graphics.DrawString('>_', $glyphFont, $shadow, $shadowRect, $format)
-
-$glyphBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-  $glyphRect,
-  [System.Drawing.Color]::FromArgb(255, 178, 245, 255),
-  [System.Drawing.Color]::FromArgb(255, 221, 190, 255),
-  0
-)
+$glyphRect = New-Object System.Drawing.RectangleF 250, 390, 524, 244
+$glyphBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 248, 248, 248))
 $graphics.DrawString('>_', $glyphFont, $glyphBrush, $glyphRect, $format)
 
 $outputDirectory = [System.IO.Path]::GetDirectoryName($outputPath)
@@ -55,10 +69,10 @@ $outputDirectory = [System.IO.Path]::GetDirectoryName($outputPath)
 $canvas.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 
 $glyphBrush.Dispose()
-$shadow.Dispose()
 $format.Dispose()
 $glyphFont.Dispose()
 $fontCollection.Dispose()
+$imageAttributes.Dispose()
 $graphics.Dispose()
 $canvas.Dispose()
 $sourceImage.Dispose()
