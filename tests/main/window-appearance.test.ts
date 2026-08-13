@@ -1,67 +1,62 @@
 import { describe, expect, it } from 'vitest';
-import { resolveGlassAppearance } from '../../src/main/window-appearance';
+import { resolveBackdropAppearance } from '../../src/main/window-appearance';
 
 const normalAppearance = {
-  resolvedTheme: 'dark' as const,
   highContrast: false,
   reducedTransparency: false,
 };
 
-describe('resolveGlassAppearance', () => {
-  it('uses official Acrylic when the native controller is available', () => {
+describe('resolveBackdropAppearance', () => {
+  it('uses the frosted backdrop when capabilities and policy are active', () => {
     expect(
-      resolveGlassAppearance({
-        windowsAcrylicAvailable: true,
+      resolveBackdropAppearance({
+        nativeState: 'active',
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toEqual({ glassMode: 'acrylic', glassAvailability: 'active' });
-    expect(
-      resolveGlassAppearance({
-        windowsAcrylicAvailable: false,
-        systemAppearance: normalAppearance,
-        screenReaderMode: false,
-      }),
-    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'unsupported' });
-  });
-
-  it('reports an opaque Windows controller fallback', () => {
-    expect(
-      resolveGlassAppearance({
-        windowsAcrylicAvailable: true,
-        windowsGlassState: 'fallback',
-        systemAppearance: normalAppearance,
-        screenReaderMode: false,
-      }),
-    ).toEqual({ glassMode: 'acrylic', glassAvailability: 'system-fallback' });
-  });
-
-  it('forces pseudo glass when the Windows controller reports high contrast', () => {
-    expect(
-      resolveGlassAppearance({
-        windowsAcrylicAvailable: true,
-        windowsGlassState: 'high-contrast',
-        systemAppearance: normalAppearance,
-        screenReaderMode: false,
-      }),
-    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' });
+    ).toEqual({ backdropMode: 'frosted', backdropStatus: 'active' });
   });
 
   it.each([
     { highContrast: true, reducedTransparency: false, screenReaderMode: false },
     { highContrast: false, reducedTransparency: true, screenReaderMode: false },
     { highContrast: false, reducedTransparency: false, screenReaderMode: true },
-  ])('forces an opaque fallback for accessibility: %o', (accessibility) => {
+  ])('uses opaque output for accessibility policy: %o', (policy) => {
     expect(
-      resolveGlassAppearance({
-        windowsAcrylicAvailable: true,
+      resolveBackdropAppearance({
+        nativeState: 'active',
         systemAppearance: {
           ...normalAppearance,
-          highContrast: accessibility.highContrast,
-          reducedTransparency: accessibility.reducedTransparency,
+          highContrast: policy.highContrast,
+          reducedTransparency: policy.reducedTransparency,
         },
-        screenReaderMode: accessibility.screenReaderMode,
+        screenReaderMode: policy.screenReaderMode,
       }),
-    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' });
+    ).toEqual({ backdropMode: 'opaque', backdropStatus: 'policy-disabled' });
+  });
+
+  it('honors the native energy-saver, remote-session, or Windows-effects policy', () => {
+    expect(
+      resolveBackdropAppearance({
+        nativeState: 'policy-disabled',
+        systemAppearance: normalAppearance,
+        screenReaderMode: false,
+      }),
+    ).toEqual({ backdropMode: 'opaque', backdropStatus: 'policy-disabled' });
+  });
+
+  it('makes runtime failure sticky and exposes its stable code', () => {
+    expect(
+      resolveBackdropAppearance({
+        nativeState: 'active',
+        failureCode: 'runtime-rebuild-failed',
+        systemAppearance: normalAppearance,
+        screenReaderMode: false,
+      }),
+    ).toEqual({
+      backdropMode: 'opaque',
+      backdropStatus: 'runtime-failure',
+      backdropFailureCode: 'runtime-rebuild-failed',
+    });
   });
 });

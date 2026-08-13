@@ -16,8 +16,7 @@ import {
 import type {
   PtyToRendererMessage,
   RendererToPtyMessage,
-  ResolvedTheme,
-  SettingsV3,
+  SettingsV4,
   ShellProfileDescriptor,
 } from '../../shared/contracts';
 import { safeExternalUrl, sanitizeTerminalTitle } from '../../shared/validation';
@@ -41,8 +40,7 @@ interface TerminalPaneProps {
   profile: ShellProfileDescriptor;
   port: MessagePort;
   active: boolean;
-  settings: SettingsV3;
-  resolvedTheme: ResolvedTheme;
+  settings: SettingsV4;
   reducedMotion: boolean;
   onTitle(title: string): void;
   onExit(code: number): void;
@@ -68,7 +66,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
     port,
     active,
     settings,
-    resolvedTheme,
     reducedMotion,
     onTitle,
     onExit,
@@ -121,7 +118,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       screenReaderMode: settings.screenReaderMode,
       scrollback: settings.scrollback,
       scrollOnUserInput: true,
-      theme: terminalTheme(resolvedTheme),
+      theme: terminalTheme,
       windowOptions: {},
       linkHandler: {
         activate: (event, text) => {
@@ -240,12 +237,11 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       settings.cursorBlink && !reducedMotion && !settings.screenReaderMode;
     terminal.options.screenReaderMode = settings.screenReaderMode;
     terminal.options.scrollback = settings.scrollback;
-    terminal.options.theme = terminalTheme(resolvedTheme);
     if (active) {
       fitRef.current?.fit();
       terminal.focus();
     }
-  }, [active, reducedMotion, resolvedTheme, settings]);
+  }, [active, reducedMotion, settings]);
 
   const blockNativePaste = (event: ReactClipboardEvent) => {
     event.preventDefault();

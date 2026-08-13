@@ -1,109 +1,147 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { app, type BrowserWindow } from 'electron';
-import type { SystemAppearance, WindowsGlassState } from '../shared/contracts';
-import { BACKGROUND_OPACITY_MAX, BACKGROUND_OPACITY_MIN } from '../shared/settings';
+import type {
+  BackdropFailureCode,
+  BackdropPreviewPatch,
+  NativeBackdropState,
+  SettingsV4,
+  SystemAppearance,
+} from '../shared/contracts';
+import {
+  FROST_STRENGTH_MAX,
+  FROST_STRENGTH_MIN,
+  GLASS_OPACITY_MAX,
+  GLASS_OPACITY_MIN,
+} from '../shared/settings';
 
-const MAX_LUMINOSITY_OPACITY = 0.59;
-
-interface WindowsGlassOptions {
-  theme: 'light' | 'dark';
-  highContrast: boolean;
-  tintOpacity: number;
-  luminosityOpacity: number;
-  neutralTone: number;
+export interface WindowsBackdropOptions {
+  policyEnabled: boolean;
+  glassOpacity: number;
+  frostStrength: number;
 }
 
-export interface WindowsAcrylicValues {
-  tintOpacity: number;
-  luminosityOpacity: number;
-  neutralTone: number;
-}
-
-export function resolveWindowsAcrylicValues(
-  theme: 'light' | 'dark',
-  backgroundOpacity: number,
-): WindowsAcrylicValues {
-  const boundedOpacity = Math.min(
-    BACKGROUND_OPACITY_MAX,
-    Math.max(BACKGROUND_OPACITY_MIN, backgroundOpacity),
-  );
-  const tintOpacity = boundedOpacity / 100;
-  const strength = boundedOpacity / BACKGROUND_OPACITY_MAX;
-  return {
-    tintOpacity,
-    luminosityOpacity: MAX_LUMINOSITY_OPACITY * strength,
-    neutralTone: theme === 'dark' ? 24 : 244,
-  };
+interface BackdropProbeResult {
+  supported: boolean;
+  fast: boolean;
 }
 
 interface WindowsGlassAddon {
-  isSupported(): boolean;
+  probe(): BackdropProbeResult;
   attach(
     handle: Buffer,
-    options: WindowsGlassOptions,
-    onStateChanged: (state: WindowsGlassState) => void,
-  ): WindowsGlassState | false;
-  update(options: WindowsGlassOptions): WindowsGlassState | false;
+    options: WindowsBackdropOptions,
+    onStateChanged: (state: NativeBackdropState) => void,
+  ): NativeBackdropState | false;
+  update(options: WindowsBackdropOptions): NativeBackdropState | false;
   detach(): void;
 }
 
+export class BackdropNativeError extends Error {
+  constructor(
+    readonly code: BackdropFailureCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'BackdropNativeError';
+  }
+}
+
+export function resolveWindowsBackdropOptions(
+  appearance: SystemAppearance,
+  screenReaderMode: boolean,
+  settings: Pick<SettingsV4, 'glassOpacity' | 'frostStrength'>,
+  preview: BackdropPreviewPatch = {},
+): WindowsBackdropOptions {
+  const glassOpacity = preview.glassOpacity ?? settings.glassOpacity;
+  const frostStrength = preview.frostStrength ?? settings.frostStrength;
+  return {
+    policyEnabled: !appearance.highContrast && !appearance.reducedTransparency && !screenReaderMode,
+    glassOpacity: Math.min(GLASS_OPACITY_MAX, Math.max(GLASS_OPACITY_MIN, glassOpacity)),
+    frostStrength: Math.min(FROST_STRENGTH_MAX, Math.max(FROST_STRENGTH_MIN, frostStrength)),
+  };
+}
+
 export class WindowsGlass {
-  private addon: WindowsGlassAddon | null | undefined;
-  private supported: boolean | undefined;
+  private addon: WindowsGlassAddon | undefined;
   private attachedWindowId: number | undefined;
-  private reportedError = false;
 
-  constructor(private readonly onStateChanged: (state: WindowsGlassState) => void) {}
+  constructor(private readonly onStateChanged: (state: NativeBackdropState) => void) {}
 
-  isSupported(): boolean {
-    if (this.supported !== undefined) return this.supported;
+  probe(): BackdropProbeResult {
+    let addon: WindowsGlassAddon;
     try {
-      this.supported = this.loadAddon().isSupported();
+      addon = this.loadAddon();
     } catch (error: unknown) {
-      this.supported = false;
-      this.report(error);
+      throw new BackdropNativeError(
+        'addon-load-failed',
+        'The native frosted-backdrop module could not be loaded.',
+        { cause: error },
+      );
     }
-    return this.supported;
+
+    let result: BackdropProbeResult;
+    try {
+      result = addon.probe();
+    } catch (error: unknown) {
+      throw new BackdropNativeError(
+        'effect-graph-failed',
+        'The composition effect graph could not be created.',
+        { cause: error },
+      );
+    }
+    if (!result.supported) {
+      throw new BackdropNativeError(
+        'effects-unsupported',
+        'Composition effects are unsupported on this system.',
+      );
+    }
+    if (!result.fast) {
+      throw new BackdropNativeError(
+        'effects-not-fast',
+        'Composition effects are not fast on this system.',
+      );
+    }
+    return result;
   }
 
-  apply(
-    window: BrowserWindow,
-    appearance: SystemAppearance,
-    backgroundOpacity: number,
-  ): WindowsGlassState | undefined {
-    if (!this.isSupported()) return undefined;
+  apply(window: BrowserWindow, options: WindowsBackdropOptions): NativeBackdropState {
+    const addon = this.loadAddonSafely();
     try {
-      const addon = this.loadAddon();
-      const options: WindowsGlassOptions = {
-        theme: appearance.resolvedTheme,
-        highContrast: appearance.highContrast,
-        ...resolveWindowsAcrylicValues(appearance.resolvedTheme, backgroundOpacity),
-      };
-      let state: WindowsGlassState | false;
-      if (this.attachedWindowId === window.id && (state = addon.update(options)) !== false) {
-        return state;
+      let state: NativeBackdropState | false;
+      if (this.attachedWindowId === window.id) {
+        state = addon.update(options);
+      } else {
+        state = addon.attach(window.getNativeWindowHandle(), options, (nextState) => {
+          if (['active', 'policy-disabled', 'capability-lost'].includes(nextState)) {
+            this.onStateChanged(nextState);
+          }
+        });
       }
-      state = addon.attach(window.getNativeWindowHandle(), options, (nextState) =>
-        this.handleStateChanged(nextState),
-      );
-      this.attachedWindowId = state === false ? undefined : window.id;
-      return state === false ? undefined : state;
+      if (state === false) throw new Error('Native backdrop operation returned false.');
+      this.attachedWindowId = window.id;
+      return state;
     } catch (error: unknown) {
       this.attachedWindowId = undefined;
       try {
-        this.addon?.detach();
+        addon.detach();
       } catch {
-        // The opaque renderer fallback remains safe even if native cleanup also fails.
+        // Startup and runtime recovery still report the original attach/update failure.
       }
-      this.report(error);
-      return undefined;
+      throw new BackdropNativeError(
+        'attach-failed',
+        'The frosted backdrop could not be attached.',
+        {
+          cause: error,
+        },
+      );
     }
   }
 
-  private handleStateChanged(state: WindowsGlassState): void {
-    if (!['active', 'fallback', 'high-contrast'].includes(state)) return;
-    this.onStateChanged(state);
+  rebuild(window: BrowserWindow, options: WindowsBackdropOptions): NativeBackdropState {
+    this.detach();
+    return this.apply(window, options);
   }
 
   detach(): void {
@@ -111,9 +149,21 @@ export class WindowsGlass {
     try {
       this.addon.detach();
     } catch (error: unknown) {
-      this.report(error);
+      console.warn('Failed to detach the native frosted backdrop.', error);
     } finally {
       this.attachedWindowId = undefined;
+    }
+  }
+
+  private loadAddonSafely(): WindowsGlassAddon {
+    try {
+      return this.loadAddon();
+    } catch (error: unknown) {
+      throw new BackdropNativeError(
+        'addon-load-failed',
+        'The native frosted-backdrop module could not be loaded.',
+        { cause: error },
+      );
     }
   }
 
@@ -125,11 +175,5 @@ export class WindowsGlass {
     const require = createRequire(__filename);
     this.addon = require(addonPath) as WindowsGlassAddon;
     return this.addon;
-  }
-
-  private report(error: unknown): void {
-    if (this.reportedError) return;
-    this.reportedError = true;
-    console.warn('Windows Acrylic is unavailable; using opaque pseudo glass.', error);
   }
 }

@@ -15,17 +15,14 @@ export const messages = {
     paste: 'Paste',
     selectAll: 'Select all',
     clear: 'Clear terminal',
-    theme: 'Theme',
     system: 'System',
-    light: 'Light',
-    dark: 'Dark',
-    backgroundOpacity: 'Background opacity',
-    backgroundUnavailableAccessibility:
-      'Transparency is disabled by an accessibility preference. Your saved value is kept.',
-    backgroundUnavailableUnsupported:
-      'Adjustable transparency is unavailable. An opaque neutral surface is used.',
-    backgroundUnavailableSystemFallback:
-      'Windows is temporarily using the safe opaque backdrop. Your saved value is kept.',
+    glassOpacity: 'Glass opacity',
+    frostStrength: 'Frost strength',
+    backdropUnavailablePolicy:
+      'Frost is disabled by Windows, accessibility, energy-saver, or remote-session policy. Saved values are kept.',
+    backdropUnavailableRuntime: 'Frost is unavailable until restart. Saved values are kept.',
+    backdropRuntimeFailure:
+      'The frosted backdrop stopped working. Terminals remain active; restart the app to try again.',
     defaultShell: 'Default shell',
     automatic: 'Automatic',
     fontSize: 'Font size',
@@ -77,17 +74,14 @@ export const messages = {
     paste: '貼り付け',
     selectAll: 'すべて選択',
     clear: '端末をクリア',
-    theme: 'テーマ',
     system: 'システム',
-    light: 'ライト',
-    dark: 'ダーク',
-    backgroundOpacity: '背景の不透明度',
-    backgroundUnavailableAccessibility:
-      'アクセシビリティ設定により透明効果を無効化しています。保存値は維持されます。',
-    backgroundUnavailableUnsupported:
-      'この環境では透明度を調整できません。不透明な中性色の表示を使用します。',
-    backgroundUnavailableSystemFallback:
-      'Windowsが一時的に安全な不透明背景へ切り替えています。保存値は維持されます。',
+    glassOpacity: 'ガラスの不透明度',
+    frostStrength: '曇りの強さ',
+    backdropUnavailablePolicy:
+      'Windows、アクセシビリティ、省電力、またはリモート接続の設定により曇り効果を無効化しています。保存値は維持されます。',
+    backdropUnavailableRuntime: '再起動するまで曇り効果を利用できません。保存値は維持されます。',
+    backdropRuntimeFailure:
+      '背景の曇り効果が停止しました。端末は動作を続けます。再試行するにはアプリを再起動してください。',
     defaultShell: '既定のシェル',
     automatic: '自動',
     fontSize: 'フォントサイズ',

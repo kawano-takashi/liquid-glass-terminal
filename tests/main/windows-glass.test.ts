@@ -1,29 +1,60 @@
 import { describe, expect, it } from 'vitest';
-import { resolveWindowsAcrylicValues } from '../../src/main/windows-glass';
+import { resolveWindowsBackdropOptions } from '../../src/main/windows-glass';
 
-describe('Windows Acrylic values', () => {
-  it('maps the default opacity to a neutral dark Acrylic recipe', () => {
-    const values = resolveWindowsAcrylicValues('dark', 25);
-    expect(values.tintOpacity).toBe(0.25);
-    expect(values.luminosityOpacity).toBeCloseTo(0.295);
-    expect(values.neutralTone).toBe(24);
-  });
+const normalAppearance = {
+  highContrast: false,
+  reducedTransparency: false,
+};
 
-  it('uses the same opacity and a milk-white tint in light mode', () => {
-    expect(resolveWindowsAcrylicValues('light', 25)).toMatchObject({
-      tintOpacity: 0.25,
-      neutralTone: 244,
+describe('Windows frosted-backdrop values', () => {
+  it('passes the independent default glass and frost settings', () => {
+    expect(
+      resolveWindowsBackdropOptions(normalAppearance, false, {
+        glassOpacity: 25,
+        frostStrength: 6,
+      }),
+    ).toEqual({
+      policyEnabled: true,
+      glassOpacity: 25,
+      frostStrength: 6,
     });
   });
 
-  it('clamps native preview values to the supported endpoints', () => {
-    expect(resolveWindowsAcrylicValues('dark', -1)).toMatchObject({
-      tintOpacity: 0,
-      luminosityOpacity: 0,
-    });
-    expect(resolveWindowsAcrylicValues('dark', 100)).toMatchObject({
-      tintOpacity: 0.5,
-      luminosityOpacity: 0.59,
-    });
+  it('applies a structured live preview without mutating saved settings', () => {
+    const saved = { glassOpacity: 25, frostStrength: 6 };
+    expect(
+      resolveWindowsBackdropOptions(normalAppearance, false, saved, {
+        glassOpacity: 0,
+        frostStrength: 13,
+      }),
+    ).toMatchObject({ glassOpacity: 0, frostStrength: 13 });
+    expect(saved).toEqual({ glassOpacity: 25, frostStrength: 6 });
+  });
+
+  it.each([
+    { highContrast: true, reducedTransparency: false, screenReader: false },
+    { highContrast: false, reducedTransparency: true, screenReader: false },
+    { highContrast: false, reducedTransparency: false, screenReader: true },
+  ])('disables native effects for accessibility policy: %o', (policy) => {
+    expect(
+      resolveWindowsBackdropOptions(
+        {
+          ...normalAppearance,
+          highContrast: policy.highContrast,
+          reducedTransparency: policy.reducedTransparency,
+        },
+        policy.screenReader,
+        { glassOpacity: 25, frostStrength: 6 },
+      ).policyEnabled,
+    ).toBe(false);
+  });
+
+  it('clamps defense-in-depth values to native endpoints', () => {
+    expect(
+      resolveWindowsBackdropOptions(normalAppearance, false, {
+        glassOpacity: -1,
+        frostStrength: 99,
+      }),
+    ).toMatchObject({ glassOpacity: 0, frostStrength: 13 });
   });
 });

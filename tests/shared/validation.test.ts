@@ -6,6 +6,7 @@ import {
   quotePathForShell,
   safeExternalUrl,
   sanitizeTerminalTitle,
+  validateBackdropPreviewPatch,
   validateSettingsPatch,
 } from '../../src/shared/validation';
 
@@ -34,15 +35,32 @@ describe('IPC validation', () => {
     expect(validateSettingsPatch({ nodeIntegration: true })).toBeNull();
   });
 
-  it('accepts only integer background opacity values in the supported range', () => {
-    expect(validateSettingsPatch({ backgroundOpacity: 0 })).toEqual({ backgroundOpacity: 0 });
-    expect(validateSettingsPatch({ backgroundOpacity: 50 })).toEqual({ backgroundOpacity: 50 });
-    expect(validateSettingsPatch({ backgroundOpacity: -1 })).toBeNull();
-    expect(validateSettingsPatch({ backgroundOpacity: 51 })).toBeNull();
-    expect(validateSettingsPatch({ backgroundOpacity: 25.5 })).toBeNull();
-    expect(validateSettingsPatch({ backgroundOpacity: Number.NaN })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 25 })).toBeNull();
+  it('accepts only 5% glass steps and all 14 frost indices', () => {
+    expect(validateSettingsPatch({ glassOpacity: 0 })).toEqual({ glassOpacity: 0 });
+    expect(validateSettingsPatch({ glassOpacity: 100 })).toEqual({ glassOpacity: 100 });
+    expect(validateSettingsPatch({ glassOpacity: -5 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 101 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 26 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: Number.NaN })).toBeNull();
+    expect(validateSettingsPatch({ frostStrength: 0 })).toEqual({ frostStrength: 0 });
+    expect(validateSettingsPatch({ frostStrength: 13 })).toEqual({ frostStrength: 13 });
+    expect(validateSettingsPatch({ frostStrength: 14 })).toBeNull();
+    expect(validateSettingsPatch({ backgroundOpacity: 25 })).toBeNull();
     expect(validateSettingsPatch({ glass: 'balanced' })).toBeNull();
+    expect(validateSettingsPatch({ theme: 'dark' })).toBeNull();
+  });
+
+  it('validates structured backdrop preview IPC and rejects ambiguous input', () => {
+    expect(validateBackdropPreviewPatch({ glassOpacity: 50 })).toEqual({ glassOpacity: 50 });
+    expect(validateBackdropPreviewPatch({ frostStrength: 9 })).toEqual({ frostStrength: 9 });
+    expect(validateBackdropPreviewPatch({ glassOpacity: 50, frostStrength: 9 })).toEqual({
+      glassOpacity: 50,
+      frostStrength: 9,
+    });
+    expect(validateBackdropPreviewPatch({})).toBeNull();
+    expect(validateBackdropPreviewPatch({ glassOpacity: 51 })).toBeNull();
+    expect(validateBackdropPreviewPatch({ frostStrength: -1 })).toBeNull();
+    expect(validateBackdropPreviewPatch({ glassOpacity: 25, rawElectron: true })).toBeNull();
   });
 });
 

@@ -10,7 +10,7 @@ npm run audit:install-scripts
 npm run bootstrap:native
 ```
 
-Development and packaging require an x64 client edition of Windows 11 22H2 or later and the Visual Studio 2022 **Desktop development with C++** workload. The bootstrap step restores the versions in `winapp.yaml`, builds `native/windows-glass`, and stages the Windows App SDK self-contained runtime. Do not commit `.winapp`, the addon build directory, or staged runtime binaries.
+Development and packaging require an x64 client edition of Windows 11 22H2 or later and the Visual Studio 2022 **Desktop development with C++** workload. The bootstrap step restores the pinned Windows SDK, C++/WinRT, and WIL packages in `winapp.yaml`, then builds `native/windows-glass` against Windows system Composition and Direct3D APIs. It does not stage a Windows App SDK runtime. Do not commit `.winapp`, addon build/dist directories, or staged runtime binaries.
 
 Do not use `--force` or `--legacy-peer-deps`. Keep every direct dependency exact and commit `package-lock.json`. Dependency updates are manual: review changelogs, install/lifecycle scripts, native ABI compatibility, and the generated lockfile before changing a version or `allowScripts`.
 
@@ -29,7 +29,7 @@ Changes to PTY framing, IPC, preload APIs, URL/path validation, permissions, CSP
 ## User interface
 
 - Keep terminal text outside decorative distortion and preserve a minimum xterm contrast ratio of 4.5.
-- Verify light, dark, high-contrast, reduced-transparency, and reduced-motion behavior.
+- Verify that Windows light and dark settings both keep the app dark, and verify dark high-contrast, reduced-transparency, and reduced-motion behavior.
 - Update both English and Japanese dictionaries and README files together.
 - Do not add remote fonts, analytics, update checks, or runtime content delivery.
 

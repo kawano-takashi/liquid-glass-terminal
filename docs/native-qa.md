@@ -1,8 +1,8 @@
 # Native material QA checklist
 
-Automated tests validate mappings, migration, fallback selection, IPC validation, and renderer effect variables. Frosted-backdrop quality still requires a real interactive Windows 11 desktop.
+Automated tests validate mappings, migration, fallback selection, IPC validation, and dark-only renderer behavior. Frosted-backdrop quality still requires a real interactive Windows 11 desktop.
 
-Record the application version, Windows build and edition, display scale, GPU, theme, accessibility state, and result for every run.
+Record the application version, Windows build and edition, display scale, GPU, Windows color setting, accessibility state, and result for every run.
 
 ## Host gate
 
@@ -15,18 +15,21 @@ Record the application version, Windows build and edition, display scale, GPU, t
 
 - [ ] Window opens at 1100×720, honors the 720×420 minimum, resizes smoothly, maximizes, restores, and supports Snap.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
-- [ ] Acrylic stays active when the window loses focus; light/dark theme changes update its neutral recipe without restarting.
-- [ ] At the 25% default, shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable.
-- [ ] The 0% endpoint retains DWM frost while native tint and luminosity reach zero.
-- [ ] At 0%, renderer noise, local blur, decorative fills, danger/bell fills, and text halo are absent; text, icons, cursor, selection, focus, and errors remain clear.
-- [ ] The 0% and 50% endpoints are visibly different; changes preview live in 1% steps and survive restart.
-- [ ] Settings, search, menus, dialogs, and toasts add no cumulative tint, visible rim, or shadow.
-- [ ] High contrast, reduced transparency, and screen-reader mode use a safe opaque surface, disable the slider with a reason, and restore the saved opacity afterward.
-- [ ] Forced native Acrylic failure also uses the opaque fallback without leaving transparent renderer CSS.
+- [ ] Frost stays active when the window loses focus; switching Windows between light and dark leaves the renderer, titlebar, menus, xterm palette, and `#181818` tint dark without restarting.
+- [ ] At the 25% / 7-of-14 defaults, shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable.
+- [ ] The 0% glass endpoint removes tint but retains the custom HostBackdrop blur; control fills and the terminal text halo remain readable.
+- [ ] The 100% glass endpoint is completely opaque and does not expose stale desktop pixels while resizing.
+- [ ] All 14 frost levels (8, 10, 12, 14, 17, 20, 24, 28, 33, 39, 46, 54, 63, 74 DIPs) differ progressively, preview live, and survive restart.
+- [ ] Static noise remains approximately 3%, appears behind terminal content only, and does not cover titlebar, settings, search, menus, dialogs, or toasts.
+- [ ] Settings, search, menus, dialogs, and toasts add no local CSS blur, cumulative tint, visible rim, or shadow.
+- [ ] High contrast keeps the app's dark colors, suppresses Windows forced-color replacement, uses a safe opaque surface, hides noise, disables both appearance sliders with a reason, and restores both saved values afterward.
+- [ ] Reduced transparency and screen-reader mode use the same opaque dark surface and restore both saved values afterward.
+- [ ] Energy saver, Remote Desktop, and disabled Windows transparency follow the same opaque policy and automatically restore frost when policy clears.
+- [ ] An unsupported or non-fast compositor fails startup after two total attempts with a localized stable error code and creates no PTY.
+- [ ] A forced runtime effect failure rebuilds once; a failed rebuild keeps every PTY alive, uses an opaque surface, and shows persistent restart guidance.
 - [ ] The DWM colored rim is absent, corners use the small preference, and resize/Snap/maximize remain functional.
-- [ ] Battery saver, Remote Desktop, disabled Windows transparency, and insufficient compositor capability remain readable.
 - [ ] No screen-capture or screen-recording permission prompt appears.
-- [ ] A package works after uninstalling the machine-wide Windows App Runtime; required self-contained DLLs sit beside the executable.
+- [ ] A package works without a machine-wide Windows App Runtime and does not stage Windows App SDK DLLs beside the executable.
 - [ ] 100%, 150%, and 200% scale show a sharp icon, titlebar controls, xterm glyphs, and drag targets.
 
 ## Terminal and input

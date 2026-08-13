@@ -109,10 +109,14 @@ test('launches one terminal and opens settings', async () => {
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
     await expect(settingsDialog).toBeVisible();
-    const backgroundOpacity = page.getByRole('slider', {
-      name: /Background opacity|背景の不透明度/,
+    const glassOpacity = page.getByRole('slider', {
+      name: /Glass opacity|ガラスの不透明度/,
     });
-    await expect(backgroundOpacity).toHaveValue('25');
+    const frostStrength = page.getByRole('slider', {
+      name: /Frost strength|曇りの強さ/,
+    });
+    await expect(glassOpacity).toHaveValue('25');
+    await expect(frostStrength).toHaveValue('6');
     const overlayStyles = await page.evaluate(() => {
       const drawerBackdrop = document.querySelector('.drawer-backdrop');
       const settingsDrawer = document.querySelector('.settings-drawer');
@@ -130,13 +134,79 @@ test('launches one terminal and opens settings', async () => {
       drawerBorder: '0px',
       drawerShadow: 'none',
     });
+
+    const appShell = page.locator('.app-shell');
+    await expect(settingsDialog.getByRole('group', { name: /Theme|テーマ/ })).toHaveCount(0);
+    await expect(settingsDialog.getByRole('button', { name: /^(Light|ライト)$/ })).toHaveCount(0);
+    await expect(settingsDialog.getByRole('button', { name: /^(Dark|ダーク)$/ })).toHaveCount(0);
+
+    const rendererAppearance = () =>
+      appShell.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          color: style.color,
+          colorScheme: style.colorScheme,
+          backgroundRgb: style.getPropertyValue('--background-rgb').trim(),
+        };
+      });
+    await page.emulateMedia({ colorScheme: 'light' });
+    const lightSystemAppearance = await rendererAppearance();
+    expect(lightSystemAppearance).toEqual({
+      color: 'rgb(245, 245, 245)',
+      colorScheme: 'dark',
+      backgroundRgb: '24 24 24',
+    });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await rendererAppearance()).toEqual(lightSystemAppearance);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const reducedMotionState = await settingsDialog.evaluate((element) => {
+      const durations = getComputedStyle(element)
+        .transitionDuration.split(',')
+        .map((value) => {
+          const duration = value.trim();
+          return duration.endsWith('ms')
+            ? Number.parseFloat(duration) / 1_000
+            : Number.parseFloat(duration);
+        });
+      return {
+        matches: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        longestTransitionSeconds: Math.max(...durations),
+      };
+    });
+    expect(reducedMotionState.matches).toBe(true);
+    expect(reducedMotionState.longestTransitionSeconds).toBeLessThanOrEqual(0.000_01);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+    await page.emulateMedia({ forcedColors: 'active' });
+    expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true);
+    await expect(page.locator('.background-noise')).toHaveCSS('display', 'none');
+    expect(
+      await appShell.evaluate((element) => {
+        const tint = document.querySelector('.background-tint');
+        if (!tint) throw new Error('Background tint not found');
+        const style = getComputedStyle(element);
+        return {
+          color: style.color,
+          forcedColorAdjust: style.forcedColorAdjust,
+          tint: getComputedStyle(tint).backgroundColor,
+        };
+      }),
+    ).toEqual({
+      color: 'rgb(245, 245, 245)',
+      forcedColorAdjust: 'none',
+      tint: 'rgb(24, 24, 24)',
+    });
+    await page.emulateMedia({ forcedColors: 'none' });
+
     const screenReader = page.getByRole('checkbox', {
       name: /Screen reader mode|スクリーンリーダーモード/,
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
-    await expect(backgroundOpacity).toBeDisabled();
-    await expect(settingsDialog).toContainText(/accessibility preference|アクセシビリティ設定/);
+    await expect(glassOpacity).toBeDisabled();
+    await expect(frostStrength).toBeDisabled();
+    await expect(settingsDialog).toContainText(/Windows, accessibility|Windows、アクセシビリティ/);
     const accessibilityTree = page.locator('.xterm-accessibility-tree');
     await expect(accessibilityTree).toBeVisible();
     await expect(accessibilityTree).toContainText('LGT_E2E_READY');
@@ -152,14 +222,15 @@ test('launches one terminal and opens settings', async () => {
   }
 });
 
-test('migrates, previews, and persists Windows background opacity', async () => {
+test('migrates, previews, and persists independent frosted-backdrop settings', async () => {
   const executablePath = await findPackagedExecutable(path.resolve('out'));
-  const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-opacity-e2e-'));
+  const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-frost-e2e-'));
   const settingsPath = path.join(userData, 'settings.json');
   await writeFile(
     settingsPath,
     JSON.stringify({
       schemaVersion: 2,
+      theme: 'light',
       glassOpacity: 85,
       fontSize: 17,
       __internal__: { migrations: { version: '0.1.0' } },
@@ -174,34 +245,42 @@ test('migrates, previews, and persists Windows background opacity', async () => 
     let page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    let slider = page.getByRole('slider', {
-      name: /Background opacity|背景の不透明度/,
+    let glassSlider = page.getByRole('slider', {
+      name: /Glass opacity|ガラスの不透明度/,
     });
-    test.skip(await slider.isDisabled(), 'The current Windows session is using a system fallback.');
-    await expect(slider).toHaveValue('50');
+    let frostSlider = page.getByRole('slider', {
+      name: /Frost strength|曇りの強さ/,
+    });
+    test.skip(await glassSlider.isDisabled(), 'The current Windows session has disabled effects.');
+    await expect(glassSlider).toHaveValue('25');
+    await expect(frostSlider).toHaveValue('6');
     const migratedSettings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
       schemaVersion?: unknown;
-      backgroundOpacity?: unknown;
       glassOpacity?: unknown;
+      frostStrength?: unknown;
+      backgroundOpacity?: unknown;
+      theme?: unknown;
       fontSize?: unknown;
     };
     expect(migratedSettings).toMatchObject({
-      schemaVersion: 3,
-      backgroundOpacity: 50,
+      schemaVersion: 4,
+      glassOpacity: 25,
+      frostStrength: 6,
       fontSize: 17,
     });
-    expect(migratedSettings).not.toHaveProperty('glassOpacity');
+    expect(migratedSettings).not.toHaveProperty('backgroundOpacity');
+    expect(migratedSettings).not.toHaveProperty('theme');
 
-    await slider.fill('0');
-    await slider.dispatchEvent('pointerup');
-    await expect(slider).toHaveValue('0');
+    await glassSlider.fill('0');
+    await glassSlider.dispatchEvent('pointerup');
+    await frostSlider.fill('13');
+    await frostSlider.dispatchEvent('pointerup');
+    await expect(glassSlider).toHaveValue('0');
+    await expect(frostSlider).toHaveValue('13');
     const zeroEffects = await page.locator('.app-shell').evaluate((element) => {
       const style = getComputedStyle(element);
       return {
-        backgroundOpacity: style.getPropertyValue('--background-opacity').trim(),
-        effectStrength: style.getPropertyValue('--effect-strength').trim(),
-        blur: style.getPropertyValue('--effect-blur').trim(),
-        noise: style.getPropertyValue('--background-noise-opacity').trim(),
+        noise: Number.parseFloat(style.getPropertyValue('--background-noise-opacity')),
         control: style.getPropertyValue('--control-fill').trim(),
         halo: style.getPropertyValue('--terminal-halo-color').trim(),
         danger: style.getPropertyValue('--danger-fill-percent').trim(),
@@ -209,15 +288,18 @@ test('migrates, previews, and persists Windows background opacity', async () => 
       };
     });
     expect(zeroEffects).toMatchObject({
-      backgroundOpacity: '0',
-      effectStrength: '0',
-      blur: '0px',
-      noise: '0',
-      danger: '0%',
-      bell: '0%',
+      noise: 0.03,
+      danger: '14%',
+      bell: '5%',
     });
-    expect(zeroEffects.control).toMatch(/\/ 0\)$/);
-    expect(zeroEffects.halo).toMatch(/\/ 0\)$/);
+    expect(zeroEffects.control).not.toMatch(/\/ 0\)$/);
+    expect(zeroEffects.halo).not.toMatch(/\/ 0\)$/);
+    const localBackdropFilters = await page
+      .locator('.settings-drawer, .search-bar, .profile-menu, .modal-panel')
+      .evaluateAll((elements) =>
+        elements.map((element) => getComputedStyle(element).backdropFilter),
+      );
+    expect(localBackdropFilters.every((value) => value === 'none')).toBe(true);
     await page.waitForTimeout(250);
     await application.close();
 
@@ -228,17 +310,10 @@ test('migrates, previews, and persists Windows background opacity', async () => 
     page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    slider = page.getByRole('slider', { name: /Background opacity|背景の不透明度/ });
-    await expect(slider).toHaveValue('0');
-    await expect
-      .poll(() =>
-        page
-          .locator('.app-shell')
-          .evaluate((element) =>
-            getComputedStyle(element).getPropertyValue('--effect-strength').trim(),
-          ),
-      )
-      .toBe('0');
+    glassSlider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    frostSlider = page.getByRole('slider', { name: /Frost strength|曇りの強さ/ });
+    await expect(glassSlider).toHaveValue('0');
+    await expect(frostSlider).toHaveValue('13');
   } finally {
     if (application) await application.close().catch(() => undefined);
     await removeTemporaryUserData(userData);

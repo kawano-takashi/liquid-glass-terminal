@@ -19,7 +19,7 @@ Liquid Glass Terminal includes open-source dependencies recorded in `package-loc
 - electron-store — MIT
 - dnd-kit — MIT
 - Lucide — ISC
-- Microsoft Windows App SDK redistributable runtime — Microsoft Software License Terms and notices are bundled with Windows packages
 - C++/WinRT and Windows Implementation Library build components — MIT
+- Microsoft Windows.UI.Composition Win32 Samples (effect-descriptor implementation reference) — MIT
 
 This notice is informational and does not replace the license text shipped by each dependency.

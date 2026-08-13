@@ -1,13 +1,14 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type {
   AppCommand,
+  BackdropPreviewPatch,
   BootstrapState,
   ContextMenuState,
   PreloadApi,
   SessionCreateRequest,
   SessionPortPayload,
   SettingsPatch,
-  SettingsV3,
+  SettingsV4,
   WindowAppearance,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
@@ -19,9 +20,9 @@ ipcRenderer.on(IPC_CHANNELS.sessionPort, (event, payload: SessionPortPayload) =>
 const api: PreloadApi = {
   bootstrap: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap) as Promise<BootstrapState>,
   updateSettings: (patch: SettingsPatch) =>
-    ipcRenderer.invoke(IPC_CHANNELS.updateSettings, patch) as Promise<SettingsV3>,
-  previewBackgroundOpacity: (opacity: number) =>
-    ipcRenderer.send(IPC_CHANNELS.previewBackgroundOpacity, opacity),
+    ipcRenderer.invoke(IPC_CHANNELS.updateSettings, patch) as Promise<SettingsV4>,
+  previewBackdrop: (patch: BackdropPreviewPatch) =>
+    ipcRenderer.send(IPC_CHANNELS.previewBackdrop, patch),
   requestSession: (request: SessionCreateRequest) =>
     ipcRenderer.send(IPC_CHANNELS.requestSession, request),
   prepareDroppedPath: (sessionId: string, path: string) =>

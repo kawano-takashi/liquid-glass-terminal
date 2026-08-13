@@ -1,14 +1,19 @@
-import type { SettingsV3 } from './contracts';
+import type { SettingsV4 } from './contracts';
 
-export const BACKGROUND_OPACITY_MIN = 0;
-export const BACKGROUND_OPACITY_MAX = 50;
-export const BACKGROUND_OPACITY_DEFAULT = 25;
+export const GLASS_OPACITY_MIN = 0;
+export const GLASS_OPACITY_MAX = 100;
+export const GLASS_OPACITY_STEP = 5;
+export const GLASS_OPACITY_DEFAULT = 25;
+export const FROST_STRENGTH_MIN = 0;
+export const FROST_STRENGTH_MAX = 13;
+export const FROST_STRENGTH_DEFAULT = 6;
+export const FROST_BLUR_AMOUNTS = [8, 10, 12, 14, 17, 20, 24, 28, 33, 39, 46, 54, 63, 74] as const;
 
-export const DEFAULT_SETTINGS: SettingsV3 = {
-  schemaVersion: 3,
+export const DEFAULT_SETTINGS: SettingsV4 = {
+  schemaVersion: 4,
   locale: 'system',
-  theme: 'system',
-  backgroundOpacity: BACKGROUND_OPACITY_DEFAULT,
+  glassOpacity: GLASS_OPACITY_DEFAULT,
+  frostStrength: FROST_STRENGTH_DEFAULT,
   defaultProfileId: 'auto',
   fontSize: 14,
   cursorStyle: 'block',
@@ -21,15 +26,21 @@ export const DEFAULT_SETTINGS: SettingsV3 = {
 };
 
 export const SETTINGS_SCHEMA = {
-  schemaVersion: { type: 'number', enum: [3], default: 3 },
+  schemaVersion: { type: 'number', enum: [4], default: 4 },
   locale: { type: 'string', enum: ['system', 'en', 'ja'], default: 'system' },
-  theme: { type: 'string', enum: ['system', 'light', 'dark'], default: 'system' },
-  backgroundOpacity: {
+  glassOpacity: {
     type: 'number',
-    minimum: BACKGROUND_OPACITY_MIN,
-    maximum: BACKGROUND_OPACITY_MAX,
+    minimum: GLASS_OPACITY_MIN,
+    maximum: GLASS_OPACITY_MAX,
+    multipleOf: GLASS_OPACITY_STEP,
+    default: GLASS_OPACITY_DEFAULT,
+  },
+  frostStrength: {
+    type: 'number',
+    minimum: FROST_STRENGTH_MIN,
+    maximum: FROST_STRENGTH_MAX,
     multipleOf: 1,
-    default: BACKGROUND_OPACITY_DEFAULT,
+    default: FROST_STRENGTH_DEFAULT,
   },
   defaultProfileId: { type: 'string', maxLength: 200, default: 'auto' },
   fontSize: { type: 'number', minimum: 10, maximum: 32, default: 14 },

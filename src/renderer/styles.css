@@ -25,16 +25,13 @@
   --text-faint: #878787;
   --danger: #dc7880;
   --background-rgb: 24 24 24;
-  --background-opacity: 0.25;
-  --effect-strength: 0.5;
-  --effect-blur: 15px;
-  --background-noise-opacity: 0.005;
-  --control-fill: rgb(255 255 255 / 0.03);
-  --control-fill-hover: rgb(255 255 255 / 0.05);
-  --control-fill-strong: rgb(255 255 255 / 0.07);
-  --terminal-halo-color: rgb(0 0 0 / 0.36);
-  --danger-fill-percent: 7%;
-  --bell-fill-percent: 2.5%;
+  --background-noise-opacity: 0.03;
+  --control-fill: rgb(255 255 255 / 0.06);
+  --control-fill-hover: rgb(255 255 255 / 0.1);
+  --control-fill-strong: rgb(255 255 255 / 0.14);
+  --terminal-halo-color: rgb(0 0 0 / 0.72);
+  --danger-fill-percent: 14%;
+  --bell-fill-percent: 5%;
 }
 
 * {
@@ -83,54 +80,32 @@ select:focus-visible {
   color: var(--text);
 }
 
-.app-shell[data-theme='light'] {
-  color-scheme: light;
-  --text: #181818;
-  --text-muted: #4e4e4e;
-  --text-faint: #747474;
-  --danger: #a74850;
-  --background-rgb: 244 244 244;
-  --control-fill: rgb(0 0 0 / 0.0275);
-  --control-fill-hover: rgb(0 0 0 / 0.045);
-  --control-fill-strong: rgb(0 0 0 / 0.065);
-  --terminal-halo-color: rgb(255 255 255 / 0.39);
-}
-
-.background-tint,
-.background-noise {
+.background-tint {
   position: absolute;
   inset: 0;
   z-index: -2;
   pointer-events: none;
-}
-
-.background-tint {
-  background: rgb(var(--background-rgb) / var(--background-opacity));
-}
-
-.app-shell[data-native-glass='acrylic'] .background-tint {
   background: transparent;
 }
 
-.app-shell[data-native-glass='pseudo'] .background-tint {
+.app-shell[data-backdrop-mode='opaque'] .background-tint {
   background: rgb(var(--background-rgb));
 }
 
 .background-noise {
-  z-index: -1;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   opacity: var(--background-noise-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
   background-size: 180px 180px;
   mix-blend-mode: soft-light;
 }
 
-.app-shell[data-glass-availability='accessibility-disabled'] .background-noise {
+.app-shell[data-backdrop-status='policy-disabled'] .background-noise,
+.app-shell[data-backdrop-status='runtime-failure'] .background-noise {
   display: none;
-}
-
-.app-shell[data-high-contrast='true'] {
-  background: Canvas;
-  color: CanvasText;
 }
 
 .titlebar {
@@ -308,8 +283,7 @@ select:focus-visible {
   padding: 6px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: transparent;
-  backdrop-filter: blur(var(--effect-blur)) saturate(1);
+  background: var(--control-fill-strong);
 }
 
 .profile-menu button {
@@ -357,6 +331,7 @@ select:focus-visible {
 }
 
 .terminal-slot {
+  z-index: 1;
   display: none;
 }
 
@@ -405,8 +380,33 @@ select:focus-visible {
 .toast {
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: transparent;
-  backdrop-filter: blur(var(--effect-blur)) saturate(1);
+  background: var(--control-fill-strong);
+}
+
+.backdrop-warning {
+  position: absolute;
+  top: calc(var(--titlebar-height) + 7px);
+  left: 50%;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(680px, calc(100vw - 28px));
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgb(var(--background-rgb) / 0.94);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.backdrop-warning code {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .exit-card {
@@ -856,22 +856,15 @@ select:focus-visible {
 }
 
 @media (forced-colors: active) {
+  .app-shell {
+    forced-color-adjust: none;
+  }
+
   .background-tint {
-    background: Canvas !important;
+    background: rgb(var(--background-rgb)) !important;
   }
 
   .background-noise {
     display: none;
-  }
-
-  .titlebar,
-  .terminal-stage,
-  .settings-drawer,
-  .modal-panel,
-  .profile-menu,
-  .search-bar {
-    background: Canvas;
-    color: CanvasText;
-    forced-color-adjust: none;
   }
 }

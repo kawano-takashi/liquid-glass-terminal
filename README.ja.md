@@ -16,16 +16,18 @@ Windows 11向けの、中性でCOSMIC風のフロステッドグラス表現を�
 - ドラッグ可能な複数タブ、Windows shell自動検出、検索、終了したshellの再起動。
 - PowerShell 7、Windows PowerShell、cmd、Git Bash、WSL profile。
 - 複数行paste確認、1 MiB超の必須確認、安全な外部リンク、実行しないファイル／フォルダーdrop。
-- 日本語・英語、システム／ライト／ダーク、設定とwindow位置の保存。
+- 日本語・英語、ダーク固定の外観、設定とwindow位置の保存。
 - telemetry、リモートコンテンツ、更新確認、crash upload、desktop capture、shell profileへのコード注入は一切なし。
 
 ## 対応環境
 
 Liquid Glass Terminal 0.2.0は、Windows 11 22H2以降（build 22621以上）のx64クライアント版だけに対応します。Windows 10、Windows Server、Windows on ARM（x64 emulationを含む）、macOS、Linuxは、設定storeやPTYを作成する前に拒否します。
 
-windowは通常どおりresize、maximize、Snapが可能です。DWMがsystem frostを提供し、自己完結型Windows App SDK Desktop Acrylic controllerが調整可能な中性色tintを提供します。画面収録の許可は要求せず、他windowのpixelをcapture・保持しません。
+windowは通常どおりresize、maximize、Snapが可能です。client領域全体を覆うnative Windows Composition visualが`HostBackdrop → GaussianBlur（Quality、hard border）→ Saturation 1.10`を描画し、その上へ固定の中性色`#181818` tintを重ねます。Electronが透過surfaceを作った直後にDWM system backdropを明示的に無効化します。画面収録の許可は要求せず、他windowのpixelをcapture、copy、保持しません。
 
-「背景の不透明度」は0〜50%を1%刻みで変更でき、既定値は25%です。0%ではDWM blurを残しつつ、tint、luminosity、renderer noise、local blur、装飾fill、terminal text haloを0にします。50%ではtint opacityが0.50、luminosity opacityが0.59になります。高コントラスト、透明効果の低減、スクリーンリーダーモード、native Acrylic失敗時は安全な不透明fallbackへ切り替え、理由を表示してsliderを無効化し、保存値は維持します。
+「ガラスの不透明度」は0〜100%を5%刻みで変更でき、既定値は25%です。「曇りの強さ」は8〜74 DIPの14段階から独立して選択でき、既定値は7段階目です。不透明度0%では中性色tintだけが消えてblurは残り、100%では完全な不透明面となってblurを迂回します。操作部とterminal text haloは読みやすい固定表現を保ち、静的な3% noiseはterminal背景だけに表示します。
+
+高コントラスト、透明効果の低減、スクリーンリーダーモード、省電力、Remote Desktop、Windows効果の無効化時は、不透明な中性色面へ自動的に切り替えます。2本のappearance sliderには理由を表示して無効化し、保存値を維持して、policy解除時にfrostを復元します。起動時はComposition効果が対応かつ高速であることを必須とし、初期化を1回だけ再試行した後、localized error codeを表示して終了します。実行中のcompositor障害では1回だけ再構築し、失敗後もPTYを維持したまま不透明表示と再起動案内へ切り替えます。
 
 ## ローカル開発
 
@@ -42,7 +44,7 @@ npm run bootstrap:native
 npm start
 ```
 
-`bootstrap:native`は固定versionのWindows App SDKを復元し、x64 Node-API Acrylic addonと自己完結runtimeを準備し、`node-pty`をElectron ABI向けにrebuildします。
+`bootstrap:native`は固定versionのWindows SDK／C++/WinRT build headerを復元し、x64 Node-API frosted-backdrop addonをbuildして、`node-pty`をElectron ABI向けにrebuildします。package版はWindows 11のsystem Composition／Direct3D libraryだけを使い、Windows App SDK runtimeを同梱しません。
 
 品質チェック：
 

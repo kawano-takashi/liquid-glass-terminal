@@ -1,38 +1,39 @@
 import type {
-  GlassAvailability,
-  GlassMode,
+  BackdropFailureCode,
+  NativeBackdropState,
   SystemAppearance,
-  WindowsGlassState,
 } from '../shared/contracts';
 
-export interface GlassModeInput {
-  windowsAcrylicAvailable: boolean;
-  windowsGlassState?: WindowsGlassState;
+export interface BackdropAppearanceInput {
+  nativeState?: NativeBackdropState;
+  failureCode?: BackdropFailureCode;
   systemAppearance: SystemAppearance;
   screenReaderMode: boolean;
 }
 
-export interface ResolvedGlassAppearance {
-  glassMode: GlassMode;
-  glassAvailability: GlassAvailability;
+export interface ResolvedBackdropAppearance {
+  backdropMode: 'frosted' | 'opaque';
+  backdropStatus: 'active' | 'policy-disabled' | 'runtime-failure';
+  backdropFailureCode?: BackdropFailureCode;
 }
 
-export function resolveGlassAppearance(input: GlassModeInput): ResolvedGlassAppearance {
+export function resolveBackdropAppearance(
+  input: BackdropAppearanceInput,
+): ResolvedBackdropAppearance {
+  if (input.failureCode || input.nativeState === 'capability-lost') {
+    return {
+      backdropMode: 'opaque',
+      backdropStatus: 'runtime-failure',
+      backdropFailureCode: input.failureCode ?? 'runtime-rebuild-failed',
+    };
+  }
   if (
     input.systemAppearance.highContrast ||
     input.systemAppearance.reducedTransparency ||
-    input.screenReaderMode
+    input.screenReaderMode ||
+    input.nativeState === 'policy-disabled'
   ) {
-    return { glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' };
+    return { backdropMode: 'opaque', backdropStatus: 'policy-disabled' };
   }
-  if (!input.windowsAcrylicAvailable) {
-    return { glassMode: 'pseudo', glassAvailability: 'unsupported' };
-  }
-  if (input.windowsGlassState === 'fallback') {
-    return { glassMode: 'acrylic', glassAvailability: 'system-fallback' };
-  }
-  if (input.windowsGlassState === 'high-contrast') {
-    return { glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' };
-  }
-  return { glassMode: 'acrylic', glassAvailability: 'active' };
+  return { backdropMode: 'frosted', backdropStatus: 'active' };
 }

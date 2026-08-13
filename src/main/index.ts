@@ -13,13 +13,13 @@ import {
 } from 'electron';
 import type {
   AppCommand,
+  BackdropFailureCode,
+  BackdropPreviewPatch,
   BootstrapState,
-  GlassAvailability,
-  GlassMode,
-  SettingsV3,
+  NativeBackdropState,
+  SettingsV4,
   SystemAppearance,
   WindowAppearance,
-  WindowsGlassState,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
 import { resolveLocale } from '../shared/i18n';
@@ -27,10 +27,11 @@ import {
   isContextMenuState,
   isSessionCreateRequest,
   safeExternalUrl,
+  validateBackdropPreviewPatch,
   validateSettingsPatch,
-  validateBackgroundOpacity,
 } from '../shared/validation';
 import { CwdTokenVault, parseLaunchRequest, type LaunchRequest } from './cli';
+import { initializeBackdropWithRetry, OneShotBackdropRecovery } from './backdrop-recovery';
 import { currentHostEnvironment, resolveHostSupport } from './host-support';
 import {
   installApplicationMenu,
@@ -47,8 +48,8 @@ import {
 import { SettingsStore } from './settings-store';
 import { ShellProfileRegistry } from './shell-profiles';
 import { WindowStateStore } from './window-state';
-import { resolveGlassAppearance } from './window-appearance';
-import { WindowsGlass } from './windows-glass';
+import { resolveBackdropAppearance } from './window-appearance';
+import { BackdropNativeError, resolveWindowsBackdropOptions, WindowsGlass } from './windows-glass';
 
 registerPrivilegedScheme();
 
@@ -64,28 +65,27 @@ let profiles: ShellProfileRegistry;
 let ptyManager: PtyManager;
 let allowWindowClose = false;
 let rendererReady = false;
-let currentGlassMode: GlassMode = 'pseudo';
-let currentGlassAvailability: GlassAvailability = 'unsupported';
-let windowsAcrylicAvailable = false;
-let windowsGlassState: WindowsGlassState | undefined;
+let nativeBackdropState: NativeBackdropState | undefined;
+let backdropFailureCode: BackdropFailureCode | undefined;
+const runtimeRecovery = new OneShotBackdropRecovery();
+let backdropPolicyTimer: ReturnType<typeof setInterval> | undefined;
 const commandQueue: AppCommand[] = [];
 const cwdTokens = new CwdTokenVault();
 let initialLaunchCwdToken: string | undefined;
 let initialStartupNotice: string | undefined;
-const windowsGlass = new WindowsGlass(handleWindowsGlassStateChanged);
+const windowsGlass = new WindowsGlass(handleNativeBackdropStateChanged);
 
 function appearance(): SystemAppearance {
   return {
-    resolvedTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
     highContrast: nativeTheme.shouldUseHighContrastColors,
     reducedTransparency: nativeTheme.prefersReducedTransparency,
   };
 }
 
-function desiredGlassAppearance() {
-  return resolveGlassAppearance({
-    windowsAcrylicAvailable,
-    windowsGlassState,
+function desiredBackdropAppearance() {
+  return resolveBackdropAppearance({
+    nativeState: nativeBackdropState,
+    failureCode: backdropFailureCode,
     systemAppearance: appearance(),
     screenReaderMode: settingsStore.value.screenReaderMode,
   });
@@ -94,8 +94,7 @@ function desiredGlassAppearance() {
 function windowAppearance(): WindowAppearance {
   return {
     ...appearance(),
-    glassMode: currentGlassMode,
-    glassAvailability: currentGlassAvailability,
+    ...desiredBackdropAppearance(),
   };
 }
 
@@ -104,12 +103,12 @@ function publishWindowAppearance(): void {
   mainWindow.webContents.send(IPC_CHANNELS.windowAppearance, windowAppearance());
 }
 
-function handleWindowsGlassStateChanged(state: WindowsGlassState): void {
-  windowsGlassState = state;
-  const resolved = desiredGlassAppearance();
-  currentGlassMode = resolved.glassMode;
-  currentGlassAvailability = resolved.glassAvailability;
-  publishWindowAppearance();
+function handleNativeBackdropStateChanged(state: NativeBackdropState): void {
+  if (state === 'capability-lost') {
+    recoverNativeBackdrop();
+    return;
+  }
+  applyNativeAppearance();
 }
 
 function locale(): 'en' | 'ja' {
@@ -124,31 +123,89 @@ function sendCommand(command: AppCommand): void {
   mainWindow.webContents.send(IPC_CHANNELS.command, command);
 }
 
-function applyNativeAppearance(backgroundOpacity = settingsStore.value.backgroundOpacity): void {
+function currentBackdropOptions(preview: BackdropPreviewPatch = {}) {
+  return resolveWindowsBackdropOptions(
+    appearance(),
+    settingsStore.value.screenReaderMode,
+    settingsStore.value,
+    preview,
+  );
+}
+
+function updateTitleBarOverlay(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const systemAppearance = appearance();
-  let resolved = desiredGlassAppearance();
-  if (resolved.glassMode === 'acrylic') {
-    const state = windowsGlass.apply(mainWindow, systemAppearance, backgroundOpacity);
-    if (state) {
-      windowsGlassState = state;
-    } else {
-      windowsAcrylicAvailable = false;
-      windowsGlassState = undefined;
-    }
-    resolved = desiredGlassAppearance();
-  } else {
-    windowsGlass.detach();
-    windowsGlassState = undefined;
-  }
-  currentGlassMode = resolved.glassMode;
-  currentGlassAvailability = resolved.glassAvailability;
   mainWindow.setTitleBarOverlay({
     color: '#00000000',
-    symbolColor: nativeTheme.shouldUseDarkColors ? '#f5f5f5' : '#171717',
+    symbolColor: '#f5f5f5',
     height: 44,
   });
+}
+
+function enterStickyBackdropFailure(error: unknown): void {
+  console.error('Native backdrop recovery failed; using the opaque runtime fallback.', error);
+  backdropFailureCode = 'runtime-rebuild-failed';
+  nativeBackdropState = 'capability-lost';
+  windowsGlass.detach();
+  updateTitleBarOverlay();
   publishWindowAppearance();
+}
+
+function recoverNativeBackdrop(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (backdropFailureCode || runtimeRecovery.attempted) {
+    enterStickyBackdropFailure(new Error('The one permitted backdrop rebuild was exhausted.'));
+    return;
+  }
+  try {
+    nativeBackdropState = runtimeRecovery.run(() => {
+      windowsGlass.probe();
+      return windowsGlass.rebuild(mainWindow!, currentBackdropOptions());
+    });
+    updateTitleBarOverlay();
+    publishWindowAppearance();
+  } catch (error: unknown) {
+    enterStickyBackdropFailure(error);
+  }
+}
+
+function applyNativeAppearance(preview: BackdropPreviewPatch = {}): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (backdropFailureCode) {
+    updateTitleBarOverlay();
+    publishWindowAppearance();
+    return;
+  }
+  try {
+    nativeBackdropState = windowsGlass.apply(mainWindow, currentBackdropOptions(preview));
+    updateTitleBarOverlay();
+    publishWindowAppearance();
+  } catch (error: unknown) {
+    console.warn('Native backdrop update failed; attempting one rebuild.', error);
+    recoverNativeBackdrop();
+  }
+}
+
+function initializeNativeBackdrop(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new BackdropNativeError('attach-failed', 'The application window is unavailable.');
+  }
+  try {
+    nativeBackdropState = initializeBackdropWithRetry(
+      () => {
+        windowsGlass.probe();
+        return windowsGlass.apply(mainWindow!, currentBackdropOptions());
+      },
+      (error, attempt) => {
+        windowsGlass.detach();
+        console.warn(`Native backdrop startup attempt ${attempt} failed.`, error);
+      },
+    );
+    updateTitleBarOverlay();
+  } catch (error: unknown) {
+    throw error instanceof Error
+      ? error
+      : new BackdropNativeError('attach-failed', 'The frosted backdrop could not be initialized.');
+  }
 }
 
 function rebuildMenu(): void {
@@ -185,22 +242,21 @@ function installIpc(): void {
     };
   });
 
-  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV3 => {
+  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV4 => {
     if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
     const patch = validateSettingsPatch(value);
     if (!patch) throw new TypeError('Invalid settings patch');
     const next = settingsStore.update(patch);
-    if (patch.theme !== undefined) nativeTheme.themeSource = patch.theme;
     if (patch.locale !== undefined) rebuildMenu();
     applyNativeAppearance();
     return next;
   });
 
-  ipcMain.on(IPC_CHANNELS.previewBackgroundOpacity, (event, value: unknown) => {
+  ipcMain.on(IPC_CHANNELS.previewBackdrop, (event, value: unknown) => {
     if (!isTrustedFrame(event)) return;
-    const opacity = validateBackgroundOpacity(value);
-    if (opacity === null) return;
-    applyNativeAppearance(opacity);
+    const patch = validateBackdropPreviewPatch(value);
+    if (!patch) return;
+    applyNativeAppearance(patch);
   });
 
   ipcMain.on(IPC_CHANNELS.requestSession, (event, value: unknown) => {
@@ -308,11 +364,6 @@ function installIpc(): void {
 async function createWindow(): Promise<void> {
   const stateStore = new WindowStateStore();
   const state = stateStore.restore();
-  windowsAcrylicAvailable = windowsGlass.isSupported();
-  const initialGlassAppearance = desiredGlassAppearance();
-  currentGlassMode = initialGlassAppearance.glassMode;
-  currentGlassAvailability = initialGlassAppearance.glassAvailability;
-  const isDark = nativeTheme.shouldUseDarkColors;
 
   mainWindow = new BrowserWindow({
     x: state.x,
@@ -325,13 +376,13 @@ async function createWindow(): Promise<void> {
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#00000000',
-      symbolColor: isDark ? '#f5f5f5' : '#171717',
+      symbolColor: '#f5f5f5',
       height: 44,
     },
-    // Electron establishes the system-drawn backdrop. The Node-API bridge keeps the
-    // transient DWM frost and attaches the adjustable neutral controller.
-    ...(windowsAcrylicAvailable ? { backgroundMaterial: 'acrylic' as const } : {}),
-    backgroundColor: windowsAcrylicAvailable ? '#00000000' : isDark ? '#181818' : '#f4f4f4',
+    // This enables Chromium's translucent surface. Native code immediately disables
+    // the DWM system backdrop and supplies the custom HostBackdrop effect graph.
+    backgroundMaterial: 'acrylic',
+    backgroundColor: '#00000000',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -344,7 +395,13 @@ async function createWindow(): Promise<void> {
     },
   });
 
-  applyNativeAppearance();
+  try {
+    initializeNativeBackdrop();
+  } catch (error: unknown) {
+    mainWindow.destroy();
+    mainWindow = undefined;
+    throw error;
+  }
 
   stateStore.track(mainWindow);
   hardenWindow(mainWindow, MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -383,6 +440,9 @@ async function createWindow(): Promise<void> {
   } else {
     await mainWindow.loadURL('app://bundle/index.html');
   }
+
+  backdropPolicyTimer = setInterval(() => applyNativeAppearance(), 5_000);
+  backdropPolicyTimer.unref();
 }
 
 function handleSecondInstance(request: LaunchRequest): void {
@@ -422,7 +482,7 @@ void app
     settingsStore = new SettingsStore();
     profiles = new ShellProfileRegistry();
     await profiles.detect();
-    nativeTheme.themeSource = settingsStore.value.theme;
+    nativeTheme.themeSource = 'dark';
 
     if (initialLaunch.cwd) initialLaunchCwdToken = cwdTokens.issue(initialLaunch.cwd);
     if (initialLaunch.invalidCwd) initialStartupNotice = 'invalidCwd';
@@ -448,7 +508,19 @@ void app
   })
   .catch((error: unknown) => {
     console.error('Application startup failed', error);
+    if (error instanceof BackdropNativeError) {
+      const japanese = app.getLocale().toLowerCase().startsWith('ja');
+      dialog.showErrorBox(
+        japanese ? '背景効果を開始できません' : 'Frosted backdrop unavailable',
+        japanese
+          ? `必要な背景効果を初期化できませんでした。Windows とグラフィックスドライバーを更新して再起動してください。\n\nエラーコード: ${error.code}`
+          : `The required backdrop effect could not be initialized. Update Windows and your graphics driver, then restart the app.\n\nError code: ${error.code}`,
+      );
+    }
     app.quit();
   });
 
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => {
+  if (backdropPolicyTimer) clearInterval(backdropPolicyTimer);
+  app.quit();
+});

@@ -1,7 +1,7 @@
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
   updateSettings: 'settings:update',
-  previewBackgroundOpacity: 'appearance:preview-background-opacity',
+  previewBackdrop: 'appearance:preview-backdrop',
   requestSession: 'terminal:request-session',
   sessionPort: 'terminal:session-port',
   prepareDroppedPath: 'terminal:prepare-dropped-path',
@@ -19,21 +19,25 @@ export const IPC_CHANNELS = {
 } as const;
 
 export type LocaleMode = 'system' | 'en' | 'ja';
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
 export type LegacyGlassPreset = 'clear' | 'balanced' | 'dense';
 export type CursorStyle = 'block' | 'bar' | 'underline';
-export type GlassMode = 'acrylic' | 'pseudo';
-export type GlassAvailability =
-  'active' | 'accessibility-disabled' | 'unsupported' | 'system-fallback';
-export type WindowsGlassState = 'active' | 'fallback' | 'high-contrast';
+export type BackdropMode = 'frosted' | 'opaque';
+export type BackdropStatus = 'active' | 'policy-disabled' | 'runtime-failure';
+export type BackdropFailureCode =
+  | 'addon-load-failed'
+  | 'effects-unsupported'
+  | 'effects-not-fast'
+  | 'effect-graph-failed'
+  | 'attach-failed'
+  | 'runtime-rebuild-failed';
+export type NativeBackdropState = 'active' | 'policy-disabled' | 'capability-lost';
 export type ShellProfileKind = 'powershell' | 'windows-powershell' | 'cmd' | 'git-bash' | 'wsl';
 
-export interface SettingsV3 {
-  schemaVersion: 3;
+export interface SettingsV4 {
+  schemaVersion: 4;
   locale: LocaleMode;
-  theme: ThemeMode;
-  backgroundOpacity: number;
+  glassOpacity: number;
+  frostStrength: number;
   defaultProfileId: string;
   fontSize: number;
   cursorStyle: CursorStyle;
@@ -45,7 +49,12 @@ export interface SettingsV3 {
   firstRunHintsSeen: boolean;
 }
 
-export type SettingsPatch = Partial<Omit<SettingsV3, 'schemaVersion'>>;
+export type SettingsPatch = Partial<Omit<SettingsV4, 'schemaVersion'>>;
+
+export interface BackdropPreviewPatch {
+  glassOpacity?: number;
+  frostStrength?: number;
+}
 
 export interface ShellProfileDescriptor {
   id: string;
@@ -55,19 +64,19 @@ export interface ShellProfileDescriptor {
 }
 
 export interface SystemAppearance {
-  resolvedTheme: ResolvedTheme;
   highContrast: boolean;
   reducedTransparency: boolean;
 }
 
 export interface WindowAppearance extends SystemAppearance {
-  glassMode: GlassMode;
-  glassAvailability: GlassAvailability;
+  backdropMode: BackdropMode;
+  backdropStatus: BackdropStatus;
+  backdropFailureCode?: BackdropFailureCode;
 }
 
 export interface BootstrapState {
   appVersion: string;
-  settings: SettingsV3;
+  settings: SettingsV4;
   profiles: ShellProfileDescriptor[];
   windowAppearance: WindowAppearance;
   launchCwdToken?: string;
@@ -126,8 +135,8 @@ export interface ContextMenuState {
 
 export interface PreloadApi {
   bootstrap(): Promise<BootstrapState>;
-  updateSettings(patch: SettingsPatch): Promise<SettingsV3>;
-  previewBackgroundOpacity(opacity: number): void;
+  updateSettings(patch: SettingsPatch): Promise<SettingsV4>;
+  previewBackdrop(patch: BackdropPreviewPatch): void;
   requestSession(request: SessionCreateRequest): void;
   prepareDroppedPath(sessionId: string, path: string): Promise<string | null>;
   openExternal(url: string): Promise<boolean>;

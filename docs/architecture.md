@@ -28,32 +28,33 @@ OSC 0/2 supplies a sanitized, 80-grapheme tab title. OSC 7 is accepted only for 
 ```text
 Windows 11 22H2+ x64 client
         │
-        ├─ DWM transient system backdrop ───────── fixed frost / blur
-        ├─ Windows App SDK DesktopAcrylicController ─ tint + luminosity
-        └─ renderer effect variables ───────────── noise / local blur / fills / halo
+        ├─ Electron backgroundMaterial: acrylic ── translucent Chromium surface only
+        ├─ DWM system backdrop: NONE
+        ├─ Windows.UI.Composition DesktopWindowTarget
+        │      HostBackdrop
+        │        → GaussianBlur (Quality + hard border, 8–74 DIPs)
+        │        → Saturation (1.10)
+        │        → fixed dark tint (#181818)
+        └─ renderer ── fixed controls + text halo; static 3% terminal-only noise
 ```
 
-The application uses a normal resizable, maximizable, Snap-compatible BrowserWindow; it does not use Electron's `transparent: true` mode. The native bridge keeps the DWM transient backdrop active and attaches a self-contained Windows App SDK 2.3 Acrylic controller. It reapplies a borderless small-corner policy while preserving standard window behavior. No component captures, stores, or redraws the desktop.
+The application uses a normal resizable, maximizable, Snap-compatible BrowserWindow; it does not use Electron's `transparent: true` mode. Electron's `backgroundMaterial: 'acrylic'` is used only to establish Chromium's internal translucent surface. Native code immediately sets `DWMWA_SYSTEMBACKDROP_TYPE` to `NONE`, extends the frame, and attaches one client-sized Composition visual tree. The app never calls Electron's material setter with `none`, and no component captures, stores, or redraws desktop pixels.
 
-`backgroundOpacity` is an integer from 0 to 50. Native values are linear:
+The visual source is `CreateHostBackdropBrush()`. A Direct2D Gaussian blur configured for Quality optimization and hard borders feeds a fixed Saturation 1.10 effect. A dark `#181818` color sprite is layered above it. `glassOpacity` is an integer from 0 to 100 in steps of 5 and directly controls that sprite's opacity. `frostStrength` is an integer index from 0 to 13:
 
 ```text
-strength = backgroundOpacity / 50
-tint opacity = backgroundOpacity / 100
-luminosity opacity = 0.59 × strength
+index:  0   1   2   3   4   5   6   7   8   9  10  11  12  13
+blur:   8  10  12  14  17  20  24  28  33  39  46  54  63  74 DIPs
 ```
 
-Thus 0% maps to 0/0, the 25% default maps to 0.25/0.295, and 50% maps to 0.50/0.59. The renderer uses the same strength for decorative noise, local `backdrop-filter` blur, translucent control fills, danger/bell fills, and the terminal text halo. All reach zero at the slider's 0% endpoint; functional text, icons, cursor, selection, focus, and error color remain visible.
+The defaults are 25% glass opacity and frost index 6 (shown as 7/14). At 0% the tint is absent but the blur visual remains active. At 100% the tint is fully opaque and the blur visual is hidden so unnecessary blur work is bypassed. There are no local CSS `backdrop-filter` layers. Control fills, danger/bell fills, and the terminal text halo stay fixed for readability; static 3% noise sits behind terminal content only and is removed for opaque policy/failure output.
 
-The main process is the source of truth for system appearance and native material availability. High contrast, reduced transparency, screen-reader mode, an unavailable addon, or a runtime controller failure switches to a safe opaque pseudo material. The renderer then uses full-strength readable controls, the slider is disabled with a reason, and its saved value is retained.
+The native addon uses only Windows system APIs. Its strict capability probe requires active DWM composition, a hardware Direct3D 11 feature-level 11 adapter (software adapters are rejected), and successful creation of the exact Windows.UI.Composition effect graph. This is also run when policy currently disables transparency. Initialization gets two total attempts; failure shows a localized dialog with a stable code and exits before any PTY is created. No Windows App SDK runtime is staged or loaded.
+
+The main process is the source of truth for material status. High contrast, reduced transparency, screen-reader mode, disabled advanced effects, energy saver, or Remote Desktop switches the attached tree and renderer to an opaque dark surface without replacing the app's colors with Windows forced colors. Both appearance sliders are disabled with a reason, saved values remain untouched, and polling plus native change notifications restore frost automatically. A runtime exception or capability loss permits one detach/probe/reattach cycle. If that fails—or a later failure occurs—the opaque fallback is sticky until restart, existing PTYs stay alive, and the renderer displays persistent nonmodal guidance.
 
 ## Persistence
 
-Settings and window geometry are separate atomic JSON stores. Settings schema v3 stores integer `backgroundOpacity`. Migration rules are deterministic:
-
-- v2 `glassOpacity` values from 0 to 50 are preserved, values above 50 become 50, and values below 0 become 0.
-- Invalid v2 values become the 25% default.
-- v1 Clear, Balanced, and Dense presets become 10%, 25%, and 40%.
-- Legacy `glass` and `glassOpacity` keys are removed.
+Settings and window geometry are separate atomic JSON stores. Settings schema v4 stores integer `glassOpacity` and `frostStrength`. Any pre-v4 record resets appearance to the new defaults (25% and index 6) while preserving unrelated settings. Legacy `theme`, `glass`, and `backgroundOpacity` keys are removed. A valid v4 record is idempotent.
 
 Only settings, one-time hints, and clamped geometry persist. Tabs, PTYs, output, titles, and order never survive restart.

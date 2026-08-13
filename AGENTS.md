@@ -41,7 +41,7 @@ npm run verify:fuses
 
 ## Tech Stack
 
-- TypeScript 6.0.3 / Electron 43.2.0 / React 19.2.8 / Vite 8.2.1 / Vitest 4.1.10 / Playwright 1.62.1 / C++20 Node-API / Windows App SDK 2.3.1.
+- TypeScript 6.0.3 / Electron 43.2.0 / React 19.2.8 / Vite 8.2.1 / Vitest 4.1.10 / Playwright 1.62.1 / C++20 Node-API / Windows.UI.Composition / Direct3D 11.
 
 ## Constraints
 
@@ -60,7 +60,7 @@ npm run verify:fuses
 
 - Changes to PTY framing, IPC, preload APIs, URL/path validation, permissions, CSP, or Electron Fuses require tests for rejected and valid input.
 - Keep terminal text outside decorative distortion and preserve an xterm contrast ratio of at least 4.5.
-- Verify UI changes in light, dark, high-contrast, reduced-transparency, and reduced-motion modes.
+- Verify that Windows light and dark settings both keep the app dark, and verify dark high-contrast, reduced-transparency, and reduced-motion modes.
 - Update English and Japanese dictionaries and README files together.
 - Set `LGT_CLIPBOARD_E2E=1` only intentionally; the test temporarily replaces and restores the OS clipboard text.
 - Regenerate a normal package after E2E packaging before running final Fuse verification.

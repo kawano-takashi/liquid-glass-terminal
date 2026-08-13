@@ -3,62 +3,47 @@ import { migrateSettingsRecord } from '../../src/shared/settings-migration';
 
 describe('settings migration', () => {
   it.each([
-    ['clear', 10],
-    ['balanced', 25],
-    ['dense', 40],
-  ] as const)('maps the legacy %s preset to %i percent', (glass, backgroundOpacity) => {
-    expect(migrateSettingsRecord({ schemaVersion: 1, glass, locale: 'ja', fontSize: 17 })).toEqual({
-      schemaVersion: 3,
-      backgroundOpacity,
+    { schemaVersion: 1, glass: 'clear' },
+    { schemaVersion: 2, glassOpacity: 85 },
+    { schemaVersion: 3, backgroundOpacity: 12 },
+  ])('resets all pre-v4 appearance values while preserving unrelated settings: %o', (legacy) => {
+    expect(
+      migrateSettingsRecord({ ...legacy, locale: 'ja', theme: 'light', fontSize: 17 }),
+    ).toEqual({
+      schemaVersion: 4,
+      glassOpacity: 25,
+      frostStrength: 6,
       locale: 'ja',
       fontSize: 17,
     });
   });
 
-  it('clamps opacity saved with the previous upper bound', () => {
-    expect(migrateSettingsRecord({ schemaVersion: 2, glassOpacity: 85, theme: 'dark' })).toEqual({
-      schemaVersion: 3,
-      backgroundOpacity: 50,
+  it('removes the legacy theme while preserving current v4 appearance values idempotently', () => {
+    const current = {
+      schemaVersion: 4,
+      glassOpacity: 0,
+      frostStrength: 13,
       theme: 'dark',
-    });
+    };
+    const expected = { schemaVersion: 4, glassOpacity: 0, frostStrength: 13 };
+    expect(migrateSettingsRecord(current)).toEqual(expected);
+    expect(migrateSettingsRecord(migrateSettingsRecord(current))).toEqual(expected);
   });
 
-  it('preserves v2 values already inside the new range and clamps the lower endpoint', () => {
-    expect(migrateSettingsRecord({ schemaVersion: 2, glassOpacity: 25 })).toEqual({
-      schemaVersion: 3,
-      backgroundOpacity: 25,
-    });
-    expect(migrateSettingsRecord({ schemaVersion: 2, glassOpacity: -10 })).toEqual({
-      schemaVersion: 3,
-      backgroundOpacity: 0,
-    });
-  });
-
-  it('uses the safe default for a malformed legacy preset and is idempotent', () => {
-    const migrated = migrateSettingsRecord({ schemaVersion: 1, glass: 'broken', theme: 'dark' });
-    expect(migrated).toEqual({ schemaVersion: 3, backgroundOpacity: 25, theme: 'dark' });
-    expect(migrateSettingsRecord(migrated)).toEqual(migrated);
-  });
-
-  it('uses the default for invalid numeric values and removes both legacy keys', () => {
+  it('removes every legacy appearance key', () => {
     expect(
       migrateSettingsRecord({
-        schemaVersion: 2,
-        glassOpacity: Number.NaN,
-        glass: undefined,
+        schemaVersion: 3,
+        backgroundOpacity: 50,
+        glass: 'dense',
+        glassOpacity: 100,
       }),
-    ).toEqual({ schemaVersion: 3, backgroundOpacity: 25 });
-  });
-
-  it('keeps the current v3 value when a stale legacy key is also present', () => {
-    expect(
-      migrateSettingsRecord({ schemaVersion: 3, backgroundOpacity: 12, glassOpacity: 50 }),
-    ).toEqual({ schemaVersion: 3, backgroundOpacity: 12 });
+    ).toEqual({ schemaVersion: 4, glassOpacity: 25, frostStrength: 6 });
   });
 
   it('does not mutate the source record', () => {
-    const source = { schemaVersion: 1, glass: 'clear' } as const;
+    const source = { schemaVersion: 3, backgroundOpacity: 25, theme: 'system' } as const;
     migrateSettingsRecord(source);
-    expect(source).toEqual({ schemaVersion: 1, glass: 'clear' });
+    expect(source).toEqual({ schemaVersion: 3, backgroundOpacity: 25, theme: 'system' });
   });
 });

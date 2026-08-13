@@ -15,7 +15,11 @@
         "_WIN32_WINNT=0x0A00"
       ],
       "libraries": [
+        "d2d1.lib",
+        "d3d11.lib",
         "dwmapi.lib",
+        "dxguid.lib",
+        "dxgi.lib",
         "runtimeobject.lib",
         "windowsapp.lib"
       ],

@@ -2,7 +2,7 @@ import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import Store from 'electron-store';
-import type { SettingsPatch, SettingsV3 } from '../shared/contracts';
+import type { SettingsPatch, SettingsV4 } from '../shared/contracts';
 import { migrateSettingsRecord } from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
 
@@ -34,24 +34,28 @@ export class SettingsStore {
       defaults: { ...DEFAULT_SETTINGS },
       schema: SETTINGS_SCHEMA,
       clearInvalidConfig: false,
+      // Settings migrations follow the schema version, independently of the app release.
+      // This guarantees v4 runs for development builds that already recorded app 0.2.0.
+      ...({ projectVersion: '4.0.1' } as Record<string, unknown>),
       migrations: {
-        '0.1.0': (store) => {
+        '4.0.0': (store) => {
           store.store = migrateSettingsRecord(store.store);
         },
-        '0.2.0': (store) => {
+        // Development builds may already have recorded 4.0.0 with a theme key.
+        '4.0.1': (store) => {
           store.store = migrateSettingsRecord(store.store);
         },
       },
     });
   }
 
-  get value(): SettingsV3 {
-    const stored = this.#store.store as unknown as SettingsV3;
+  get value(): SettingsV4 {
+    const stored = this.#store.store as unknown as SettingsV4;
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       locale: stored.locale,
-      theme: stored.theme,
-      backgroundOpacity: stored.backgroundOpacity,
+      glassOpacity: stored.glassOpacity,
+      frostStrength: stored.frostStrength,
       defaultProfileId: stored.defaultProfileId,
       fontSize: stored.fontSize,
       cursorStyle: stored.cursorStyle,
@@ -64,7 +68,7 @@ export class SettingsStore {
     };
   }
 
-  update(patch: SettingsPatch): SettingsV3 {
+  update(patch: SettingsPatch): SettingsV4 {
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) this.#store.set(key, value);
     }

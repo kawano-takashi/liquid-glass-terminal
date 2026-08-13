@@ -16,16 +16,18 @@ A local-first Electron terminal with a neutral, COSMIC-inspired frosted-glass in
 - Draggable tabs, Windows shell discovery, search, and restartable exited sessions.
 - PowerShell 7, Windows PowerShell, cmd, Git Bash, and WSL profiles.
 - Multiline paste confirmation, mandatory confirmation above 1 MiB, safe external links, and insert-only file/folder drop.
-- English and Japanese UI, system/light/dark themes, and persisted settings/window geometry.
+- English and Japanese UI, a dark-only appearance, and persisted settings/window geometry.
 - No telemetry, remote content, update checks, crash uploads, desktop capture, or shell-profile injection.
 
 ## Supported host
 
 Liquid Glass Terminal 0.2.0 supports only the x64 client edition of Windows 11 22H2 or later (build 22621+). Windows 10, Windows Server, Windows on ARM—including x64 emulation—macOS, and Linux are rejected before settings or a PTY are created.
 
-The app remains a normal resizable, maximizable, and Snap-compatible window. DWM supplies the system frost, while a self-contained Windows App SDK Desktop Acrylic controller supplies the adjustable neutral tint. No screen-recording permission is requested and pixels from other windows are never captured or retained.
+The app remains a normal resizable, maximizable, and Snap-compatible window. A native Windows Composition visual spans the client area and renders `HostBackdrop → GaussianBlur (Quality, hard border) → Saturation 1.10`, followed by a fixed neutral `#181818` tint. The DWM system backdrop is explicitly disabled after Electron creates its translucent surface. No screen-recording permission is requested and pixels from other windows are never captured, copied, or retained.
 
-Background opacity ranges from 0% to 50% in 1% steps and defaults to 25%. At 0%, the DWM blur remains visible while tint, luminosity, renderer noise, local blur, decorative fills, and terminal text halo are removed. At 50%, tint opacity is 0.50 and luminosity opacity is 0.59. High contrast, reduced transparency, screen-reader mode, or a native Acrylic failure switches to a safe opaque fallback, disables the slider with an explanation, and preserves the saved value.
+Glass opacity ranges from 0% to 100% in 5% steps and defaults to 25%. Frost strength independently selects one of 14 blur amounts (8–74 DIPs) and defaults to level 7. At 0% opacity the neutral tint disappears while blur remains; at 100% the surface is fully opaque and blur is bypassed. Controls and the terminal text halo keep a fixed readable treatment, while static 3% noise is limited to the terminal background.
+
+High contrast, reduced transparency, screen-reader mode, energy saver, Remote Desktop, or disabled Windows effects automatically switch to an opaque neutral surface, disable both appearance sliders with an explanation, preserve their values, and restore frost when policy permits. Startup requires supported, fast composition effects and retries initialization once before showing a localized error code and exiting. A later compositor failure rebuilds once, then keeps PTYs alive behind an opaque surface and displays restart guidance.
 
 ## Develop locally
 
@@ -42,7 +44,7 @@ npm run bootstrap:native
 npm start
 ```
 
-`bootstrap:native` restores the pinned Windows App SDK, builds the x64 Node-API Acrylic addon, stages its self-contained runtime, and rebuilds `node-pty` for Electron's ABI.
+`bootstrap:native` restores pinned Windows SDK/C++/WinRT build headers, builds the x64 Node-API frosted-backdrop addon, and rebuilds `node-pty` for Electron's ABI. The packaged app uses only Windows 11 system Composition and Direct3D libraries; it carries no Windows App SDK runtime.
 
 Quality gates:
 

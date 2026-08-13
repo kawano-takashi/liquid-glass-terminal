@@ -1,24 +1,28 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type {
+  BackdropPreviewPatch,
   SettingsPatch,
-  SettingsV3,
+  SettingsV4,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../../shared/contracts';
-import { BACKGROUND_OPACITY_MAX, BACKGROUND_OPACITY_MIN } from '../../shared/settings';
+import {
+  FROST_STRENGTH_MAX,
+  FROST_STRENGTH_MIN,
+  GLASS_OPACITY_MAX,
+  GLASS_OPACITY_MIN,
+  GLASS_OPACITY_STEP,
+} from '../../shared/settings';
 
 interface SettingsLabels {
   settings: string;
   close: string;
-  theme: string;
   system: string;
-  light: string;
-  dark: string;
-  backgroundOpacity: string;
-  backgroundUnavailableAccessibility: string;
-  backgroundUnavailableUnsupported: string;
-  backgroundUnavailableSystemFallback: string;
+  glassOpacity: string;
+  frostStrength: string;
+  backdropUnavailablePolicy: string;
+  backdropUnavailableRuntime: string;
   defaultShell: string;
   automatic: string;
   fontSize: string;
@@ -33,39 +37,39 @@ interface SettingsLabels {
 
 interface SettingsDrawerProps {
   open: boolean;
-  settings: SettingsV3;
+  settings: SettingsV4;
   windowAppearance: WindowAppearance;
-  backgroundOpacity: number;
+  glassOpacity: number;
+  frostStrength: number;
   profiles: ShellProfileDescriptor[];
   labels: SettingsLabels;
   onClose(): void;
   onChange(patch: SettingsPatch): void;
-  onBackgroundPreview(opacity: number): void;
-  onBackgroundCommit(opacity?: number): void;
+  onBackdropPreview(patch: BackdropPreviewPatch): void;
+  onBackdropCommit(): void;
 }
 
 export function SettingsDrawer({
   open,
   settings,
   windowAppearance,
-  backgroundOpacity,
+  glassOpacity,
+  frostStrength,
   profiles,
   labels,
   onClose,
   onChange,
-  onBackgroundPreview,
-  onBackgroundCommit,
+  onBackdropPreview,
+  onBackdropCommit,
 }: SettingsDrawerProps) {
   const panelRef = useRef<HTMLElement>(null);
-  const backgroundDisabled = windowAppearance.glassAvailability !== 'active';
-  const backgroundDisabledReason =
-    windowAppearance.glassAvailability === 'accessibility-disabled'
-      ? labels.backgroundUnavailableAccessibility
-      : windowAppearance.glassAvailability === 'system-fallback'
-        ? labels.backgroundUnavailableSystemFallback
-        : windowAppearance.glassAvailability === 'unsupported'
-          ? labels.backgroundUnavailableUnsupported
-          : undefined;
+  const backdropDisabled = windowAppearance.backdropStatus !== 'active';
+  const backdropDisabledReason =
+    windowAppearance.backdropStatus === 'runtime-failure'
+      ? labels.backdropUnavailableRuntime
+      : windowAppearance.backdropStatus === 'policy-disabled'
+        ? labels.backdropUnavailablePolicy
+        : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +122,7 @@ export function SettingsDrawer({
             <span>{labels.language}</span>
             <select
               value={settings.locale}
-              onChange={(event) => onChange({ locale: event.target.value as SettingsV3['locale'] })}
+              onChange={(event) => onChange({ locale: event.target.value as SettingsV4['locale'] })}
             >
               <option value="system">{labels.system}</option>
               <option value="en">English</option>
@@ -126,50 +130,53 @@ export function SettingsDrawer({
             </select>
           </label>
 
-          <fieldset className="segmented-setting">
-            <legend>{labels.theme}</legend>
-            <div className="segmented-control">
-              {(['system', 'light', 'dark'] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  data-active={settings.theme === value}
-                  onClick={() => onChange({ theme: value })}
-                >
-                  {value === 'system'
-                    ? labels.system
-                    : value === 'light'
-                      ? labels.light
-                      : labels.dark}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <label className="setting-field range-field" data-disabled={backgroundDisabled}>
-            <span>{labels.backgroundOpacity}</span>
-            <output>{backgroundOpacity}%</output>
+          <label className="setting-field range-field" data-disabled={backdropDisabled}>
+            <span>{labels.glassOpacity}</span>
+            <output>{glassOpacity}%</output>
             <input
               type="range"
-              min={BACKGROUND_OPACITY_MIN}
-              max={BACKGROUND_OPACITY_MAX}
-              step="1"
-              value={backgroundOpacity}
-              disabled={backgroundDisabled}
-              aria-label={labels.backgroundOpacity}
-              aria-describedby={backgroundDisabledReason ? 'background-opacity-reason' : undefined}
-              onChange={(event) => onBackgroundPreview(Number(event.target.value))}
-              onPointerUp={() => onBackgroundCommit()}
-              onPointerCancel={() => onBackgroundCommit()}
-              onKeyUp={() => onBackgroundCommit()}
-              onBlur={() => onBackgroundCommit()}
+              min={GLASS_OPACITY_MIN}
+              max={GLASS_OPACITY_MAX}
+              step={GLASS_OPACITY_STEP}
+              value={glassOpacity}
+              disabled={backdropDisabled}
+              aria-label={labels.glassOpacity}
+              aria-describedby={backdropDisabledReason ? 'backdrop-settings-reason' : undefined}
+              onChange={(event) => onBackdropPreview({ glassOpacity: Number(event.target.value) })}
+              onPointerUp={onBackdropCommit}
+              onPointerCancel={onBackdropCommit}
+              onKeyUp={onBackdropCommit}
+              onBlur={onBackdropCommit}
             />
-            {backgroundDisabledReason && (
-              <small id="background-opacity-reason" className="setting-reason">
-                {backgroundDisabledReason}
-              </small>
-            )}
           </label>
+
+          <label className="setting-field range-field" data-disabled={backdropDisabled}>
+            <span>{labels.frostStrength}</span>
+            <output>
+              {frostStrength + 1} / {FROST_STRENGTH_MAX + 1}
+            </output>
+            <input
+              type="range"
+              min={FROST_STRENGTH_MIN}
+              max={FROST_STRENGTH_MAX}
+              step="1"
+              value={frostStrength}
+              disabled={backdropDisabled}
+              aria-label={labels.frostStrength}
+              aria-describedby={backdropDisabledReason ? 'backdrop-settings-reason' : undefined}
+              onChange={(event) => onBackdropPreview({ frostStrength: Number(event.target.value) })}
+              onPointerUp={onBackdropCommit}
+              onPointerCancel={onBackdropCommit}
+              onKeyUp={onBackdropCommit}
+              onBlur={onBackdropCommit}
+            />
+          </label>
+
+          {backdropDisabledReason && (
+            <small id="backdrop-settings-reason" className="setting-reason backdrop-setting-reason">
+              {backdropDisabledReason}
+            </small>
+          )}
 
           <label className="setting-field">
             <span>{labels.defaultShell}</span>
@@ -204,7 +211,7 @@ export function SettingsDrawer({
             <select
               value={settings.cursorStyle}
               onChange={(event) =>
-                onChange({ cursorStyle: event.target.value as SettingsV3['cursorStyle'] })
+                onChange({ cursorStyle: event.target.value as SettingsV4['cursorStyle'] })
               }
             >
               <option value="block">Block</option>

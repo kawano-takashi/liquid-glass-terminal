@@ -1,13 +1,19 @@
 import type {
+  BackdropPreviewPatch,
   ContextMenuState,
   CursorStyle,
   LocaleMode,
   RendererToPtyMessage,
   SessionCreateRequest,
   SettingsPatch,
-  ThemeMode,
 } from './contracts';
-import { BACKGROUND_OPACITY_MAX, BACKGROUND_OPACITY_MIN } from './settings';
+import {
+  FROST_STRENGTH_MAX,
+  FROST_STRENGTH_MIN,
+  GLASS_OPACITY_MAX,
+  GLASS_OPACITY_MIN,
+  GLASS_OPACITY_STEP,
+} from './settings';
 
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,80}$/;
 const SESSION_ID = /^[a-f0-9-]{20,80}$/;
@@ -72,8 +78,8 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   if (!isRecord(value)) return null;
   const allowed = new Set([
     'locale',
-    'theme',
-    'backgroundOpacity',
+    'glassOpacity',
+    'frostStrength',
     'defaultProfileId',
     'fontSize',
     'cursorStyle',
@@ -92,15 +98,15 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
       return null;
     patch.locale = value.locale as LocaleMode;
   }
-  if (value.theme !== undefined) {
-    if (typeof value.theme !== 'string' || !['system', 'light', 'dark'].includes(value.theme))
-      return null;
-    patch.theme = value.theme as ThemeMode;
-  }
-  if (value.backgroundOpacity !== undefined) {
-    const opacity = validateBackgroundOpacity(value.backgroundOpacity);
+  if (value.glassOpacity !== undefined) {
+    const opacity = validateGlassOpacity(value.glassOpacity);
     if (opacity === null) return null;
-    patch.backgroundOpacity = opacity;
+    patch.glassOpacity = opacity;
+  }
+  if (value.frostStrength !== undefined) {
+    const strength = validateFrostStrength(value.frostStrength);
+    if (strength === null) return null;
+    patch.frostStrength = strength;
   }
   if (value.defaultProfileId !== undefined) {
     if (typeof value.defaultProfileId !== 'string' || value.defaultProfileId.length > 200)
@@ -138,17 +144,51 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   return patch;
 }
 
-export function validateBackgroundOpacity(value: unknown): number | null {
+export function validateGlassOpacity(value: unknown): number | null {
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||
     !Number.isInteger(value) ||
-    value < BACKGROUND_OPACITY_MIN ||
-    value > BACKGROUND_OPACITY_MAX
+    value < GLASS_OPACITY_MIN ||
+    value > GLASS_OPACITY_MAX ||
+    value % GLASS_OPACITY_STEP !== 0
   ) {
     return null;
   }
   return value;
+}
+
+export function validateFrostStrength(value: unknown): number | null {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < FROST_STRENGTH_MIN ||
+    value > FROST_STRENGTH_MAX
+  ) {
+    return null;
+  }
+  return value;
+}
+
+export function validateBackdropPreviewPatch(value: unknown): BackdropPreviewPatch | null {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value);
+  if (keys.length === 0 || keys.some((key) => key !== 'glassOpacity' && key !== 'frostStrength')) {
+    return null;
+  }
+  const patch: BackdropPreviewPatch = {};
+  if (value.glassOpacity !== undefined) {
+    const opacity = validateGlassOpacity(value.glassOpacity);
+    if (opacity === null) return null;
+    patch.glassOpacity = opacity;
+  }
+  if (value.frostStrength !== undefined) {
+    const strength = validateFrostStrength(value.frostStrength);
+    if (strength === null) return null;
+    patch.frostStrength = strength;
+  }
+  return patch;
 }
 
 export function isContextMenuState(value: unknown): value is ContextMenuState {

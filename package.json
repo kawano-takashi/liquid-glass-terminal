@@ -36,7 +36,7 @@
     "verify:native-assets": "node scripts/verify-native-assets.mjs",
     "smoke:package": "node scripts/smoke-packaged.mjs",
     "bootstrap:native": "node scripts/bootstrap-native.mjs",
-    "build:windows-glass": "node scripts/build-windows-glass.mjs --stage-electron",
+    "build:windows-glass": "node scripts/build-windows-glass.mjs",
     "rebuild:native": "electron-rebuild --force --which-module node-pty"
   },
   "dependencies": {

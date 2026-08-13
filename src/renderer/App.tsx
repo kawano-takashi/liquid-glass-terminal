@@ -1,6 +1,6 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import { RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   clipboardActionForTarget,
   type ClipboardKeyInput,
@@ -8,21 +8,21 @@ import {
 } from '../shared/clipboard';
 import type {
   AppCommand,
+  BackdropPreviewPatch,
   BootstrapState,
   SettingsPatch,
-  SettingsV3,
+  SettingsV4,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../shared/contracts';
 import { formatMessage, isMessageKey, messages, resolveLocale } from '../shared/i18n';
-import { BACKGROUND_OPACITY_DEFAULT } from '../shared/settings';
+import { FROST_STRENGTH_DEFAULT, GLASS_OPACITY_DEFAULT } from '../shared/settings';
 import { detectPasteRisk } from '../shared/validation';
 import { Dialog } from './components/Dialog';
 import { SearchBar } from './components/SearchBar';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { TabBar } from './components/TabBar';
 import { TerminalPane, type TerminalPaneHandle } from './components/TerminalPane';
-import { resolveBackgroundEffectVariables } from './lib/background-effects';
 import { requestTerminalSession } from './lib/session';
 
 interface TabState {
@@ -108,9 +108,12 @@ function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState>();
-  const [settings, setSettings] = useState<SettingsV3>();
+  const [settings, setSettings] = useState<SettingsV4>();
   const [windowAppearance, setWindowAppearance] = useState<WindowAppearance>();
-  const [backgroundPreview, setBackgroundPreview] = useState(BACKGROUND_OPACITY_DEFAULT);
+  const [backdropPreview, setBackdropPreview] = useState({
+    glassOpacity: GLASS_OPACITY_DEFAULT,
+    frostStrength: FROST_STRENGTH_DEFAULT,
+  });
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -124,14 +127,14 @@ export function App() {
   const [linkHover, setLinkHover] = useState<string>();
   const [bellFlash, setBellFlash] = useState(false);
   const terminalRefs = useRef(new Map<string, TerminalPaneHandle>());
-  const settingsRef = useRef<SettingsV3 | undefined>(undefined);
+  const settingsRef = useRef<SettingsV4 | undefined>(undefined);
   const tabsRef = useRef<TabState[]>([]);
   const activeIdRef = useRef<string | undefined>(undefined);
   const initialized = useRef(false);
   const toastSequence = useRef(1);
-  const backgroundPreviewRef = useRef(BACKGROUND_OPACITY_DEFAULT);
-  const backgroundPreviewFrame = useRef<number | undefined>(undefined);
-  const backgroundPersistTimer = useRef<number | undefined>(undefined);
+  const backdropPreviewRef = useRef(backdropPreview);
+  const backdropPreviewFrame = useRef<number | undefined>(undefined);
+  const backdropPersistTimer = useRef<number | undefined>(undefined);
   const commandHandler = useRef<(command: AppCommand) => void>(() => undefined);
   const reducedMotion = useReducedMotion();
 
@@ -150,10 +153,6 @@ export function App() {
     [settings?.locale],
   );
   const t = messages[locale];
-  const resolvedTheme =
-    settings?.theme === 'light' || settings?.theme === 'dark'
-      ? settings.theme
-      : (windowAppearance?.resolvedTheme ?? 'dark');
 
   const toast = useCallback(
     (keyOrText: string) => {
@@ -329,10 +328,14 @@ export function App() {
         if (previous) {
           settingsRef.current = previous;
           setSettings(previous);
-          if (patch.backgroundOpacity !== undefined) {
-            backgroundPreviewRef.current = previous.backgroundOpacity;
-            setBackgroundPreview(previous.backgroundOpacity);
-            window.liquidGlass.previewBackgroundOpacity(previous.backgroundOpacity);
+          if (patch.glassOpacity !== undefined || patch.frostStrength !== undefined) {
+            const restored = {
+              glassOpacity: previous.glassOpacity,
+              frostStrength: previous.frostStrength,
+            };
+            backdropPreviewRef.current = restored;
+            setBackdropPreview(restored);
+            window.liquidGlass.previewBackdrop(restored);
           }
         }
         toast(locale === 'ja' ? '設定を保存できませんでした。' : 'Could not save settings.');
@@ -341,37 +344,44 @@ export function App() {
     [locale, toast],
   );
 
-  const commitBackgroundOpacity = useCallback(
-    (opacity = backgroundPreviewRef.current) => {
-      if (backgroundPersistTimer.current !== undefined) {
-        window.clearTimeout(backgroundPersistTimer.current);
-        backgroundPersistTimer.current = undefined;
-      }
-      if (settingsRef.current?.backgroundOpacity === opacity) return;
-      void updateSettings({ backgroundOpacity: opacity });
-    },
-    [updateSettings],
-  );
+  const commitBackdrop = useCallback(() => {
+    if (backdropPersistTimer.current !== undefined) {
+      window.clearTimeout(backdropPersistTimer.current);
+      backdropPersistTimer.current = undefined;
+    }
+    const current = settingsRef.current;
+    if (!current) return;
+    const preview = backdropPreviewRef.current;
+    const patch: SettingsPatch = {};
+    if (current.glassOpacity !== preview.glassOpacity) {
+      patch.glassOpacity = preview.glassOpacity;
+    }
+    if (current.frostStrength !== preview.frostStrength) {
+      patch.frostStrength = preview.frostStrength;
+    }
+    if (Object.keys(patch).length > 0) void updateSettings(patch);
+  }, [updateSettings]);
 
-  const previewBackgroundOpacity = useCallback(
-    (opacity: number) => {
-      backgroundPreviewRef.current = opacity;
-      setBackgroundPreview(opacity);
-      if (backgroundPreviewFrame.current === undefined) {
-        backgroundPreviewFrame.current = requestAnimationFrame(() => {
-          backgroundPreviewFrame.current = undefined;
-          window.liquidGlass.previewBackgroundOpacity(backgroundPreviewRef.current);
+  const previewBackdrop = useCallback(
+    (patch: BackdropPreviewPatch) => {
+      const next = { ...backdropPreviewRef.current, ...patch };
+      backdropPreviewRef.current = next;
+      setBackdropPreview(next);
+      if (backdropPreviewFrame.current === undefined) {
+        backdropPreviewFrame.current = requestAnimationFrame(() => {
+          backdropPreviewFrame.current = undefined;
+          window.liquidGlass.previewBackdrop(backdropPreviewRef.current);
         });
       }
-      if (backgroundPersistTimer.current !== undefined) {
-        window.clearTimeout(backgroundPersistTimer.current);
+      if (backdropPersistTimer.current !== undefined) {
+        window.clearTimeout(backdropPersistTimer.current);
       }
-      backgroundPersistTimer.current = window.setTimeout(() => {
-        backgroundPersistTimer.current = undefined;
-        commitBackgroundOpacity();
+      backdropPersistTimer.current = window.setTimeout(() => {
+        backdropPersistTimer.current = undefined;
+        commitBackdrop();
       }, 150);
     },
-    [commitBackgroundOpacity],
+    [commitBackdrop],
   );
 
   useEffect(() => {
@@ -381,8 +391,12 @@ export function App() {
       setBootstrap(state);
       setSettings(state.settings);
       settingsRef.current = state.settings;
-      backgroundPreviewRef.current = state.settings.backgroundOpacity;
-      setBackgroundPreview(state.settings.backgroundOpacity);
+      const initialPreview = {
+        glassOpacity: state.settings.glassOpacity,
+        frostStrength: state.settings.frostStrength,
+      };
+      backdropPreviewRef.current = initialPreview;
+      setBackdropPreview(initialPreview);
       setWindowAppearance(state.windowAppearance);
       if (state.startupNotice) toast(state.startupNotice);
       window.liquidGlass.rendererReady();
@@ -396,11 +410,11 @@ export function App() {
 
   useEffect(
     () => () => {
-      if (backgroundPreviewFrame.current !== undefined) {
-        cancelAnimationFrame(backgroundPreviewFrame.current);
+      if (backdropPreviewFrame.current !== undefined) {
+        cancelAnimationFrame(backdropPreviewFrame.current);
       }
-      if (backgroundPersistTimer.current !== undefined) {
-        window.clearTimeout(backgroundPersistTimer.current);
+      if (backdropPersistTimer.current !== undefined) {
+        window.clearTimeout(backdropPersistTimer.current);
       }
     },
     [],
@@ -528,12 +542,6 @@ export function App() {
     );
   }
 
-  const effectStyle = resolveBackgroundEffectVariables(
-    resolvedTheme,
-    backgroundPreview,
-    windowAppearance.glassAvailability === 'active',
-  ) as CSSProperties;
-
   const activeTab = tabs.find((tab) => tab.id === activeId);
   const handleBell = (id: string) => {
     if (id === activeIdRef.current) {
@@ -576,16 +584,20 @@ export function App() {
   return (
     <main
       className="app-shell"
-      data-theme={resolvedTheme}
-      data-native-glass={windowAppearance.glassMode}
-      data-glass-availability={windowAppearance.glassAvailability}
-      data-high-contrast={windowAppearance.highContrast}
+      data-backdrop-mode={windowAppearance.backdropMode}
+      data-backdrop-status={windowAppearance.backdropStatus}
       data-screen-reader={settings.screenReaderMode}
       data-bell={bellFlash}
-      style={effectStyle}
     >
       <div className="background-tint" aria-hidden="true" />
-      <div className="background-noise" aria-hidden="true" />
+      {windowAppearance.backdropStatus === 'runtime-failure' && (
+        <div className="backdrop-warning" role="status">
+          <span>{t.backdropRuntimeFailure}</span>
+          {windowAppearance.backdropFailureCode && (
+            <code>{windowAppearance.backdropFailureCode}</code>
+          )}
+        </div>
+      )}
       <TabBar
         tabs={tabs.map((tab) => ({
           id: tab.id,
@@ -620,6 +632,7 @@ export function App() {
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => void handleDrop(event)}
       >
+        <div className="background-noise" aria-hidden="true" />
         {tabs.map((tab) => (
           <div key={tab.id} className="terminal-slot" data-active={tab.id === activeId}>
             <TerminalPane
@@ -632,7 +645,6 @@ export function App() {
               port={tab.port}
               active={tab.id === activeId}
               settings={settings}
-              resolvedTheme={resolvedTheme}
               reducedMotion={reducedMotion}
               onTitle={(title) =>
                 setTabs((items) =>
@@ -718,17 +730,18 @@ export function App() {
         open={settingsOpen}
         settings={settings}
         windowAppearance={windowAppearance}
-        backgroundOpacity={backgroundPreview}
+        glassOpacity={backdropPreview.glassOpacity}
+        frostStrength={backdropPreview.frostStrength}
         profiles={bootstrap.profiles}
         labels={t}
         onClose={() => {
-          commitBackgroundOpacity();
+          commitBackdrop();
           setSettingsOpen(false);
           activeTerminal()?.focus();
         }}
         onChange={(patch) => void updateSettings(patch)}
-        onBackgroundPreview={previewBackgroundOpacity}
-        onBackgroundCommit={commitBackgroundOpacity}
+        onBackdropPreview={previewBackdrop}
+        onBackdropCommit={commitBackdrop}
       />
 
       {dialog?.kind === 'paste' && (

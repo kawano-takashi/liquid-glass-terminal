@@ -40,4 +40,4 @@ run(process.execPath, [
   'node-pty',
 ]);
 
-run(process.execPath, [path.resolve('scripts/build-windows-glass.mjs'), '--stage-electron']);
+run(process.execPath, [path.resolve('scripts/build-windows-glass.mjs')]);
