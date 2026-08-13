@@ -20,6 +20,7 @@ npm run package
 ```
 
 Run `LGT_NATIVE_TESTS=1 npm run test:run` after preparing node-pty. Run `npm run test:e2e` against the packaged application when the host supports Electron GUI tests.
+Set `LGT_CLIPBOARD_E2E=1` to include the real OS clipboard checks; they are opt-in locally because the test temporarily replaces and then restores the plain-text clipboard content.
 
 Changes to PTY framing, IPC, preload APIs, URL/path validation, permissions, CSP, or Electron Fuses require tests covering rejected input as well as valid input. Do not expose Node.js or raw Electron objects to the renderer.
 

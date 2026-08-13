@@ -1,8 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { protocol, session, type BrowserWindow } from 'electron';
-
-const APP_ORIGIN = 'app://bundle';
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -61,28 +59,8 @@ export function hardenSession(developmentOrigin?: string): void {
     developmentOrigins.add(parsed.origin);
     developmentOrigins.add(`${parsed.protocol === 'https:' ? 'wss:' : 'ws:'}//${parsed.host}`);
   }
-  const trustedOrigin = (url: string) => {
-    try {
-      const origin = new URL(url).origin;
-      return origin === APP_ORIGIN || developmentOrigins.has(origin);
-    } catch {
-      return false;
-    }
-  };
-
-  current.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
-    return (
-      trustedOrigin(requestingOrigin) &&
-      (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write')
-    );
-  });
-  current.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const allowed =
-      trustedOrigin(details.requestingUrl) &&
-      webContents.getType() === 'window' &&
-      (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write');
-    callback(allowed);
-  });
+  current.setPermissionCheckHandler(() => false);
+  current.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
 
   current.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url;
@@ -96,10 +74,9 @@ export function hardenSession(developmentOrigin?: string): void {
 export function hardenWindow(window: BrowserWindow, developmentOrigin?: string): void {
   const trusted = (target: string) => {
     try {
-      const origin = new URL(target).origin;
-      return (
-        origin === APP_ORIGIN || (developmentOrigin !== undefined && origin === developmentOrigin)
-      );
+      const url = new URL(target);
+      if (url.protocol === 'app:' && url.hostname === 'bundle') return true;
+      return developmentOrigin !== undefined && url.origin === new URL(developmentOrigin).origin;
     } catch {
       return false;
     }

@@ -56,6 +56,8 @@ export const messages = {
     terminal: 'Terminal',
     profileUnavailable: 'That shell profile is no longer available.',
     sessionFailed: 'The shell could not be started.',
+    clipboardCopyFailed: 'Could not copy to the clipboard.',
+    clipboardPasteFailed: 'Could not paste from the clipboard.',
     noMatches: 'No matches',
   },
   ja: {
@@ -113,6 +115,8 @@ export const messages = {
     terminal: 'ターミナル',
     profileUnavailable: 'そのシェルプロファイルは利用できません。',
     sessionFailed: 'シェルを起動できませんでした。',
+    clipboardCopyFailed: 'クリップボードにコピーできませんでした。',
+    clipboardPasteFailed: 'クリップボードから貼り付けできませんでした。',
     noMatches: '一致なし',
   },
 } as const;

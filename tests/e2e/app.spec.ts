@@ -1,8 +1,65 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { _electron as electron, expect, test } from '@playwright/test';
+import { _electron as electron, expect, test, type Page } from '@playwright/test';
 import { findPackagedExecutable } from '../../scripts/packaged-executable.mjs';
+
+type LaunchedApplication = Awaited<ReturnType<typeof electron.launch>>;
+
+async function removeTemporaryUserData(userData: string): Promise<void> {
+  const tempRoot = path.resolve(os.tmpdir());
+  const resolved = path.resolve(userData);
+  if (!resolved.startsWith(`${tempRoot}${path.sep}`)) {
+    throw new Error(`Refusing to remove a non-temporary user data path: ${resolved}`);
+  }
+  await rm(resolved, { recursive: true, force: true });
+}
+
+async function readClipboard(application: LaunchedApplication): Promise<string> {
+  return application.evaluate(({ clipboard }) => clipboard.readText());
+}
+
+async function writeClipboard(application: LaunchedApplication, text: string): Promise<void> {
+  await application.evaluate(({ clipboard }, value) => clipboard.writeText(value), text);
+}
+
+async function clickApplicationMenu(
+  application: LaunchedApplication,
+  itemId: string,
+): Promise<void> {
+  await application.evaluate(({ BrowserWindow, Menu }, id) => {
+    const window = BrowserWindow.getAllWindows().find((item) => !item.isDestroyed());
+    const menuItem = Menu.getApplicationMenu()?.getMenuItemById(id);
+    if (!window || !menuItem) throw new Error(`Application menu item not found: ${id}`);
+    const click = menuItem.click as (
+      event: object,
+      focusedWindow: Electron.BrowserWindow,
+      focusedWebContents: Electron.WebContents,
+    ) => void;
+    click({}, window, window.webContents);
+  }, itemId);
+}
+
+async function waitForRendererTurn(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}
+
+async function enableScreenReaderMode(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /Settings|設定/ }).click();
+  const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
+  const screenReader = page.getByRole('checkbox', {
+    name: /Screen reader mode|スクリーンリーダーモード/,
+  });
+  await screenReader.check();
+  await expect(page.locator('.xterm-accessibility-tree')).toBeVisible();
+  await settingsDialog.getByRole('button', { name: /Close|閉じる/ }).click();
+  await expect(settingsDialog).not.toBeVisible();
+}
 
 test('launches one terminal and opens settings', async () => {
   const executablePath = await findPackagedExecutable(path.resolve('out'));
@@ -18,6 +75,19 @@ test('launches one terminal and opens settings', async () => {
   try {
     const page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
+    const invalidClipboardWrite = await page.evaluate(async () => {
+      if (typeof window.liquidGlass.writeClipboardText !== 'function') return 'missing';
+      const writeClipboardText = window.liquidGlass.writeClipboardText as (
+        value: unknown,
+      ) => Promise<void>;
+      try {
+        await writeClipboardText(42);
+        return 'accepted';
+      } catch {
+        return 'rejected';
+      }
+    });
+    expect(invalidClipboardWrite).toBe('rejected');
     await expect(page.getByRole('tab')).toHaveCount(1);
     const terminalPane = page.locator('.terminal-pane[data-active="true"]');
     await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
@@ -57,6 +127,113 @@ test('launches one terminal and opens settings', async () => {
     throw new Error(`${detail}\nPackaged Electron stderr:\n${electronStderr || '(empty)'}`);
   } finally {
     await application.close();
-    await rm(userData, { recursive: true, force: true });
+    await removeTemporaryUserData(userData);
+  }
+});
+
+test('copies and pastes through native clipboard routes', async () => {
+  test.skip(
+    process.env.LGT_CLIPBOARD_E2E !== '1',
+    'Set LGT_CLIPBOARD_E2E=1 to allow this test to modify the OS clipboard.',
+  );
+
+  const executablePath = await findPackagedExecutable(path.resolve('out'));
+  const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-clipboard-e2e-'));
+  const application = await electron.launch({
+    executablePath,
+    args: [`--user-data-dir=${userData}`, '--cwd', process.cwd()],
+  });
+  let electronStderr = '';
+  let originalClipboard = '';
+  let clipboardCaptured = false;
+  application.process().stderr?.on('data', (chunk: Buffer) => {
+    electronStderr = `${electronStderr}${String(chunk)}`.slice(-32_768);
+  });
+
+  try {
+    originalClipboard = await readClipboard(application);
+    clipboardCaptured = true;
+
+    const page = await application.firstWindow();
+    await expect(page.locator('.app-shell')).toBeVisible();
+    const terminalPane = page.locator('.terminal-pane[data-active="true"]');
+    await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
+    await enableScreenReaderMode(page);
+
+    const accessibilityTree = terminalPane.locator('.xterm-accessibility-tree');
+    const terminalInput = terminalPane.locator('.xterm-helper-textarea');
+    const copyShortcut = process.platform === 'darwin' ? 'Meta+C' : 'Control+C';
+    const terminalPasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+Shift+V';
+    const editablePasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+V';
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+F' : 'Control+F');
+    const searchInput = page.getByRole('searchbox', { name: /Search|検索/ });
+    const searchMarker = 'LGT_SEARCH_CLIPBOARD';
+    await writeClipboard(application, searchMarker);
+    await searchInput.press(editablePasteShortcut);
+    await expect(searchInput).toHaveValue(searchMarker);
+
+    await searchInput.evaluate((input) => (input as HTMLInputElement).select());
+    await searchInput.press(copyShortcut);
+    await expect.poll(() => readClipboard(application)).toBe(searchMarker);
+
+    const menuSearchMarker = 'LGT_MENU_SEARCH_CLIPBOARD';
+    await searchInput.fill('');
+    await writeClipboard(application, menuSearchMarker);
+    await clickApplicationMenu(application, 'edit-paste');
+    await expect(searchInput).toHaveValue(menuSearchMarker);
+    await searchInput.press('Escape');
+
+    const shortcutMarker = 'LGT_CLIPBOARD_SHORTCUT_ONCE';
+    const shortcutCommand = `echo ${shortcutMarker}`;
+    await terminalInput.focus();
+    await writeClipboard(application, shortcutCommand);
+    await terminalInput.press(terminalPasteShortcut);
+    await expect(accessibilityTree).toContainText(shortcutCommand);
+    await terminalInput.press('Enter');
+    await expect(
+      accessibilityTree.locator('[role="listitem"]').filter({
+        hasText: new RegExp(`^${shortcutMarker}$`),
+      }),
+    ).toHaveCount(1);
+
+    const multilineFirst = 'LGT_MULTILINE_FIRST';
+    const multilineSecond = 'LGT_MULTILINE_SECOND';
+    await terminalInput.focus();
+    await writeClipboard(application, `echo ${multilineFirst}\necho ${multilineSecond}`);
+    await terminalInput.press(terminalPasteShortcut);
+    const pasteDialog = page.getByRole('alertdialog', {
+      name: /Paste multiple lines|複数行を貼り付け/,
+    });
+    await expect(pasteDialog).toBeVisible();
+    await pasteDialog.getByRole('button', { name: /Cancel|キャンセル/ }).click();
+    await expect(accessibilityTree).not.toContainText(multilineFirst);
+    await expect(accessibilityTree).not.toContainText(multilineSecond);
+
+    const menuMarker = 'LGT_CLIPBOARD_MENU_ONCE';
+    const menuCommand = `echo ${menuMarker}`;
+    await terminalInput.focus();
+    await writeClipboard(application, menuCommand);
+    await clickApplicationMenu(application, 'edit-paste');
+    await expect(accessibilityTree).toContainText(menuCommand);
+    await terminalInput.press('Enter');
+    await expect(
+      accessibilityTree.locator('[role="listitem"]').filter({
+        hasText: new RegExp(`^${menuMarker}$`),
+      }),
+    ).toHaveCount(1);
+
+    await clickApplicationMenu(application, 'edit-select-all');
+    await waitForRendererTurn(page);
+    await writeClipboard(application, 'LGT_COPY_SENTINEL');
+    await clickApplicationMenu(application, 'edit-copy');
+    await expect.poll(() => readClipboard(application)).toContain(menuMarker);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    throw new Error(`${detail}\nPackaged Electron stderr:\n${electronStderr || '(empty)'}`);
+  } finally {
+    if (clipboardCaptured) await writeClipboard(application, originalClipboard);
+    await application.close();
+    await removeTemporaryUserData(userData);
   }
 });

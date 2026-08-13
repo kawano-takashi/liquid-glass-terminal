@@ -5,6 +5,10 @@ export const IPC_CHANNELS = {
   sessionPort: 'terminal:session-port',
   prepareDroppedPath: 'terminal:prepare-dropped-path',
   openExternal: 'app:open-external',
+  clipboardReadText: 'clipboard:read-text',
+  clipboardWriteText: 'clipboard:write-text',
+  clipboardCopyFocused: 'clipboard:copy-focused',
+  clipboardPasteFocused: 'clipboard:paste-focused',
   showContextMenu: 'app:show-context-menu',
   confirmExit: 'app:confirm-exit',
   quit: 'app:quit',
@@ -120,6 +124,10 @@ export interface PreloadApi {
   requestSession(request: SessionCreateRequest): void;
   prepareDroppedPath(sessionId: string, path: string): Promise<string | null>;
   openExternal(url: string): Promise<boolean>;
+  readClipboardText(): Promise<string>;
+  writeClipboardText(text: string): Promise<void>;
+  copyFocusedText(): Promise<void>;
+  pasteFocusedText(): Promise<void>;
   showContextMenu(state: ContextMenuState): void;
   confirmExit(): void;
   quit(): void;

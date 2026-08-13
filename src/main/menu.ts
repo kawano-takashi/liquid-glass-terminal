@@ -1,4 +1,5 @@
 import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
+import { isApplicationClipboardAccelerator } from '../shared/clipboard';
 import type { AppCommand } from '../shared/contracts';
 
 type MenuLocale = 'en' | 'ja';
@@ -77,13 +78,24 @@ export function installApplicationMenu(
     {
       label: t.edit,
       submenu: [
-        { label: t.copy, accelerator: `${mod}+C`, click: () => send({ type: 'copy' }) },
         {
+          id: 'edit-copy',
+          label: t.copy,
+          accelerator: `${mod}+C`,
+          click: () => send({ type: 'copy' }),
+        },
+        {
+          id: 'edit-paste',
           label: t.paste,
           accelerator: process.platform === 'darwin' ? 'Cmd+V' : 'Ctrl+Shift+V',
           click: () => send({ type: 'paste' }),
         },
-        { label: t.selectAll, accelerator: `${mod}+A`, click: () => send({ type: 'select-all' }) },
+        {
+          id: 'edit-select-all',
+          label: t.selectAll,
+          accelerator: `${mod}+A`,
+          click: () => send({ type: 'select-all' }),
+        },
         { type: 'separator' },
         { label: t.search, accelerator: `${mod}+F`, click: () => send({ type: 'search' }) },
       ],
@@ -109,6 +121,20 @@ export function installApplicationMenu(
   );
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+export function installClipboardShortcutRouting(window: BrowserWindow): void {
+  window.webContents.on('before-input-event', (_event, input) => {
+    window.webContents.setIgnoreMenuShortcuts(
+      isApplicationClipboardAccelerator(process.platform, {
+        key: input.key,
+        control: input.control,
+        meta: input.meta,
+        shift: input.shift,
+        alt: input.alt,
+      }),
+    );
+  });
 }
 
 export function showTerminalContextMenu(

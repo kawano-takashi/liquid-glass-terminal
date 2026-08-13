@@ -26,6 +26,11 @@ const api: PreloadApi = {
     ipcRenderer.invoke(IPC_CHANNELS.prepareDroppedPath, sessionId, path) as Promise<string | null>,
   openExternal: (url: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.openExternal, url) as Promise<boolean>,
+  readClipboardText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardReadText) as Promise<string>,
+  writeClipboardText: (text: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text) as Promise<void>,
+  copyFocusedText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardCopyFocused) as Promise<void>,
+  pasteFocusedText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardPasteFocused) as Promise<void>,
   showContextMenu: (state: ContextMenuState) =>
     ipcRenderer.send(IPC_CHANNELS.showContextMenu, state),
   confirmExit: () => ipcRenderer.send(IPC_CHANNELS.confirmExit),

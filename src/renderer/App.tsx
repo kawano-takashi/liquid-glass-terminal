@@ -1,6 +1,11 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import { RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  clipboardActionForTarget,
+  type ClipboardKeyInput,
+  type ClipboardTarget,
+} from '../shared/clipboard';
 import type {
   AppCommand,
   BootstrapState,
@@ -73,6 +78,30 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${bytes} B`;
+}
+
+function focusedClipboardTarget(blockTerminal: boolean): ClipboardTarget {
+  const focused = document.activeElement;
+  if (
+    focused instanceof HTMLElement &&
+    !focused.closest('.terminal-pane') &&
+    (focused instanceof HTMLInputElement ||
+      focused instanceof HTMLTextAreaElement ||
+      focused.isContentEditable)
+  ) {
+    return 'editable';
+  }
+  return blockTerminal ? 'blocked' : 'terminal';
+}
+
+function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
+  return {
+    key: event.key,
+    control: event.ctrlKey,
+    meta: event.metaKey,
+    shift: event.shiftKey,
+    alt: event.altKey,
+  };
 }
 
 export function App() {
@@ -219,10 +248,25 @@ export function App() {
     [],
   );
 
+  const currentClipboardTarget = useCallback(
+    () => focusedClipboardTarget(dialog !== undefined || settingsOpen),
+    [dialog, settingsOpen],
+  );
+
   const copy = useCallback(async () => {
-    const selection = activeTerminal()?.getSelection();
-    if (selection) await navigator.clipboard.writeText(selection);
-  }, [activeTerminal]);
+    const target = currentClipboardTarget();
+    if (target === 'blocked') return;
+    try {
+      if (target === 'editable') {
+        await window.liquidGlass.copyFocusedText();
+        return;
+      }
+      const selection = activeTerminal()?.getSelection();
+      if (selection) await window.liquidGlass.writeClipboardText(selection);
+    } catch {
+      toast('clipboardCopyFailed');
+    }
+  }, [activeTerminal, currentClipboardTarget, toast]);
 
   const offerPaste = useCallback(
     (text: string) => {
@@ -237,16 +281,18 @@ export function App() {
   );
 
   const paste = useCallback(async () => {
+    const target = currentClipboardTarget();
+    if (target === 'blocked') return;
     try {
-      offerPaste(await navigator.clipboard.readText());
+      if (target === 'editable') {
+        await window.liquidGlass.pasteFocusedText();
+        return;
+      }
+      offerPaste(await window.liquidGlass.readClipboardText());
     } catch {
-      toast(
-        locale === 'ja'
-          ? 'クリップボードを読み取れませんでした。'
-          : 'Could not read the clipboard.',
-      );
+      toast('clipboardPasteFailed');
     }
-  }, [locale, offerPaste, toast]);
+  }, [currentClipboardTarget, offerPaste, toast]);
 
   const runSearch = useCallback(
     (previous = false, query = searchQuery, sensitive = caseSensitive) => {
@@ -354,10 +400,24 @@ export function App() {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (dialog || settingsOpen) return;
-      const mac = navigator.platform.toLowerCase().includes('mac');
-      const command = mac ? event.metaKey : event.ctrlKey;
+      const platform = bootstrap?.platform;
+      if (!platform) return;
       const active = activeTerminal();
+      const clipboardAction = clipboardActionForTarget(
+        platform,
+        clipboardKeyInput(event),
+        currentClipboardTarget(),
+        active?.hasSelection() ?? false,
+      );
+      if (clipboardAction) {
+        event.preventDefault();
+        if (clipboardAction === 'copy') void copy();
+        else void paste();
+        return;
+      }
+      if (dialog || settingsOpen) return;
+      const mac = platform === 'darwin';
+      const command = mac ? event.metaKey : event.ctrlKey;
 
       if (command && event.key.toLowerCase() === 't') {
         event.preventDefault();
@@ -380,32 +440,16 @@ export function App() {
       } else if (event.altKey && event.shiftKey && event.key === 'ArrowRight') {
         event.preventDefault();
         reorderActive(1);
-      } else if (mac && event.metaKey && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        void copy();
-      } else if (
-        !mac &&
-        event.ctrlKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'c' &&
-        active?.hasSelection()
-      ) {
-        event.preventDefault();
-        void copy();
-      } else if (
-        (mac && event.metaKey && event.key.toLowerCase() === 'v') ||
-        (!mac && event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'v')
-      ) {
-        event.preventDefault();
-        void paste();
       }
     };
     window.addEventListener('keydown', keydown, true);
     return () => window.removeEventListener('keydown', keydown, true);
   }, [
     activeTerminal,
+    bootstrap?.platform,
     closeTab,
     copy,
+    currentClipboardTarget,
     cycleTab,
     dialog,
     paste,

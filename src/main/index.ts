@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   app,
   BrowserWindow,
+  clipboard,
   ipcMain,
   MessageChannelMain,
   nativeTheme,
@@ -26,7 +27,11 @@ import {
   validateSettingsPatch,
 } from '../shared/validation';
 import { CwdTokenVault, parseLaunchRequest, type LaunchRequest } from './cli';
-import { installApplicationMenu, showTerminalContextMenu } from './menu';
+import {
+  installApplicationMenu,
+  installClipboardShortcutRouting,
+  showTerminalContextMenu,
+} from './menu';
 import { PtyManager } from './pty-manager';
 import {
   hardenSession,
@@ -215,6 +220,27 @@ function installIpc(): void {
     return true;
   });
 
+  ipcMain.handle(IPC_CHANNELS.clipboardReadText, (event): string => {
+    if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
+    return clipboard.readText();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.clipboardWriteText, (event, value: unknown): void => {
+    if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
+    if (typeof value !== 'string') throw new TypeError('Clipboard text must be a string');
+    clipboard.writeText(value);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.clipboardCopyFocused, (event): void => {
+    if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
+    event.sender.copy();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.clipboardPasteFocused, (event): void => {
+    if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
+    event.sender.paste();
+  });
+
   ipcMain.on(IPC_CHANNELS.showContextMenu, (event, value: unknown) => {
     if (!isTrustedFrame(event) || !mainWindow || !isContextMenuState(value)) return;
     showTerminalContextMenu(mainWindow, locale(), value.hasSelection, sendCommand);
@@ -283,6 +309,7 @@ async function createWindow(): Promise<void> {
 
   stateStore.track(mainWindow);
   hardenWindow(mainWindow, MAIN_WINDOW_VITE_DEV_SERVER_URL);
+  installClipboardShortcutRouting(mainWindow);
   rebuildMenu();
 
   mainWindow.on('close', (event) => {
