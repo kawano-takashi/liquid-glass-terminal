@@ -36,6 +36,7 @@
     "verify:native-assets": "node scripts/verify-native-assets.mjs",
     "smoke:package": "node scripts/smoke-packaged.mjs",
     "bootstrap:native": "node scripts/bootstrap-native.mjs",
+    "build:windows-glass": "node scripts/build-windows-glass.mjs --stage-electron",
     "rebuild:native": "electron-rebuild --force --which-module node-pty"
   },
   "dependencies": {
@@ -77,6 +78,8 @@
     "electron": "43.2.0",
     "eslint": "10.8.1",
     "jsdom": "30.0.1",
+    "node-addon-api": "8.5.0",
+    "node-gyp": "12.1.0",
     "png2icons": "2.0.1",
     "prettier": "3.9.6",
     "typescript": "6.0.3",
@@ -84,7 +87,13 @@
     "vite": "8.2.1",
     "vitest": "4.1.10"
   },
+  "optionalDependencies": {
+    "@microsoft/winappcli": "0.4.0"
+  },
   "allowScripts": {
+    "@microsoft/winappcli@0.4.0": [
+      "win32"
+    ],
     "electron-winstaller@5.4.4": true,
     "fs-xattr@0.3.1": [
       "darwin"

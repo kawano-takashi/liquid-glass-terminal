@@ -23,7 +23,17 @@ OSC 0/2 supplies a sanitized, 80-grapheme tab title. OSC 7 is accepted only for 
 
 ## Window material
 
-The window remains a normal resizable window. Windows 11 build 22621+ requests Electron Acrylic; macOS requests `under-window` Vibrancy. Other systems use CSS pseudo glass. High contrast or reduced transparency switches to a dense, non-native fallback. Pointer light is decorative, frame-limited, and disabled for reduced motion.
+```text
+live system + accessibility state
+        │
+        ├─ Windows 11 build 22621+ ── Node-API HWND bridge ── DesktopAcrylicController
+        ├─ macOS 12+ ─────────────────────────────────────── under-window Vibrancy
+        └─ Windows 10 / Linux / unsupported native path ─── opaque CSS pseudo glass
+```
+
+The window remains a normal resizable window. On Windows, Electron creates an alpha-capable surface and the self-contained Windows App SDK 2.3 runtime owns the actual Acrylic backdrop through the documented `DesktopAcrylicController.SetTarget` API. The controller stays input-active while the window is unfocused. macOS uses `under-window` Vibrancy with an active visual-effect state. No branch captures, stores, or redraws the desktop.
+
+The main process is the source of truth for both the system appearance and the glass mode actually applied. It publishes them as one atomic renderer event so native initialization failure cannot leave transparent CSS over an opaque window. High contrast, reduced transparency, or screen-reader mode detaches native material and switches to an opaque pseudo treatment; disabling the override restores the selected Clear, Balanced, or Dense preset.
 
 ## Persistence
 

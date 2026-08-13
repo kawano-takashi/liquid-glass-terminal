@@ -10,6 +10,8 @@ npm run audit:install-scripts
 npm run bootstrap:native
 ```
 
+On Windows, the bootstrap step requires the Visual Studio 2022 **Desktop development with C++** workload. It restores the versions in `winapp.yaml`, builds `native/windows-glass`, and stages the Windows App SDK self-contained runtime. Do not commit `.winapp`, the addon build directory, or staged runtime binaries.
+
 Do not use `--force` or `--legacy-peer-deps`. Keep every direct dependency exact and commit `package-lock.json`. Dependency updates are manual: review changelogs, install/lifecycle scripts, native ABI compatibility, and the generated lockfile before changing a version or `allowScripts`.
 
 ## Before a pull request

@@ -8,7 +8,7 @@ import type {
   SessionPortPayload,
   SettingsPatch,
   SettingsV1,
-  SystemAppearance,
+  WindowAppearance,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
 
@@ -42,11 +42,11 @@ const api: PreloadApi = {
     ipcRenderer.on(IPC_CHANNELS.command, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.command, listener);
   },
-  onSystemAppearance: (callback: (appearance: SystemAppearance) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, state: SystemAppearance) =>
+  onWindowAppearance: (callback: (appearance: WindowAppearance) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: WindowAppearance) =>
       callback(state);
-    ipcRenderer.on(IPC_CHANNELS.systemAppearance, listener);
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.systemAppearance, listener);
+    ipcRenderer.on(IPC_CHANNELS.windowAppearance, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.windowAppearance, listener);
   },
 };
 

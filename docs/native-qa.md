@@ -10,7 +10,8 @@ Record the application version, OS build, display scale, GPU, compositor/session
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
 - [ ] Terminal remains readable in light/dark and Clear/Balanced/Dense; text is never refracted.
 - [ ] Pointer reflection stops when idle/unfocused and disappears with reduced motion.
-- [ ] High contrast and reduced transparency override decorative glass, then restore the chosen preset when disabled.
+- [ ] High contrast, reduced transparency, and screen-reader mode detach native material, become fully opaque, then restore the chosen preset when disabled.
+- [ ] No screen-capture or screen-recording permission prompt appears.
 - [ ] 100%, 150%, and 200% scale show a sharp icon, titlebar controls, xterm glyphs, and drag targets.
 - [ ] Keyboard, Edit menu, and terminal context menu paste exactly once into the active terminal.
 - [ ] Multiline paste always shows its preview, cancel inserts nothing, and payloads above 1 MiB still require confirmation.
@@ -19,6 +20,8 @@ Record the application version, OS build, display scale, GPU, compositor/session
 ## Windows
 
 - [ ] Windows 11 22H2+ shows Acrylic behind a normal resizable/maximizable window.
+- [ ] Acrylic remains visible when the window loses focus, and light/dark theme changes update without restarting.
+- [ ] A package works after uninstalling the machine-wide Windows App Runtime (the self-contained DLLs are beside the executable).
 - [ ] Windows 10 uses the opaque pseudo-glass fallback without broken transparency.
 - [ ] PowerShell 7, Windows PowerShell, cmd, Git Bash, and installed non-system WSL distributions are detected correctly.
 - [ ] Ctrl+C copies only with a selection; otherwise it reaches the PTY as interrupt.
@@ -27,6 +30,7 @@ Record the application version, OS build, display scale, GPU, compositor/session
 ## macOS
 
 - [ ] macOS 12+ shows `under-window` Vibrancy and correctly placed traffic lights.
+- [ ] Vibrancy remains active when the window loses focus.
 - [ ] Intel and Apple Silicon artifacts launch and load the matching node-pty binary.
 - [ ] Cmd+C/Cmd+V use clipboard operations from both keyboard and menus while Ctrl+C reaches the PTY.
 

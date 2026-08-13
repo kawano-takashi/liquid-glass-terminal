@@ -1,3 +1,4 @@
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDeb } from '@electron-forge/maker-deb';
@@ -60,6 +61,39 @@ const config: ForgeConfig = {
       const osxSign = resolvedConfig.packagerConfig.osxSign;
       const hasOsxSign =
         typeof osxSign === 'object' ? Object.keys(osxSign).length > 0 : Boolean(osxSign);
+
+      if (platform === 'win32') {
+        if (arch !== 'x64') throw new Error(`Windows Acrylic is not built for ${arch}.`);
+        const source = path.resolve('native/windows-glass/dist');
+        const nativeDestination = path.resolve(resourcesPath, '..', 'windows-glass');
+        const runtimeManifest = JSON.parse(
+          await readFile(path.join(source, 'runtime-manifest.json'), 'utf8'),
+        ) as { architecture?: string; files?: Array<{ name?: string }> };
+        if (runtimeManifest.architecture !== arch || !Array.isArray(runtimeManifest.files)) {
+          throw new Error('Windows Acrylic runtime manifest does not match the package target.');
+        }
+        await mkdir(nativeDestination, { recursive: true });
+        await copyFile(
+          path.join(source, 'windows-glass.node'),
+          path.join(nativeDestination, 'windows-glass.node'),
+        );
+        await copyFile(
+          path.join(source, 'runtime-manifest.json'),
+          path.join(nativeDestination, 'runtime-manifest.json'),
+        );
+        for (const legalFile of ['LICENSE.txt', 'NOTICE.txt']) {
+          await copyFile(path.join(source, legalFile), path.join(nativeDestination, legalFile));
+        }
+        for (const entry of runtimeManifest.files) {
+          if (!entry.name || path.basename(entry.name) !== entry.name) {
+            throw new Error('Windows Acrylic runtime manifest contains an invalid path.');
+          }
+          await copyFile(
+            path.join(source, 'runtime', entry.name),
+            path.join(path.dirname(executable), entry.name),
+          );
+        }
+      }
 
       await flipFuses(executable, {
         ...fuseConfig,

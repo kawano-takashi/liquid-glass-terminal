@@ -14,7 +14,7 @@ export const IPC_CHANNELS = {
   quit: 'app:quit',
   rendererReady: 'app:renderer-ready',
   command: 'app:command',
-  systemAppearance: 'app:system-appearance',
+  windowAppearance: 'app:window-appearance',
 } as const;
 
 export type LocaleMode = 'system' | 'en' | 'ja';
@@ -57,13 +57,16 @@ export interface SystemAppearance {
   reducedTransparency: boolean;
 }
 
+export interface WindowAppearance extends SystemAppearance {
+  glassMode: GlassMode;
+}
+
 export interface BootstrapState {
   appVersion: string;
   platform: NodeJS.Platform;
   settings: SettingsV1;
   profiles: ShellProfileDescriptor[];
-  glassMode: GlassMode;
-  systemAppearance: SystemAppearance;
+  windowAppearance: WindowAppearance;
   launchCwdToken?: string;
   startupNotice?: string;
 }
@@ -134,5 +137,5 @@ export interface PreloadApi {
   rendererReady(): void;
   getPathForFile(file: File): string;
   onCommand(callback: (command: AppCommand) => void): () => void;
-  onSystemAppearance(callback: (appearance: SystemAppearance) => void): () => void;
+  onWindowAppearance(callback: (appearance: WindowAppearance) => void): () => void;
 }

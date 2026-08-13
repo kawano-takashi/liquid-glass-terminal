@@ -4,7 +4,7 @@
 
 # Liquid Glass Terminal
 
-静かなリキッドグラス表現を備えた、ローカル完結型のElectronターミナルです。対応するWindows 11ではAcrylic、macOSではVibrancyを利用し、Linuxと古いWindowsでは安定した疑似グラスへ切り替えます。
+静かなリキッドグラス表現を備えた、ローカル完結型のElectronターミナルです。対応するWindows 11では公式Windows App SDKのAcrylic controller、macOSではVibrancyを利用し、Linuxと古いWindowsでは安定した疑似グラスへ切り替えます。
 
 > **プレビュー版:** v0.1.0の成果物は未署名・未notarizeです。実行前にソースとリリースのchecksumを確認してください。
 
@@ -28,14 +28,14 @@
 | macOS   | macOS 12                   | native Vibrancy                                    | Intel x64、Apple Silicon arm64 |
 | Linux   | Ubuntu 22.04以降／Fedora系 | 疑似グラス。GNOMEを主対象、KDEはbest effort        | x64                            |
 
-LinuxとWindows 10では、背後のアプリが実際に透けることを保証しません。全環境で通常のリサイズ可能なウィンドウを維持します。
+LinuxとWindows 10では、背後のアプリが実際に透けることを保証しません。native実装はdesktop captureではなくcompositor backdropを使うため、画面収録の許可を要求せず、他windowのpixelも保持しません。全環境で通常のリサイズ可能なウィンドウを維持します。
 
 ## ローカル開発
 
 必要な環境：
 
 - Node.js **24.19.0** と npm **11.17.0**。
-- Windows native build：Visual Studio 2022 Build Toolsの「C++によるデスクトップ開発」。
+- Windows native build：Visual Studio 2022 Build Toolsの「C++によるデスクトップ開発」。`bootstrap:native`が固定versionのWindows App SDKを復元し、x64 Node-API addonをbuildして、自己完結runtimeをElectronの隣へ配置します。
 - macOS native build：最新のXcode Command Line Tools。
 - Linux native build：Python、`make`、C++ compiler、通常のElectron runtime libraries。
 

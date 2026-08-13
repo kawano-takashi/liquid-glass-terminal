@@ -17,6 +17,7 @@ import type {
   GlassMode,
   SettingsV1,
   SystemAppearance,
+  WindowAppearance,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
 import { resolveLocale } from '../shared/i18n';
@@ -42,6 +43,8 @@ import {
 import { SettingsStore } from './settings-store';
 import { ShellProfileRegistry } from './shell-profiles';
 import { WindowStateStore } from './window-state';
+import { resolveGlassMode } from './window-appearance';
+import { WindowsGlass } from './windows-glass';
 
 registerPrivilegedScheme();
 
@@ -59,12 +62,14 @@ let ptyManager: PtyManager;
 let allowWindowClose = false;
 let rendererReady = false;
 let currentGlassMode: GlassMode = 'pseudo';
+let windowsAcrylicAvailable = false;
 const commandQueue: AppCommand[] = [];
 const cwdTokens = new CwdTokenVault();
 let initialLaunchCwdToken: string | undefined;
 let initialStartupNotice: string | undefined;
+const windowsGlass = new WindowsGlass();
 
-function isWindowsAcrylicAvailable(): boolean {
+function isWindowsAcrylicOsAvailable(): boolean {
   if (process.platform !== 'win32') return false;
   const build = Number(os.release().split('.')[2] ?? 0);
   return Number.isFinite(build) && build >= 22_621;
@@ -79,11 +84,16 @@ function appearance(): SystemAppearance {
 }
 
 function desiredGlassMode(): GlassMode {
-  const state = appearance();
-  if (state.highContrast || state.reducedTransparency) return 'pseudo';
-  if (process.platform === 'win32' && isWindowsAcrylicAvailable()) return 'acrylic';
-  if (process.platform === 'darwin') return 'vibrancy';
-  return 'pseudo';
+  return resolveGlassMode({
+    platform: process.platform,
+    windowsAcrylicAvailable,
+    systemAppearance: appearance(),
+    screenReaderMode: settingsStore.value.screenReaderMode,
+  });
+}
+
+function windowAppearance(): WindowAppearance {
+  return { ...appearance(), glassMode: currentGlassMode };
 }
 
 function locale(): 'en' | 'ja' {
@@ -100,13 +110,19 @@ function sendCommand(command: AppCommand): void {
 
 function applyNativeAppearance(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  currentGlassMode = desiredGlassMode();
+  const systemAppearance = appearance();
+  let nextGlassMode = desiredGlassMode();
   if (process.platform === 'win32') {
-    mainWindow.setBackgroundMaterial(currentGlassMode === 'acrylic' ? 'acrylic' : 'none');
+    if (nextGlassMode === 'acrylic') {
+      if (!windowsGlass.apply(mainWindow, systemAppearance)) nextGlassMode = 'pseudo';
+    } else {
+      windowsGlass.detach();
+    }
   }
   if (process.platform === 'darwin') {
-    mainWindow.setVibrancy(currentGlassMode === 'vibrancy' ? 'under-window' : null);
+    mainWindow.setVibrancy(nextGlassMode === 'vibrancy' ? 'under-window' : null);
   }
+  currentGlassMode = nextGlassMode;
   if (process.platform !== 'darwin') {
     mainWindow.setTitleBarOverlay({
       color: '#00000000',
@@ -114,7 +130,7 @@ function applyNativeAppearance(): void {
       height: 44,
     });
   }
-  mainWindow.webContents.send(IPC_CHANNELS.systemAppearance, appearance());
+  mainWindow.webContents.send(IPC_CHANNELS.windowAppearance, windowAppearance());
 }
 
 function rebuildMenu(): void {
@@ -146,8 +162,7 @@ function installIpc(): void {
       platform: process.platform,
       settings: settingsStore.value,
       profiles: profiles.descriptors(),
-      glassMode: currentGlassMode,
-      systemAppearance: appearance(),
+      windowAppearance: windowAppearance(),
       ...(initialLaunchCwdToken ? { launchCwdToken: initialLaunchCwdToken } : {}),
       ...(initialStartupNotice ? { startupNotice: initialStartupNotice } : {}),
     };
@@ -269,6 +284,7 @@ function installIpc(): void {
 async function createWindow(): Promise<void> {
   const stateStore = new WindowStateStore();
   const state = stateStore.restore();
+  windowsAcrylicAvailable = isWindowsAcrylicOsAvailable() && windowsGlass.isSupported();
   currentGlassMode = desiredGlassMode();
   const isDark = nativeTheme.shouldUseDarkColors;
 
@@ -290,11 +306,18 @@ async function createWindow(): Promise<void> {
           },
         }
       : { trafficLightPosition: { x: 14, y: 14 } }),
-    ...(currentGlassMode === 'acrylic' ? { backgroundMaterial: 'acrylic' as const } : {}),
-    ...(currentGlassMode === 'vibrancy'
-      ? { vibrancy: 'under-window' as const, visualEffectState: 'followWindow' as const }
+    // Electron uses this flag to create an alpha-capable Chromium surface. The Node-API
+    // bridge clears its stock DWM material before attaching DesktopAcrylicController.
+    ...(windowsAcrylicAvailable ? { backgroundMaterial: 'acrylic' as const } : {}),
+    ...(process.platform === 'darwin'
+      ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const }
       : {}),
-    backgroundColor: isDark ? '#17131f' : '#eeeaf4',
+    backgroundColor:
+      windowsAcrylicAvailable || process.platform === 'darwin'
+        ? '#00000000'
+        : isDark
+          ? '#17131f'
+          : '#eeeaf4',
     autoHideMenuBar: process.platform !== 'darwin',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -306,6 +329,8 @@ async function createWindow(): Promise<void> {
       devTools: !app.isPackaged,
     },
   });
+
+  applyNativeAppearance();
 
   stateStore.track(mainWindow);
   hardenWindow(mainWindow, MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -321,6 +346,7 @@ async function createWindow(): Promise<void> {
   });
   const ownerId = mainWindow.webContents.id;
   mainWindow.on('closed', () => {
+    windowsGlass.detach();
     ptyManager.closeForOwner(ownerId);
     mainWindow = undefined;
     rendererReady = false;

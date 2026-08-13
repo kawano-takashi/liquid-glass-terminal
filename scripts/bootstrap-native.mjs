@@ -39,6 +39,10 @@ run(process.execPath, [
   'node-pty',
 ]);
 
+if (process.platform === 'win32') {
+  run(process.execPath, [path.resolve('scripts/build-windows-glass.mjs'), '--stage-electron']);
+}
+
 if (process.platform === 'darwin') {
   run(process.execPath, [npmCli, 'rebuild', 'fs-xattr', 'macos-alias', '--ignore-scripts=false']);
 }

@@ -4,7 +4,7 @@
 
 # Liquid Glass Terminal
 
-A local-first Electron terminal with a quiet liquid-glass interface. It uses native Acrylic on supported Windows 11 systems, Vibrancy on macOS, and a stable pseudo-glass treatment on Linux and older Windows versions.
+A local-first Electron terminal with a quiet liquid-glass interface. It uses the official Windows App SDK Acrylic controller on supported Windows 11 systems, Vibrancy on macOS, and a stable pseudo-glass treatment on Linux and older Windows versions.
 
 > **Preview:** v0.1.0 is an unsigned, unnotarized preview. Review the source and release checksums before running packaged artifacts.
 
@@ -28,14 +28,14 @@ A local-first Electron terminal with a quiet liquid-glass interface. It uses nat
 | macOS    | macOS 12                    | Native Vibrancy                                               | Intel x64, Apple Silicon arm64 |
 | Linux    | Ubuntu 22.04+/Fedora family | Pseudo glass; GNOME is the primary target, KDE is best effort | x64                            |
 
-Linux and Windows 10 intentionally do not promise visibility of applications behind the terminal. A normal resizable window is preserved on every platform.
+Linux and Windows 10 intentionally do not promise visibility of applications behind the terminal. The native implementations use compositor backdrops rather than desktop capture, so the app does not request screen-recording permission or retain pixels from other windows. A normal resizable window is preserved on every platform.
 
 ## Develop locally
 
 Requirements:
 
 - Node.js **24.19.0** with npm **11.17.0**.
-- Windows native builds: Visual Studio 2022 Build Tools with Desktop development with C++.
+- Windows native builds: Visual Studio 2022 Build Tools with Desktop development with C++. `bootstrap:native` restores the pinned Windows App SDK, builds the x64 Node-API addon, and stages its self-contained runtime beside Electron.
 - macOS native builds: current Xcode Command Line Tools.
 - Linux native builds: Python, `make`, a C++ compiler, and the normal Electron runtime libraries.
 

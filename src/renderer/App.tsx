@@ -12,7 +12,7 @@ import type {
   SettingsPatch,
   SettingsV1,
   ShellProfileDescriptor,
-  SystemAppearance,
+  WindowAppearance,
 } from '../shared/contracts';
 import { formatMessage, isMessageKey, messages, resolveLocale } from '../shared/i18n';
 import { detectPasteRisk } from '../shared/validation';
@@ -107,7 +107,7 @@ function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState>();
   const [settings, setSettings] = useState<SettingsV1>();
-  const [systemAppearance, setSystemAppearance] = useState<SystemAppearance>();
+  const [windowAppearance, setWindowAppearance] = useState<WindowAppearance>();
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -148,7 +148,7 @@ export function App() {
   const resolvedTheme =
     settings?.theme === 'light' || settings?.theme === 'dark'
       ? settings.theme
-      : (systemAppearance?.resolvedTheme ?? 'dark');
+      : (windowAppearance?.resolvedTheme ?? 'dark');
 
   const toast = useCallback(
     (keyOrText: string) => {
@@ -337,11 +337,11 @@ export function App() {
       if (!alive) return;
       setBootstrap(state);
       setSettings(state.settings);
-      setSystemAppearance(state.systemAppearance);
+      setWindowAppearance(state.windowAppearance);
       if (state.startupNotice) toast(state.startupNotice);
       window.liquidGlass.rendererReady();
     });
-    const offAppearance = window.liquidGlass.onSystemAppearance(setSystemAppearance);
+    const offAppearance = window.liquidGlass.onWindowAppearance(setWindowAppearance);
     return () => {
       alive = false;
       offAppearance();
@@ -400,6 +400,10 @@ export function App() {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      const consumeShortcut = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
       const platform = bootstrap?.platform;
       if (!platform) return;
       const active = activeTerminal();
@@ -410,7 +414,7 @@ export function App() {
         active?.hasSelection() ?? false,
       );
       if (clipboardAction) {
-        event.preventDefault();
+        consumeShortcut();
         if (clipboardAction === 'copy') void copy();
         else void paste();
         return;
@@ -420,25 +424,25 @@ export function App() {
       const command = mac ? event.metaKey : event.ctrlKey;
 
       if (command && event.key.toLowerCase() === 't') {
-        event.preventDefault();
+        consumeShortcut();
         requestNewTab();
       } else if (command && event.key.toLowerCase() === 'w') {
-        event.preventDefault();
+        consumeShortcut();
         if (activeIdRef.current) closeTab(activeIdRef.current);
       } else if (command && event.key.toLowerCase() === 'f') {
-        event.preventDefault();
+        consumeShortcut();
         setSearchOpen(true);
       } else if (command && event.key === ',') {
-        event.preventDefault();
+        consumeShortcut();
         setSettingsOpen(true);
       } else if (event.ctrlKey && event.key === 'Tab') {
-        event.preventDefault();
+        consumeShortcut();
         cycleTab(event.shiftKey ? -1 : 1);
       } else if (event.altKey && event.shiftKey && event.key === 'ArrowLeft') {
-        event.preventDefault();
+        consumeShortcut();
         reorderActive(-1);
       } else if (event.altKey && event.shiftKey && event.key === 'ArrowRight') {
-        event.preventDefault();
+        consumeShortcut();
         reorderActive(1);
       }
     };
@@ -462,7 +466,7 @@ export function App() {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  if (!bootstrap || !settings || !systemAppearance) {
+  if (!bootstrap || !settings || !windowAppearance) {
     return (
       <main className="loading-screen">
         <div className="brand-orb" />
@@ -473,8 +477,8 @@ export function App() {
 
   const activeTab = tabs.find((tab) => tab.id === activeId);
   const highReadability =
-    systemAppearance.highContrast ||
-    systemAppearance.reducedTransparency ||
+    windowAppearance.highContrast ||
+    windowAppearance.reducedTransparency ||
     settings.screenReaderMode;
 
   const handleBell = (id: string) => {
@@ -530,8 +534,8 @@ export function App() {
       className="app-shell"
       data-theme={resolvedTheme}
       data-glass={highReadability ? 'dense' : settings.glass}
-      data-native-glass={highReadability ? 'pseudo' : bootstrap.glassMode}
-      data-high-contrast={systemAppearance.highContrast}
+      data-native-glass={windowAppearance.glassMode}
+      data-high-contrast={windowAppearance.highContrast}
       data-screen-reader={settings.screenReaderMode}
       data-platform={bootstrap.platform}
       data-bell={bellFlash}

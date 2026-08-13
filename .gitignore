@@ -6,6 +6,9 @@ coverage/
 playwright-report/
 test-results/
 .tools/
+.winapp/
+native/windows-glass/build/
+native/windows-glass/dist/
 *.log
 .DS_Store
 Thumbs.db
