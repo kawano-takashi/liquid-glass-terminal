@@ -25,7 +25,7 @@ interface SettingsLabels {
   glassContrastBlack: string;
   frostStrength: string;
   backdropUnavailablePolicy: string;
-  backdropUnavailableRuntime: string;
+  backdropUnavailable: string;
   defaultShell: string;
   automatic: string;
   fontSize: string;
@@ -68,8 +68,8 @@ export function SettingsDrawer({
   const panelRef = useRef<HTMLElement>(null);
   const backdropDisabled = windowAppearance.backdropStatus !== 'active';
   const backdropDisabledReason =
-    windowAppearance.backdropStatus === 'runtime-failure'
-      ? labels.backdropUnavailableRuntime
+    windowAppearance.backdropStatus === 'unavailable'
+      ? labels.backdropUnavailable
       : windowAppearance.backdropStatus === 'policy-disabled'
         ? labels.backdropUnavailablePolicy
         : undefined;

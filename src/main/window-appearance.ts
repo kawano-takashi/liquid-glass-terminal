@@ -13,7 +13,7 @@ export interface BackdropAppearanceInput {
 
 export interface ResolvedBackdropAppearance {
   backdropMode: 'frosted' | 'opaque';
-  backdropStatus: 'active' | 'policy-disabled' | 'runtime-failure';
+  backdropStatus: 'active' | 'policy-disabled' | 'unavailable';
   backdropFailureCode?: BackdropFailureCode;
 }
 
@@ -23,7 +23,7 @@ export function resolveBackdropAppearance(
   if (input.failureCode || input.nativeState === 'capability-lost') {
     return {
       backdropMode: 'opaque',
-      backdropStatus: 'runtime-failure',
+      backdropStatus: 'unavailable',
       backdropFailureCode: input.failureCode ?? 'runtime-rebuild-failed',
     };
   }

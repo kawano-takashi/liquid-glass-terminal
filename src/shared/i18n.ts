@@ -23,9 +23,9 @@ export const messages = {
     frostStrength: 'Frost strength',
     backdropUnavailablePolicy:
       'Frost is disabled by Windows, accessibility, energy-saver, or remote-session policy. Saved values are kept.',
-    backdropUnavailableRuntime: 'Frost is unavailable until restart. Saved values are kept.',
-    backdropRuntimeFailure:
-      'The frosted backdrop stopped working. Terminals remain active; restart the app to try again.',
+    backdropUnavailable: 'Frost is unavailable until restart. Saved values are kept.',
+    backdropFailure:
+      'The frosted backdrop is unavailable. Terminals remain active; restart the app to try again.',
     defaultShell: 'Default shell',
     automatic: 'Automatic',
     fontSize: 'Font size',
@@ -85,9 +85,9 @@ export const messages = {
     frostStrength: '曇りの強さ',
     backdropUnavailablePolicy:
       'Windows、アクセシビリティ、省電力、またはリモート接続の設定により曇り効果を無効化しています。保存値は維持されます。',
-    backdropUnavailableRuntime: '再起動するまで曇り効果を利用できません。保存値は維持されます。',
-    backdropRuntimeFailure:
-      '背景の曇り効果が停止しました。端末は動作を続けます。再試行するにはアプリを再起動してください。',
+    backdropUnavailable: '再起動するまで曇り効果を利用できません。保存値は維持されます。',
+    backdropFailure:
+      '背景の曇り効果を利用できません。端末は動作を続けます。再試行するにはアプリを再起動してください。',
     defaultShell: '既定のシェル',
     automatic: '自動',
     fontSize: 'フォントサイズ',

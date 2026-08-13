@@ -23,11 +23,11 @@ Windows 11向けの、中性でCOSMIC風のフロステッドグラス表現を�
 
 Liquid Glass Terminal 0.2.0は、Windows 11 22H2以降（build 22621以上）のx64クライアント版だけに対応します。Windows 10、Windows Server、Windows on ARM（x64 emulationを含む）、macOS、Linuxは、設定storeやPTYを作成する前に拒否します。
 
-windowは通常どおりresize、maximize、Snapが可能です。client領域全体を覆うnative Windows Composition visualは`HostBackdrop → GaussianBlur（Quality、hard border）`だけを描画し、必要に応じて白または黒のcontrast spriteを重ねます。Electronが透過surfaceを作った直後にDWM system backdropを明示的に無効化します。画面収録の許可は要求せず、他windowのpixelをcapture、copy、保持しません。
+windowは通常どおりresize、maximize、Snapが可能です。client領域全体を覆うnative Windows Composition visualは`HostBackdrop → GaussianBlur（Quality、hard border）`だけを描画し、必要に応じて白または黒のcontrast spriteを重ねます。Electronはsystem materialを選択できますがblur量を指定できないため、この可変効果だけを小さなC++ Node-API境界に隔離しています。Electronが透過surfaceを作った直後にDWM system backdropを明示的に無効化します。画面収録の許可は要求せず、他windowのpixelをcapture、copy、保持しません。
 
 「ガラスのコントラスト」は白−100%から中立0%、黒+100%まで5%刻みで変更でき、既定値は中立です。「曇りの強さ」は`0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74` DIPの14段階から独立して選択でき、既定値は7段階目（9 DIP）です。1段階目はHostBackdropを維持したままGaussian blurを0 DIPにし、他の全段階と同じcontrastと前景色の規則を適用します。中立contrastではsharpでblurのない背後を表示します。contrastが±100%の両端では完全な不透明面となり、blurを迂回します。どの曇り段階でも白50%以上ではUI、titlebar symbol、xterm paletteをPTYの再作成なしで暗い前景色へ切り替えます。装飾用の静的noiseは表示しません。
 
-高コントラスト、透明効果の低減、スクリーンリーダーモード、省電力、Remote Desktop、Windows効果の無効化時は、不透明な中性色面へ自動的に切り替えます。2本のappearance sliderには理由を表示して無効化し、保存値を維持して、policy解除時にfrostを復元します。起動時はComposition効果が対応かつ高速であることを必須とし、初期化を1回だけ再試行した後、localized error codeを表示して終了します。実行中のcompositor障害では1回だけ再構築し、失敗後もPTYを維持したまま不透明表示と再起動案内へ切り替えます。
+高コントラスト、透明効果の低減、スクリーンリーダーモード、省電力、Remote Desktop、Windows効果の無効化時は、不透明な中性色面へ自動的に切り替えます。2本のappearance sliderには理由を表示して無効化し、保存値を維持して、policy解除時にfrostを復元します。起動時のnative初期化は1回だけ再試行し、2回とも失敗した場合も端末を不透明表示で起動して、再起動までlocalized error codeを常設表示します。実行中のcompositor障害では1回だけ再構築し、失敗後も既存PTYを維持したまま同じfallbackへ切り替えます。
 
 ## ローカル開発
 

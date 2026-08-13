@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, expect, test, type Page } from '@playwright/test';
@@ -351,6 +351,78 @@ test('migrates appearance v5, previews adaptive contrast, and persists later cho
     await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
   } finally {
     if (application) await application.close().catch(() => undefined);
+    await removeTemporaryUserData(userData);
+  }
+});
+
+test('keeps the terminal usable when the frosted-backdrop addon cannot load', async () => {
+  const executablePath = await findPackagedExecutable(path.resolve('out'));
+  const glassAddon = path.join(
+    path.dirname(executablePath),
+    'resources',
+    'windows-glass',
+    'windows-glass.node',
+  );
+  const disabledGlassAddon = `${glassAddon}.e2e-disabled`;
+  const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-fallback-e2e-'));
+  let application: LaunchedApplication | undefined;
+  let electronStderr = '';
+  let glassAddonDisabled = false;
+
+  try {
+    await rename(glassAddon, disabledGlassAddon);
+    glassAddonDisabled = true;
+    application = await electron.launch({
+      executablePath,
+      args: [`--user-data-dir=${userData}`, '--cwd', process.cwd()],
+    });
+    application.process().stderr?.on('data', (chunk: Buffer) => {
+      electronStderr = `${electronStderr}${String(chunk)}`.slice(-32_768);
+    });
+
+    const page = await application.firstWindow();
+    const appShell = page.locator('.app-shell');
+    await expect(appShell).toBeVisible();
+    await expect(appShell).toHaveAttribute('data-backdrop-mode', 'opaque');
+    await expect(appShell).toHaveAttribute('data-backdrop-status', 'unavailable');
+    await expect(appShell).toHaveAttribute('data-foreground-tone', 'light');
+
+    const warning = page.locator('.backdrop-warning');
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText(/unavailable|利用できません/);
+    await expect(warning.locator('code')).toHaveText('addon-load-failed');
+    await expect(page.locator('.background-tint')).toHaveCSS('background-color', 'rgb(24, 24, 24)');
+
+    const terminalPane = page.locator('.terminal-pane[data-active="true"]');
+    await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
+    const terminalInput = page.locator('.xterm-helper-textarea');
+    await terminalInput.focus();
+    await terminalInput.evaluate((element) => {
+      element.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          data: 'echo LGT_OPAQUE_FALLBACK_READY\r',
+          inputType: 'insertText',
+        }),
+      );
+    });
+    await expect(terminalPane).toHaveAttribute('data-has-output', 'true');
+
+    await page.getByRole('button', { name: /Settings|設定/ }).click();
+    await expect(
+      page.getByRole('slider', { name: /Glass contrast|ガラスのコントラスト/ }),
+    ).toBeDisabled();
+    await expect(page.getByRole('slider', { name: /Frost strength|曇りの強さ/ })).toBeDisabled();
+    await expect(page.getByRole('dialog', { name: /Settings|設定/ })).toContainText(
+      /unavailable until restart|再起動するまで曇り効果を利用できません/,
+    );
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    throw new Error(`${detail}\nPackaged Electron stderr:\n${electronStderr || '(empty)'}`);
+  } finally {
+    if (application) await application.close().catch(() => undefined);
+    if (glassAddonDisabled) await rename(disabledGlassAddon, glassAddon);
     await removeTemporaryUserData(userData);
   }
 });

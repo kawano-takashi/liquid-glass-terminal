@@ -30,7 +30,8 @@ Record the application version, Windows build and edition, display scale, GPU, W
 - [ ] High contrast keeps the app's dark fallback colors, suppresses Windows forced-color replacement, uses an opaque `#181818` surface with light foregrounds, disables both appearance sliders with a reason, and restores both saved values afterward.
 - [ ] Reduced transparency and screen-reader mode use the same opaque dark surface and restore both saved values afterward.
 - [ ] Energy saver, Remote Desktop, and disabled Windows transparency follow the same opaque policy and automatically restore frost when policy clears.
-- [ ] An unsupported or non-fast compositor fails startup after two total attempts with a localized stable error code and creates no PTY.
+- [ ] An unavailable addon, unsupported compositor, or non-fast compositor gets two total startup attempts, then opens an opaque `#181818` terminal with light foregrounds, disabled appearance sliders, persistent restart guidance, and the corresponding stable error code.
+- [ ] The startup fallback creates a working PTY, stays unavailable without further native retries, and remains resizable, maximizable, and Snap-compatible.
 - [ ] A forced runtime effect failure rebuilds once; a failed rebuild keeps every PTY alive, uses an opaque surface, and shows persistent restart guidance.
 - [ ] The DWM colored rim is absent, corners use the small preference, and resize/Snap/maximize remain functional.
 - [ ] No screen-capture or screen-recording permission prompt appears.

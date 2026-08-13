@@ -95,13 +95,13 @@ describe('SettingsDrawer frosted backdrop controls', () => {
 
   it.each([
     ['policy-disabled', /Windows, accessibility, energy-saver/],
-    ['runtime-failure', /unavailable until restart/],
+    ['unavailable', /unavailable until restart/],
   ] as const)('disables both controls and explains %s', (backdropStatus, reason) => {
     renderDrawer({
       ...activeAppearance,
       backdropMode: 'opaque',
       backdropStatus,
-      ...(backdropStatus === 'runtime-failure'
+      ...(backdropStatus === 'unavailable'
         ? { backdropFailureCode: 'runtime-rebuild-failed' as const }
         : {}),
     });

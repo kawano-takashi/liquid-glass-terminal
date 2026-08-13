@@ -45,7 +45,7 @@ describe('resolveBackdropAppearance', () => {
     ).toEqual({ backdropMode: 'opaque', backdropStatus: 'policy-disabled' });
   });
 
-  it('makes runtime failure sticky and exposes its stable code', () => {
+  it('makes a native failure unavailable and exposes its stable code', () => {
     expect(
       resolveBackdropAppearance({
         nativeState: 'active',
@@ -55,8 +55,22 @@ describe('resolveBackdropAppearance', () => {
       }),
     ).toEqual({
       backdropMode: 'opaque',
-      backdropStatus: 'runtime-failure',
+      backdropStatus: 'unavailable',
       backdropFailureCode: 'runtime-rebuild-failed',
+    });
+  });
+
+  it('preserves a startup failure code in the opaque unavailable state', () => {
+    expect(
+      resolveBackdropAppearance({
+        failureCode: 'addon-load-failed',
+        systemAppearance: normalAppearance,
+        screenReaderMode: false,
+      }),
+    ).toEqual({
+      backdropMode: 'opaque',
+      backdropStatus: 'unavailable',
+      backdropFailureCode: 'addon-load-failed',
     });
   });
 });

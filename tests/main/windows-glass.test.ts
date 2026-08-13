@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveWindowsBackdropOptions } from '../../src/main/windows-glass';
+import {
+  BackdropNativeError,
+  resolveBackdropFailureCode,
+  resolveWindowsBackdropOptions,
+} from '../../src/main/windows-glass';
 
 const normalAppearance = {
   highContrast: false,
@@ -65,5 +69,22 @@ describe('Windows frosted-backdrop values', () => {
         frostStrength: 99,
       }),
     ).toMatchObject({ glassContrast: -100, frostBlurAmount: 74 });
+  });
+});
+
+describe('Windows frosted-backdrop failure codes', () => {
+  it('preserves a stable native startup failure code', () => {
+    expect(
+      resolveBackdropFailureCode(
+        new BackdropNativeError('effects-not-fast', 'Composition effects are not fast.'),
+        'attach-failed',
+      ),
+    ).toBe('effects-not-fast');
+  });
+
+  it('uses the caller fallback for an unclassified failure', () => {
+    expect(resolveBackdropFailureCode(new Error('unexpected'), 'attach-failed')).toBe(
+      'attach-failed',
+    );
   });
 });

@@ -599,9 +599,9 @@ export function App() {
       data-bell={bellFlash}
     >
       <div className="background-tint" aria-hidden="true" />
-      {windowAppearance.backdropStatus === 'runtime-failure' && (
+      {windowAppearance.backdropStatus === 'unavailable' && (
         <div className="backdrop-warning" role="status">
-          <span>{t.backdropRuntimeFailure}</span>
+          <span>{t.backdropFailure}</span>
           {windowAppearance.backdropFailureCode && (
             <code>{windowAppearance.backdropFailureCode}</code>
           )}

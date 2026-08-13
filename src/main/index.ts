@@ -50,7 +50,12 @@ import { SettingsStore } from './settings-store';
 import { ShellProfileRegistry } from './shell-profiles';
 import { WindowStateStore } from './window-state';
 import { resolveBackdropAppearance } from './window-appearance';
-import { BackdropNativeError, resolveWindowsBackdropOptions, WindowsGlass } from './windows-glass';
+import {
+  BackdropNativeError,
+  resolveBackdropFailureCode,
+  resolveWindowsBackdropOptions,
+  WindowsGlass,
+} from './windows-glass';
 
 registerPrivilegedScheme();
 
@@ -144,11 +149,19 @@ function updateTitleBarOverlay(options = currentBackdropOptions()): void {
   });
 }
 
-function enterStickyBackdropFailure(error: unknown): void {
-  console.error('Native backdrop recovery failed; using the opaque runtime fallback.', error);
-  backdropFailureCode = 'runtime-rebuild-failed';
+function enterStickyBackdropFailure(error: unknown, failureCode: BackdropFailureCode): void {
+  console.error('Native backdrop failed; using the opaque fallback until restart.', error);
+  backdropFailureCode = failureCode;
   nativeBackdropState = 'capability-lost';
   windowsGlass.detach();
+  if (backdropPolicyTimer) {
+    clearInterval(backdropPolicyTimer);
+    backdropPolicyTimer = undefined;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setBackgroundMaterial('none');
+    mainWindow.setBackgroundColor('#181818');
+  }
   updateTitleBarOverlay();
   publishWindowAppearance();
 }
@@ -156,7 +169,10 @@ function enterStickyBackdropFailure(error: unknown): void {
 function recoverNativeBackdrop(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (backdropFailureCode || runtimeRecovery.attempted) {
-    enterStickyBackdropFailure(new Error('The one permitted backdrop rebuild was exhausted.'));
+    enterStickyBackdropFailure(
+      new Error('The one permitted backdrop rebuild was exhausted.'),
+      'runtime-rebuild-failed',
+    );
     return;
   }
   try {
@@ -167,7 +183,7 @@ function recoverNativeBackdrop(): void {
     updateTitleBarOverlay();
     publishWindowAppearance();
   } catch (error: unknown) {
-    enterStickyBackdropFailure(error);
+    enterStickyBackdropFailure(error, 'runtime-rebuild-failed');
   }
 }
 
@@ -206,9 +222,7 @@ function initializeNativeBackdrop(): void {
     );
     updateTitleBarOverlay();
   } catch (error: unknown) {
-    throw error instanceof Error
-      ? error
-      : new BackdropNativeError('attach-failed', 'The frosted backdrop could not be initialized.');
+    enterStickyBackdropFailure(error, resolveBackdropFailureCode(error, 'attach-failed'));
   }
 }
 
@@ -445,8 +459,10 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadURL('app://bundle/index.html');
   }
 
-  backdropPolicyTimer = setInterval(() => applyNativeAppearance(), 5_000);
-  backdropPolicyTimer.unref();
+  if (!backdropFailureCode) {
+    backdropPolicyTimer = setInterval(() => applyNativeAppearance(), 5_000);
+    backdropPolicyTimer.unref();
+  }
 }
 
 function handleSecondInstance(request: LaunchRequest): void {
@@ -512,15 +528,6 @@ void app
   })
   .catch((error: unknown) => {
     console.error('Application startup failed', error);
-    if (error instanceof BackdropNativeError) {
-      const japanese = app.getLocale().toLowerCase().startsWith('ja');
-      dialog.showErrorBox(
-        japanese ? '背景効果を開始できません' : 'Frosted backdrop unavailable',
-        japanese
-          ? `必要な背景効果を初期化できませんでした。Windows とグラフィックスドライバーを更新して再起動してください。\n\nエラーコード: ${error.code}`
-          : `The required backdrop effect could not be initialized. Update Windows and your graphics driver, then restart the app.\n\nError code: ${error.code}`,
-      );
-    }
     app.quit();
   });
 

@@ -21,7 +21,7 @@ export const IPC_CHANNELS = {
 export type LocaleMode = 'system' | 'en' | 'ja';
 export type CursorStyle = 'block' | 'bar' | 'underline';
 export type BackdropMode = 'frosted' | 'opaque';
-export type BackdropStatus = 'active' | 'policy-disabled' | 'runtime-failure';
+export type BackdropStatus = 'active' | 'policy-disabled' | 'unavailable';
 export type BackdropFailureCode =
   | 'addon-load-failed'
   | 'effects-unsupported'

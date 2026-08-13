@@ -43,6 +43,13 @@ export class BackdropNativeError extends Error {
   }
 }
 
+export function resolveBackdropFailureCode(
+  error: unknown,
+  fallback: BackdropFailureCode,
+): BackdropFailureCode {
+  return error instanceof BackdropNativeError ? error.code : fallback;
+}
+
 export function resolveWindowsBackdropOptions(
   appearance: SystemAppearance,
   screenReaderMode: boolean,
