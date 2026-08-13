@@ -3,15 +3,23 @@ import { migrateSettingsRecord } from '../../src/shared/settings-migration';
 
 describe('settings migration', () => {
   it.each([
-    ['clear', 45],
-    ['balanced', 60],
-    ['dense', 75],
+    ['clear', 20],
+    ['balanced', 35],
+    ['dense', 50],
   ] as const)('maps the legacy %s preset to %i percent', (glass, glassOpacity) => {
     expect(migrateSettingsRecord({ schemaVersion: 1, glass, locale: 'ja', fontSize: 17 })).toEqual({
       schemaVersion: 2,
       glassOpacity,
       locale: 'ja',
       fontSize: 17,
+    });
+  });
+
+  it('clamps opacity saved with the previous upper bound', () => {
+    expect(migrateSettingsRecord({ schemaVersion: 2, glassOpacity: 85, theme: 'dark' })).toEqual({
+      schemaVersion: 2,
+      glassOpacity: 60,
+      theme: 'dark',
     });
   });
 

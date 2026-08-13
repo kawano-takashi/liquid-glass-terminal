@@ -58,14 +58,14 @@ describe('SettingsDrawer glass opacity', () => {
   it('previews 1% slider changes and commits the final value', () => {
     const { preview, commit } = renderDrawer();
     const slider = screen.getByRole('slider', { name: 'Glass opacity' });
-    expect(slider).toHaveAttribute('min', '35');
-    expect(slider).toHaveAttribute('max', '85');
+    expect(slider).toHaveAttribute('min', '10');
+    expect(slider).toHaveAttribute('max', '60');
     expect(slider).toHaveAttribute('step', '1');
     expect(screen.getByText('60%')).toBeVisible();
 
-    fireEvent.change(slider, { target: { value: '61' } });
+    fireEvent.change(slider, { target: { value: '59' } });
     fireEvent.pointerUp(slider);
-    expect(preview).toHaveBeenCalledWith(61);
+    expect(preview).toHaveBeenCalledWith(59);
     expect(commit).toHaveBeenCalled();
   });
 

@@ -17,7 +17,7 @@ describe('Windows Acrylic values', () => {
   });
 
   it('clamps native preview values to the supported endpoints', () => {
-    expect(resolveWindowsAcrylicValues('dark', 0).tintOpacity).toBe(0.35);
-    expect(resolveWindowsAcrylicValues('dark', 100).tintOpacity).toBe(0.85);
+    expect(resolveWindowsAcrylicValues('dark', 0).tintOpacity).toBe(0.1);
+    expect(resolveWindowsAcrylicValues('dark', 100).tintOpacity).toBe(0.6);
   });
 });

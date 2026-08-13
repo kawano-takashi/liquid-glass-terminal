@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, expect, test, type Page } from '@playwright/test';
@@ -157,6 +157,16 @@ test('previews and persists Windows glass opacity', async () => {
 
   const executablePath = await findPackagedExecutable(path.resolve('out'));
   const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-opacity-e2e-'));
+  const settingsPath = path.join(userData, 'settings.json');
+  await writeFile(
+    settingsPath,
+    JSON.stringify({
+      schemaVersion: 2,
+      glassOpacity: 85,
+      fontSize: 17,
+      __internal__: { migrations: { version: '0.1.0' } },
+    }),
+  );
   let application: LaunchedApplication | undefined;
   try {
     application = await electron.launch({
@@ -168,10 +178,16 @@ test('previews and persists Windows glass opacity', async () => {
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     let slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
     test.skip(await slider.isDisabled(), 'The current Windows session is using a system fallback.');
+    await expect(slider).toHaveValue('60');
+    const migratedSettings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
+      glassOpacity?: unknown;
+      fontSize?: unknown;
+    };
+    expect(migratedSettings).toMatchObject({ glassOpacity: 60, fontSize: 17 });
 
-    await slider.fill('35');
+    await slider.fill('10');
     await slider.dispatchEvent('pointerup');
-    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.35');
+    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.1');
     await page.waitForTimeout(250);
     await application.close();
 
@@ -183,8 +199,8 @@ test('previews and persists Windows glass opacity', async () => {
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
-    await expect(slider).toHaveValue('35');
-    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.35');
+    await expect(slider).toHaveValue('10');
+    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.1');
   } finally {
     if (application) await application.close().catch(() => undefined);
     await removeTemporaryUserData(userData);

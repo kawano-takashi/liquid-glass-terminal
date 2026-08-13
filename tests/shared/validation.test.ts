@@ -35,10 +35,10 @@ describe('IPC validation', () => {
   });
 
   it('accepts only integer glass opacity values in the supported range', () => {
-    expect(validateSettingsPatch({ glassOpacity: 35 })).toEqual({ glassOpacity: 35 });
-    expect(validateSettingsPatch({ glassOpacity: 85 })).toEqual({ glassOpacity: 85 });
-    expect(validateSettingsPatch({ glassOpacity: 34 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 86 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 10 })).toEqual({ glassOpacity: 10 });
+    expect(validateSettingsPatch({ glassOpacity: 60 })).toEqual({ glassOpacity: 60 });
+    expect(validateSettingsPatch({ glassOpacity: 9 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 61 })).toBeNull();
     expect(validateSettingsPatch({ glassOpacity: 60.5 })).toBeNull();
     expect(validateSettingsPatch({ glassOpacity: Number.NaN })).toBeNull();
     expect(validateSettingsPatch({ glass: 'balanced' })).toBeNull();

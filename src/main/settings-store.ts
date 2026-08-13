@@ -6,6 +6,12 @@ import type { SettingsPatch, SettingsV2 } from '../shared/contracts';
 import { migrateSettingsRecord } from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
 
+const SETTINGS_STORAGE_SCHEMA = {
+  ...SETTINGS_SCHEMA,
+  // Accept the previous upper bound long enough to normalize it without discarding other settings.
+  glassOpacity: { ...SETTINGS_SCHEMA.glassOpacity, maximum: 85 },
+} as const;
+
 export class SettingsStore {
   readonly #store: Store<Record<string, unknown>>;
   readonly recovered: boolean;
@@ -13,6 +19,7 @@ export class SettingsStore {
   constructor() {
     try {
       this.#store = this.createStore();
+      this.normalizeStoredSettings();
       this.recovered = false;
     } catch {
       const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -32,7 +39,7 @@ export class SettingsStore {
     return new Store<Record<string, unknown>>({
       name: 'settings',
       defaults: { ...DEFAULT_SETTINGS },
-      schema: SETTINGS_SCHEMA,
+      schema: SETTINGS_STORAGE_SCHEMA,
       clearInvalidConfig: false,
       migrations: {
         '0.1.0': (store) => {
@@ -40,6 +47,18 @@ export class SettingsStore {
         },
       },
     });
+  }
+
+  private normalizeStoredSettings(): void {
+    const stored = this.#store.store;
+    const normalized = migrateSettingsRecord(stored);
+    if (
+      stored.schemaVersion !== normalized.schemaVersion ||
+      stored.glassOpacity !== normalized.glassOpacity ||
+      Object.hasOwn(stored, 'glass')
+    ) {
+      this.#store.store = normalized;
+    }
   }
 
   get value(): SettingsV2 {

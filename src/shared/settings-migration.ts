@@ -1,10 +1,10 @@
 import type { LegacyGlassPreset } from './contracts';
-import { GLASS_OPACITY_DEFAULT } from './settings';
+import { GLASS_OPACITY_DEFAULT, GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from './settings';
 
 const LEGACY_GLASS_OPACITY: Record<LegacyGlassPreset, number> = {
-  clear: 45,
-  balanced: 60,
-  dense: 75,
+  clear: 20,
+  balanced: 35,
+  dense: 50,
 };
 
 function isLegacyGlassPreset(value: unknown): value is LegacyGlassPreset {
@@ -21,6 +21,16 @@ export function migrateSettingsRecord(
       : GLASS_OPACITY_DEFAULT;
     output.schemaVersion = 2;
     delete output.glass;
+  }
+  if (
+    typeof output.glassOpacity === 'number' &&
+    Number.isFinite(output.glassOpacity) &&
+    Number.isInteger(output.glassOpacity)
+  ) {
+    output.glassOpacity = Math.min(
+      GLASS_OPACITY_MAX,
+      Math.max(GLASS_OPACITY_MIN, output.glassOpacity),
+    );
   }
   return output;
 }

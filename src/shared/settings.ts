@@ -1,7 +1,7 @@
 import type { SettingsV2 } from './contracts';
 
-export const GLASS_OPACITY_MIN = 35;
-export const GLASS_OPACITY_MAX = 85;
+export const GLASS_OPACITY_MIN = 10;
+export const GLASS_OPACITY_MAX = 60;
 export const GLASS_OPACITY_DEFAULT = 60;
 
 export const DEFAULT_SETTINGS: SettingsV2 = {

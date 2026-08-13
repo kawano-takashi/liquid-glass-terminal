@@ -16,7 +16,7 @@ A local-first Electron terminal with a neutral frosted-glass interface. It uses 
 - A single window with draggable tabs, shell profile discovery, search, and restartable exited sessions.
 - Windows PowerShell 7/Windows PowerShell/cmd/Git Bash/WSL discovery; `$SHELL`, zsh, and bash discovery on macOS/Linux.
 - Multiline paste confirmation, mandatory confirmation above 1 MiB, safe external links, and insert-only file/folder drop.
-- English and Japanese UI, system/light/dark themes, live 35–85% glass opacity, and persisted settings/window geometry.
+- English and Japanese UI, system/light/dark themes, live 10–60% glass opacity, and persisted settings/window geometry.
 - Reduced-transparency, high-contrast, reduced-motion, and opt-in screen-reader adaptations.
 - No telemetry, remote content, update checks, crash uploads, or shell-profile injection.
 

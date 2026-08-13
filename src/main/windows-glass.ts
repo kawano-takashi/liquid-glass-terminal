@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { app, type BrowserWindow } from 'electron';
 import type { SystemAppearance, WindowsGlassState } from '../shared/contracts';
+import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from '../shared/settings';
 
 interface WindowsGlassOptions {
   theme: 'light' | 'dark';
@@ -21,7 +22,10 @@ export function resolveWindowsAcrylicValues(
   theme: 'light' | 'dark',
   glassOpacity: number,
 ): WindowsAcrylicValues {
-  const tintOpacity = Math.min(0.85, Math.max(0.35, glassOpacity / 100));
+  const tintOpacity = Math.min(
+    GLASS_OPACITY_MAX / 100,
+    Math.max(GLASS_OPACITY_MIN / 100, glassOpacity / 100),
+  );
   return {
     tintOpacity,
     luminosityOpacity: Math.min(1, Math.max(0, 0.15 + 0.88 * tintOpacity)),

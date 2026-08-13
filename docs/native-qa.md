@@ -9,7 +9,7 @@ Record the application version, OS build, display scale, GPU, compositor/session
 - [ ] Window opens at 1100×720, honors 720×420 minimum, resizes smoothly, maximizes, and restores without a visible app-drawn border or shadow.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
 - [ ] At the 60% default, large shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable in light and dark themes.
-- [ ] The 35% and 85% endpoints are visibly different; changes preview live in 1% steps and survive restart.
+- [ ] The 10% and 60% endpoints are visibly different; changes preview live in 1% steps and survive restart.
 - [ ] Settings, search, menus, dialogs, and toasts add no backdrop dimming, cumulative tint, visible rim, or shadow.
 - [ ] High contrast, reduced transparency, and screen-reader mode detach native material, become fully opaque, disable the slider with a reason, then restore the saved opacity when disabled.
 - [ ] No screen-capture or screen-recording permission prompt appears.
