@@ -1,50 +1,42 @@
 # Native material QA checklist
 
-Automated tests validate behavior and deterministic pseudo-glass screenshots. Native backdrop quality still requires a real interactive desktop.
+Automated tests validate mappings, migration, fallback selection, IPC validation, and renderer effect variables. Frosted-backdrop quality still requires a real interactive Windows 11 desktop.
 
-Record the application version, OS build, display scale, GPU, compositor/session, theme, and result for every run.
+Record the application version, Windows build and edition, display scale, GPU, theme, accessibility state, and result for every run.
 
-## Common
+## Host gate
 
-- [ ] Window opens at 1100×720, honors 720×420 minimum, resizes smoothly, maximizes, and restores without a visible app-drawn border or shadow.
+- [ ] Windows 11 22H2+ x64 client launches normally.
+- [ ] Windows 10 exits with the localized native unsupported-system dialog before creating settings or a PTY.
+- [ ] Windows Server exits through the same gate.
+- [ ] Windows on ARM, including an x64-emulated process, exits through the same gate.
+
+## Window and material
+
+- [ ] Window opens at 1100×720, honors the 720×420 minimum, resizes smoothly, maximizes, restores, and supports Snap.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
-- [ ] At the 60% default, large shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable in light and dark themes.
-- [ ] The 10% and 60% endpoints are visibly different; changes preview live in 1% steps and survive restart.
-- [ ] Settings, search, menus, dialogs, and toasts add no backdrop dimming, cumulative tint, visible rim, or shadow.
-- [ ] High contrast, reduced transparency, and screen-reader mode detach native material, become fully opaque, disable the slider with a reason, then restore the saved opacity when disabled.
+- [ ] Acrylic stays active when the window loses focus; light/dark theme changes update its neutral recipe without restarting.
+- [ ] At the 25% default, shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable.
+- [ ] The 0% endpoint retains DWM frost while native tint and luminosity reach zero.
+- [ ] At 0%, renderer noise, local blur, decorative fills, danger/bell fills, and text halo are absent; text, icons, cursor, selection, focus, and errors remain clear.
+- [ ] The 0% and 50% endpoints are visibly different; changes preview live in 1% steps and survive restart.
+- [ ] Settings, search, menus, dialogs, and toasts add no cumulative tint, visible rim, or shadow.
+- [ ] High contrast, reduced transparency, and screen-reader mode use a safe opaque surface, disable the slider with a reason, and restore the saved opacity afterward.
+- [ ] Forced native Acrylic failure also uses the opaque fallback without leaving transparent renderer CSS.
+- [ ] The DWM colored rim is absent, corners use the small preference, and resize/Snap/maximize remain functional.
+- [ ] Battery saver, Remote Desktop, disabled Windows transparency, and insufficient compositor capability remain readable.
 - [ ] No screen-capture or screen-recording permission prompt appears.
+- [ ] A package works after uninstalling the machine-wide Windows App Runtime; required self-contained DLLs sit beside the executable.
 - [ ] 100%, 150%, and 200% scale show a sharp icon, titlebar controls, xterm glyphs, and drag targets.
-- [ ] Keyboard, Edit menu, and terminal context menu paste exactly once into the active terminal.
+
+## Terminal and input
+
+- [ ] PowerShell 7, Windows PowerShell, cmd, Git Bash, and installed non-system WSL distributions are detected correctly.
+- [ ] Ctrl+C copies only with a selection; otherwise it reaches the PTY as interrupt.
+- [ ] Ctrl+Shift+V and both menus paste exactly once; Ctrl+V remains available to the PTY.
 - [ ] Multiline paste always shows its preview, cancel inserts nothing, and payloads above 1 MiB still require confirmation.
 - [ ] Copy and paste in the search field preserve its selection and do not send data to the terminal.
 
-## Windows
+## Status for v0.2.0 Preview
 
-- [ ] Windows 11 22H2+ shows Acrylic behind a normal resizable/maximizable window.
-- [ ] Acrylic remains visible when the window loses focus, and light/dark theme changes update neutral tint and luminosity without restarting.
-- [ ] Native Acrylic reports Active/Fallback/HighContrast correctly; Fallback is opaque and preserves the saved slider value.
-- [ ] The DWM colored rim is absent, corners use the small preference, and resize/snap/maximize remain functional.
-- [ ] Battery saver, Remote Desktop, disabled Windows transparency, and insufficient compositor capability use the documented safe fallback.
-- [ ] A package works after uninstalling the machine-wide Windows App Runtime (the self-contained DLLs are beside the executable).
-- [ ] Windows 10 uses the opaque pseudo-glass fallback without broken transparency.
-- [ ] PowerShell 7, Windows PowerShell, cmd, Git Bash, and installed non-system WSL distributions are detected correctly.
-- [ ] Ctrl+C copies only with a selection; otherwise it reaches the PTY as interrupt.
-- [ ] Ctrl+Shift+V pastes, while Ctrl+V remains available to the PTY.
-
-## macOS
-
-- [ ] macOS 12+ shows `under-window` Vibrancy and correctly placed traffic lights.
-- [ ] Vibrancy remains active when the window loses focus.
-- [ ] Intel and Apple Silicon artifacts launch and load the matching node-pty binary.
-- [ ] Cmd+C/Cmd+V use clipboard operations from both keyboard and menus while Ctrl+C reaches the PTY.
-
-## Linux
-
-- [ ] GNOME Wayland and X11 show the same stable pseudo-glass composition and resizable window.
-- [ ] KDE launches and functions; compositor-specific appearance differences are documented as best effort.
-- [ ] Ctrl+Shift+V and both menus paste under X11 and Wayland while Ctrl+V remains available to the PTY.
-- [ ] DEB and RPM install, launch, expose the icon, and remove cleanly.
-
-## Status for v0.1.0 Preview
-
-CI package/launch smoke is required on all target architectures. Windows local visual QA is expected first; macOS and Linux native visual checks may remain explicitly marked pending when the draft release is created.
+GitHub CI builds and statically verifies the Windows x64 package on Windows Server but does not launch it. Package launch, E2E, compositor behavior, and final visual checks must be completed locally on a supported Windows 11 x64 client before publishing the draft release.

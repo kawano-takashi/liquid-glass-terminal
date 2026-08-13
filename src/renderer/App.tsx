@@ -1,6 +1,6 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import { RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   clipboardActionForTarget,
   type ClipboardKeyInput,
@@ -10,18 +10,19 @@ import type {
   AppCommand,
   BootstrapState,
   SettingsPatch,
-  SettingsV2,
+  SettingsV3,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../shared/contracts';
 import { formatMessage, isMessageKey, messages, resolveLocale } from '../shared/i18n';
-import { GLASS_OPACITY_DEFAULT } from '../shared/settings';
+import { BACKGROUND_OPACITY_DEFAULT } from '../shared/settings';
 import { detectPasteRisk } from '../shared/validation';
 import { Dialog } from './components/Dialog';
 import { SearchBar } from './components/SearchBar';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { TabBar } from './components/TabBar';
 import { TerminalPane, type TerminalPaneHandle } from './components/TerminalPane';
+import { resolveBackgroundEffectVariables } from './lib/background-effects';
 import { requestTerminalSession } from './lib/session';
 
 interface TabState {
@@ -107,9 +108,9 @@ function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState>();
-  const [settings, setSettings] = useState<SettingsV2>();
+  const [settings, setSettings] = useState<SettingsV3>();
   const [windowAppearance, setWindowAppearance] = useState<WindowAppearance>();
-  const [glassPreview, setGlassPreview] = useState(GLASS_OPACITY_DEFAULT);
+  const [backgroundPreview, setBackgroundPreview] = useState(BACKGROUND_OPACITY_DEFAULT);
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -123,14 +124,14 @@ export function App() {
   const [linkHover, setLinkHover] = useState<string>();
   const [bellFlash, setBellFlash] = useState(false);
   const terminalRefs = useRef(new Map<string, TerminalPaneHandle>());
-  const settingsRef = useRef<SettingsV2 | undefined>(undefined);
+  const settingsRef = useRef<SettingsV3 | undefined>(undefined);
   const tabsRef = useRef<TabState[]>([]);
   const activeIdRef = useRef<string | undefined>(undefined);
   const initialized = useRef(false);
   const toastSequence = useRef(1);
-  const glassPreviewRef = useRef(GLASS_OPACITY_DEFAULT);
-  const glassPreviewFrame = useRef<number | undefined>(undefined);
-  const glassPersistTimer = useRef<number | undefined>(undefined);
+  const backgroundPreviewRef = useRef(BACKGROUND_OPACITY_DEFAULT);
+  const backgroundPreviewFrame = useRef<number | undefined>(undefined);
+  const backgroundPersistTimer = useRef<number | undefined>(undefined);
   const commandHandler = useRef<(command: AppCommand) => void>(() => undefined);
   const reducedMotion = useReducedMotion();
 
@@ -328,10 +329,10 @@ export function App() {
         if (previous) {
           settingsRef.current = previous;
           setSettings(previous);
-          if (patch.glassOpacity !== undefined) {
-            glassPreviewRef.current = previous.glassOpacity;
-            setGlassPreview(previous.glassOpacity);
-            window.liquidGlass.previewGlassOpacity(previous.glassOpacity);
+          if (patch.backgroundOpacity !== undefined) {
+            backgroundPreviewRef.current = previous.backgroundOpacity;
+            setBackgroundPreview(previous.backgroundOpacity);
+            window.liquidGlass.previewBackgroundOpacity(previous.backgroundOpacity);
           }
         }
         toast(locale === 'ja' ? '設定を保存できませんでした。' : 'Could not save settings.');
@@ -340,37 +341,37 @@ export function App() {
     [locale, toast],
   );
 
-  const commitGlassOpacity = useCallback(
-    (opacity = glassPreviewRef.current) => {
-      if (glassPersistTimer.current !== undefined) {
-        window.clearTimeout(glassPersistTimer.current);
-        glassPersistTimer.current = undefined;
+  const commitBackgroundOpacity = useCallback(
+    (opacity = backgroundPreviewRef.current) => {
+      if (backgroundPersistTimer.current !== undefined) {
+        window.clearTimeout(backgroundPersistTimer.current);
+        backgroundPersistTimer.current = undefined;
       }
-      if (settingsRef.current?.glassOpacity === opacity) return;
-      void updateSettings({ glassOpacity: opacity });
+      if (settingsRef.current?.backgroundOpacity === opacity) return;
+      void updateSettings({ backgroundOpacity: opacity });
     },
     [updateSettings],
   );
 
-  const previewGlassOpacity = useCallback(
+  const previewBackgroundOpacity = useCallback(
     (opacity: number) => {
-      glassPreviewRef.current = opacity;
-      setGlassPreview(opacity);
-      if (glassPreviewFrame.current === undefined) {
-        glassPreviewFrame.current = requestAnimationFrame(() => {
-          glassPreviewFrame.current = undefined;
-          window.liquidGlass.previewGlassOpacity(glassPreviewRef.current);
+      backgroundPreviewRef.current = opacity;
+      setBackgroundPreview(opacity);
+      if (backgroundPreviewFrame.current === undefined) {
+        backgroundPreviewFrame.current = requestAnimationFrame(() => {
+          backgroundPreviewFrame.current = undefined;
+          window.liquidGlass.previewBackgroundOpacity(backgroundPreviewRef.current);
         });
       }
-      if (glassPersistTimer.current !== undefined) {
-        window.clearTimeout(glassPersistTimer.current);
+      if (backgroundPersistTimer.current !== undefined) {
+        window.clearTimeout(backgroundPersistTimer.current);
       }
-      glassPersistTimer.current = window.setTimeout(() => {
-        glassPersistTimer.current = undefined;
-        commitGlassOpacity();
+      backgroundPersistTimer.current = window.setTimeout(() => {
+        backgroundPersistTimer.current = undefined;
+        commitBackgroundOpacity();
       }, 150);
     },
-    [commitGlassOpacity],
+    [commitBackgroundOpacity],
   );
 
   useEffect(() => {
@@ -380,8 +381,8 @@ export function App() {
       setBootstrap(state);
       setSettings(state.settings);
       settingsRef.current = state.settings;
-      glassPreviewRef.current = state.settings.glassOpacity;
-      setGlassPreview(state.settings.glassOpacity);
+      backgroundPreviewRef.current = state.settings.backgroundOpacity;
+      setBackgroundPreview(state.settings.backgroundOpacity);
       setWindowAppearance(state.windowAppearance);
       if (state.startupNotice) toast(state.startupNotice);
       window.liquidGlass.rendererReady();
@@ -395,11 +396,11 @@ export function App() {
 
   useEffect(
     () => () => {
-      if (glassPreviewFrame.current !== undefined) {
-        cancelAnimationFrame(glassPreviewFrame.current);
+      if (backgroundPreviewFrame.current !== undefined) {
+        cancelAnimationFrame(backgroundPreviewFrame.current);
       }
-      if (glassPersistTimer.current !== undefined) {
-        window.clearTimeout(glassPersistTimer.current);
+      if (backgroundPersistTimer.current !== undefined) {
+        window.clearTimeout(backgroundPersistTimer.current);
       }
     },
     [],
@@ -461,11 +462,8 @@ export function App() {
         event.preventDefault();
         event.stopPropagation();
       };
-      const platform = bootstrap?.platform;
-      if (!platform) return;
       const active = activeTerminal();
       const clipboardAction = clipboardActionForTarget(
-        platform,
         clipboardKeyInput(event),
         currentClipboardTarget(),
         active?.hasSelection() ?? false,
@@ -477,8 +475,7 @@ export function App() {
         return;
       }
       if (dialog || settingsOpen) return;
-      const mac = platform === 'darwin';
-      const command = mac ? event.metaKey : event.ctrlKey;
+      const command = event.ctrlKey;
 
       if (command && event.key.toLowerCase() === 't') {
         consumeShortcut();
@@ -507,7 +504,6 @@ export function App() {
     return () => window.removeEventListener('keydown', keydown, true);
   }, [
     activeTerminal,
-    bootstrap?.platform,
     closeTab,
     copy,
     currentClipboardTarget,
@@ -531,6 +527,12 @@ export function App() {
       </main>
     );
   }
+
+  const effectStyle = resolveBackgroundEffectVariables(
+    resolvedTheme,
+    backgroundPreview,
+    windowAppearance.glassAvailability === 'active',
+  ) as CSSProperties;
 
   const activeTab = tabs.find((tab) => tab.id === activeId);
   const handleBell = (id: string) => {
@@ -579,12 +581,11 @@ export function App() {
       data-glass-availability={windowAppearance.glassAvailability}
       data-high-contrast={windowAppearance.highContrast}
       data-screen-reader={settings.screenReaderMode}
-      data-platform={bootstrap.platform}
       data-bell={bellFlash}
-      style={{ '--glass-opacity': glassPreview / 100 } as React.CSSProperties}
+      style={effectStyle}
     >
-      <div className="glass-tint" aria-hidden="true" />
-      <div className="glass-noise" aria-hidden="true" />
+      <div className="background-tint" aria-hidden="true" />
+      <div className="background-noise" aria-hidden="true" />
       <TabBar
         tabs={tabs.map((tab) => ({
           id: tab.id,
@@ -717,17 +718,17 @@ export function App() {
         open={settingsOpen}
         settings={settings}
         windowAppearance={windowAppearance}
-        glassOpacity={glassPreview}
+        backgroundOpacity={backgroundPreview}
         profiles={bootstrap.profiles}
         labels={t}
         onClose={() => {
-          commitGlassOpacity();
+          commitBackgroundOpacity();
           setSettingsOpen(false);
           activeTerminal()?.focus();
         }}
         onChange={(patch) => void updateSettings(patch)}
-        onGlassPreview={previewGlassOpacity}
-        onGlassCommit={commitGlassOpacity}
+        onBackgroundPreview={previewBackgroundOpacity}
+        onBackgroundCommit={commitBackgroundOpacity}
       />
 
       {dialog?.kind === 'paste' && (

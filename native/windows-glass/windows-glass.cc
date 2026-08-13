@@ -170,8 +170,8 @@ AppearanceOptions ReadOptions(const Napi::Value& value) {
   const double opacity = tintOpacity.As<Napi::Number>().DoubleValue();
   const double luminosity = luminosityOpacity.As<Napi::Number>().DoubleValue();
   const double tone = neutralTone.As<Napi::Number>().DoubleValue();
-  if (!std::isfinite(opacity) || opacity < 0.10 || opacity > 0.60) {
-    throw std::invalid_argument("Tint opacity must be between 0.10 and 0.60");
+  if (!std::isfinite(opacity) || opacity < 0.0 || opacity > 0.50) {
+    throw std::invalid_argument("Tint opacity must be between 0.0 and 0.50");
   }
   if (!std::isfinite(luminosity) || luminosity < 0.0 || luminosity > 1.0 ||
       !std::isfinite(tone) || std::floor(tone) != tone || tone < 0.0 || tone > 255.0) {

@@ -8,10 +8,9 @@ const normalAppearance = {
 };
 
 describe('resolveGlassAppearance', () => {
-  it('uses official Acrylic only on a supported Windows host', () => {
+  it('uses official Acrylic when the native controller is available', () => {
     expect(
       resolveGlassAppearance({
-        platform: 'win32',
         windowsAcrylicAvailable: true,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
@@ -19,7 +18,6 @@ describe('resolveGlassAppearance', () => {
     ).toEqual({ glassMode: 'acrylic', glassAvailability: 'active' });
     expect(
       resolveGlassAppearance({
-        platform: 'win32',
         windowsAcrylicAvailable: false,
         systemAppearance: normalAppearance,
         screenReaderMode: false,
@@ -27,38 +25,26 @@ describe('resolveGlassAppearance', () => {
     ).toEqual({ glassMode: 'pseudo', glassAvailability: 'unsupported' });
   });
 
-  it('uses under-window Vibrancy on macOS and pseudo glass on Linux', () => {
+  it('reports an opaque Windows controller fallback', () => {
     expect(
       resolveGlassAppearance({
-        platform: 'darwin',
-        windowsAcrylicAvailable: false,
-        systemAppearance: normalAppearance,
-        screenReaderMode: false,
-      }),
-    ).toEqual({ glassMode: 'vibrancy', glassAvailability: 'active' });
-    expect(
-      resolveGlassAppearance({
-        platform: 'linux',
-        windowsAcrylicAvailable: false,
-        systemAppearance: normalAppearance,
-        screenReaderMode: false,
-      }),
-    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'unsupported' });
-  });
-
-  it.each([
-    ['fallback', 'system-fallback'],
-    ['high-contrast', 'accessibility-disabled'],
-  ] as const)('reports Windows controller state %s', (windowsGlassState, availability) => {
-    expect(
-      resolveGlassAppearance({
-        platform: 'win32',
         windowsAcrylicAvailable: true,
-        windowsGlassState,
+        windowsGlassState: 'fallback',
         systemAppearance: normalAppearance,
         screenReaderMode: false,
       }),
-    ).toEqual({ glassMode: 'acrylic', glassAvailability: availability });
+    ).toEqual({ glassMode: 'acrylic', glassAvailability: 'system-fallback' });
+  });
+
+  it('forces pseudo glass when the Windows controller reports high contrast', () => {
+    expect(
+      resolveGlassAppearance({
+        windowsAcrylicAvailable: true,
+        windowsGlassState: 'high-contrast',
+        systemAppearance: normalAppearance,
+        screenReaderMode: false,
+      }),
+    ).toEqual({ glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' });
   });
 
   it.each([
@@ -68,7 +54,6 @@ describe('resolveGlassAppearance', () => {
   ])('forces an opaque fallback for accessibility: %o', (accessibility) => {
     expect(
       resolveGlassAppearance({
-        platform: 'win32',
         windowsAcrylicAvailable: true,
         systemAppearance: {
           ...normalAppearance,

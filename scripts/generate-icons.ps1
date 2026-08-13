@@ -79,7 +79,7 @@ $sourceImage.Dispose()
 
 $node = (Get-Command node -ErrorAction Stop).Source
 $converter = Join-Path $projectRoot 'node_modules/png2icons/png2icons-cli.js'
-& $node $converter $outputPath $outputBase -allwe -bc -i
+& $node $converter $outputPath $outputBase -icowe -bc -i
 if ($LASTEXITCODE -ne 0) { throw "png2icons exited with code $LASTEXITCODE" }
 
-Write-Output "Generated icon.png, icon.ico, and icon.icns in $outputDirectory"
+Write-Output "Generated icon.png and icon.ico in $outputDirectory"

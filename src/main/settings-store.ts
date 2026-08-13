@@ -2,15 +2,9 @@ import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import Store from 'electron-store';
-import type { SettingsPatch, SettingsV2 } from '../shared/contracts';
+import type { SettingsPatch, SettingsV3 } from '../shared/contracts';
 import { migrateSettingsRecord } from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
-
-const SETTINGS_STORAGE_SCHEMA = {
-  ...SETTINGS_SCHEMA,
-  // Accept the previous upper bound long enough to normalize it without discarding other settings.
-  glassOpacity: { ...SETTINGS_SCHEMA.glassOpacity, maximum: 85 },
-} as const;
 
 export class SettingsStore {
   readonly #store: Store<Record<string, unknown>>;
@@ -19,7 +13,6 @@ export class SettingsStore {
   constructor() {
     try {
       this.#store = this.createStore();
-      this.normalizeStoredSettings();
       this.recovered = false;
     } catch {
       const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -39,35 +32,26 @@ export class SettingsStore {
     return new Store<Record<string, unknown>>({
       name: 'settings',
       defaults: { ...DEFAULT_SETTINGS },
-      schema: SETTINGS_STORAGE_SCHEMA,
+      schema: SETTINGS_SCHEMA,
       clearInvalidConfig: false,
       migrations: {
         '0.1.0': (store) => {
+          store.store = migrateSettingsRecord(store.store);
+        },
+        '0.2.0': (store) => {
           store.store = migrateSettingsRecord(store.store);
         },
       },
     });
   }
 
-  private normalizeStoredSettings(): void {
-    const stored = this.#store.store;
-    const normalized = migrateSettingsRecord(stored);
-    if (
-      stored.schemaVersion !== normalized.schemaVersion ||
-      stored.glassOpacity !== normalized.glassOpacity ||
-      Object.hasOwn(stored, 'glass')
-    ) {
-      this.#store.store = normalized;
-    }
-  }
-
-  get value(): SettingsV2 {
-    const stored = this.#store.store as unknown as SettingsV2;
+  get value(): SettingsV3 {
+    const stored = this.#store.store as unknown as SettingsV3;
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       locale: stored.locale,
       theme: stored.theme,
-      glassOpacity: stored.glassOpacity,
+      backgroundOpacity: stored.backgroundOpacity,
       defaultProfileId: stored.defaultProfileId,
       fontSize: stored.fontSize,
       cursorStyle: stored.cursorStyle,
@@ -80,7 +64,7 @@ export class SettingsStore {
     };
   }
 
-  update(patch: SettingsPatch): SettingsV2 {
+  update(patch: SettingsPatch): SettingsV3 {
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) this.#store.set(key, value);
     }

@@ -4,42 +4,36 @@
 
 # Liquid Glass Terminal
 
-中性のフロステッドグラス表現を備えた、ローカル完結型のElectronターミナルです。対応するWindows 11では調整済みのWindows App SDK Desktop Acrylic controller、macOSではVibrancyを利用し、Linuxと古いWindowsでは安定した不透明表示へ切り替えます。
+Windows 11向けの、中性でCOSMIC風のフロステッドグラス表現を備えたローカル完結型Electronターミナルです。
 
-> **プレビュー版:** v0.1.0の成果物は未署名・未notarizeです。実行前にソースとリリースのchecksumを確認してください。
+> **プレビュー版:** v0.2.0の成果物は未署名です。実行前にソースとリリースのchecksumを確認してください。
 
 [English](README.md) · [アーキテクチャ](docs/architecture.md) · [実機QA](docs/native-qa.md) · [セキュリティ](SECURITY.md)
 
 ## 特長
 
 - `node-pty`による実ローカルシェルと、WebGL／DOM fallback対応のxterm.js描画。
-- ドラッグ可能な複数タブ、シェル自動検出、検索、終了したシェルの再起動。
-- WindowsではPowerShell 7／Windows PowerShell／cmd／Git Bash／WSL、macOS/Linuxでは`$SHELL`／zsh／bashを検出。
+- ドラッグ可能な複数タブ、Windows shell自動検出、検索、終了したshellの再起動。
+- PowerShell 7、Windows PowerShell、cmd、Git Bash、WSL profile。
 - 複数行paste確認、1 MiB超の必須確認、安全な外部リンク、実行しないファイル／フォルダーdrop。
-- 日本語・英語、システム／ライト／ダーク、10〜60%をライブ調整できるガラス不透明度、設定とウィンドウ位置の保存。
-- 透明度低減、高コントラスト、動きの低減、任意のスクリーンリーダーモードへの対応。
-- telemetry、リモートコンテンツ、更新確認、crash upload、shell profileへのコード注入は一切なし。
+- 日本語・英語、システム／ライト／ダーク、設定とwindow位置の保存。
+- telemetry、リモートコンテンツ、更新確認、crash upload、desktop capture、shell profileへのコード注入は一切なし。
 
 ## 対応環境
 
-| 環境    | 最低要件                   | 外観                                                         | アーキテクチャ                 |
-| ------- | -------------------------- | ------------------------------------------------------------ | ------------------------------ |
-| Windows | Windows 10 x64             | Windows 11 22H2以降は調整可能なAcrylic、それ以外は不透明表示 | x64                            |
-| macOS   | macOS 12                   | 調整可能なnative Vibrancy                                    | Intel x64、Apple Silicon arm64 |
-| Linux   | Ubuntu 22.04以降／Fedora系 | 安定した中性色の不透明表示                                   | x64                            |
+Liquid Glass Terminal 0.2.0は、Windows 11 22H2以降（build 22621以上）のx64クライアント版だけに対応します。Windows 10、Windows Server、Windows on ARM（x64 emulationを含む）、macOS、Linuxは、設定storeやPTYを作成する前に拒否します。
 
-LinuxとWindows 10では、背後のアプリが実際に透けることを保証しません。native実装はdesktop captureではなくcompositor backdropを使うため、画面収録の許可を要求せず、他windowのpixelも保持しません。全環境で通常のリサイズ可能なウィンドウを維持します。
+windowは通常どおりresize、maximize、Snapが可能です。DWMがsystem frostを提供し、自己完結型Windows App SDK Desktop Acrylic controllerが調整可能な中性色tintを提供します。画面収録の許可は要求せず、他windowのpixelをcapture・保持しません。
 
-ガラス不透明度の既定値は60%で、1%刻みでライブ変更できます。高コントラスト、透明効果の低減、スクリーンリーダーモード、未対応環境、Windows compositorのfallbackでは安全な不透明表示へ切り替え、理由を表示してsliderを無効化します。保存値は維持され、条件が戻ると復元されます。
+「背景の不透明度」は0〜50%を1%刻みで変更でき、既定値は25%です。0%ではDWM blurを残しつつ、tint、luminosity、renderer noise、local blur、装飾fill、terminal text haloを0にします。50%ではtint opacityが0.50、luminosity opacityが0.59になります。高コントラスト、透明効果の低減、スクリーンリーダーモード、native Acrylic失敗時は安全な不透明fallbackへ切り替え、理由を表示してsliderを無効化し、保存値は維持します。
 
 ## ローカル開発
 
 必要な環境：
 
+- Windows 11 22H2以降のx64クライアント版。
 - Node.js **24.19.0** と npm **11.17.0**。
-- Windows native build：Visual Studio 2022 Build Toolsの「C++によるデスクトップ開発」。`bootstrap:native`が固定versionのWindows App SDKを復元し、x64 Node-API addonをbuildして、自己完結runtimeをElectronの隣へ配置します。
-- macOS native build：最新のXcode Command Line Tools。
-- Linux native build：Python、`make`、C++ compiler、通常のElectron runtime libraries。
+- Visual Studio 2022 Build Toolsの「C++によるデスクトップ開発」。
 
 ```powershell
 npm install
@@ -48,19 +42,21 @@ npm run bootstrap:native
 npm start
 ```
 
-依存packageのlifecycle scriptは`.npmrc`で無効化しています。`audit:install-scripts`がreview済み・version固定のallowlistを検証し、`bootstrap:native`がElectron取得とElectron ABI向けPTY rebuildだけを明示的に実行します。
-
-release前には`npm audit --omit=dev`が0件であることを必須にします。packaging専用の開発依存に関する警告の扱いは[セキュリティポリシー](SECURITY.md#dependency-audit-scope)を参照してください。
+`bootstrap:native`は固定versionのWindows App SDKを復元し、x64 Node-API Acrylic addonと自己完結runtimeを準備し、`node-pty`をElectron ABI向けにrebuildします。
 
 品質チェック：
 
 ```powershell
 npm run check
-npm run package
+$env:LGT_NATIVE_TESTS = '1'; npm run test:run
+npm run package:e2e
 npm run test:e2e
+npm run make
+npm run verify:native-assets
+npm run verify:fuses
 ```
 
-native PTYを準備済みの場合は、`LGT_NATIVE_TESTS=1`で実shell integration testも有効になります。
+GitHub-hosted Windows runnerはWindows Serverであり、applicationが意図的に拒否するため、package版の起動／E2EはローカルWindows 11で実行します。OS clipboardのplain textを一時的に置換して復元するtestは、`LGT_CLIPBOARD_E2E=1`で有効になります。
 
 ## 使い方
 
@@ -70,28 +66,28 @@ package版が公開する引数は1つだけです。
 liquid-glass-terminal --cwd <directory>
 ```
 
-相対パスは呼び出し元の作業directoryから解決します。無効なパスはhomeへfallbackし、通知を表示します。二重起動時は既存windowを前面へ出し、指定directoryで新しいtabを開きます。
+相対pathは呼び出し元の作業directoryから解決します。無効なpathはhomeへfallbackし、通知を表示します。二重起動時は既存windowを前面へ出し、指定directoryで新しいtabを開きます。
 
 ### キーボード
 
-| 操作               | Windows/Linux             | macOS                     |
-| ------------------ | ------------------------- | ------------------------- |
-| tab追加／終了      | Ctrl+T / Ctrl+W           | Cmd+T / Cmd+W             |
-| 検索               | Ctrl+F                    | Cmd+F                     |
-| paste              | Ctrl+Shift+V              | Cmd+V                     |
-| copy               | 選択中のCtrl+C            | Cmd+C                     |
-| interrupt送信      | 未選択時のCtrl+C          | Ctrl+C                    |
-| 次／前のtab        | Ctrl+Tab / Ctrl+Shift+Tab | Ctrl+Tab / Ctrl+Shift+Tab |
-| active tab並べ替え | Alt+Shift+Left/Right      | Alt+Shift+Left/Right      |
-| 設定               | Ctrl+,                    | Cmd+,                     |
+| 操作               | shortcut                  |
+| ------------------ | ------------------------- |
+| tab追加／終了      | Ctrl+T / Ctrl+W           |
+| 検索               | Ctrl+F                    |
+| paste              | Ctrl+Shift+V              |
+| copy               | 選択中のCtrl+C            |
+| interrupt送信      | 未選択時のCtrl+C          |
+| 次／前のtab        | Ctrl+Tab / Ctrl+Shift+Tab |
+| active tab並べ替え | Alt+Shift+Left / Right    |
+| 設定               | Ctrl+,                    |
 
-リンクはCtrl/Cmd+click時のみ、かつ`http:`／`https:`だけを開きます。dropしたパスはshell別にquoteされ、Enterを送らず現在位置へ挿入されます。
+リンクはCtrl+click時のみ、かつ`http:`／`https:`だけを開きます。dropしたpathはshell別にquoteされ、Enterを送らず現在位置へ挿入されます。
 
 ## buildとrelease
 
-Electron ForgeでWindows Setup EXE、macOS DMG/ZIP、Linux DEB/RPMを生成します。`v*` tagで全matrixを検証し、SHA-256 checksum付きDraft GitHub Releaseを作成します。署名、notarization、auto-update、session復元、SSH管理、split pane、任意custom profile、plugin、inline imageはv0.1.0の対象外です。
+Electron Forgeは未署名のWindows x64 Setup EXEを生成します。一致する`v*` tagでWindows x64の品質checkを実行し、SHA-256 checksum付きDraft GitHub Releaseを作成します。署名、auto-update、session復元、SSH管理、split pane、任意custom profile、plugin、inline imageはv0.2.0の対象外です。
 
-依存関係やnative codeを変更する前に[CONTRIBUTING.md](CONTRIBUTING.md)を確認してください。Liquid Glass TerminalはAppleおよびMicrosoftとは無関係の独立したsoftwareです。
+依存関係やnative codeを変更する前に[CONTRIBUTING.md](CONTRIBUTING.md)を確認してください。
 
 ## License
 

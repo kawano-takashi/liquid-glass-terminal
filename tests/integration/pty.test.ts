@@ -5,11 +5,8 @@ const native = process.env.LGT_NATIVE_TESTS === '1' ? describe : describe.skip;
 native('node-pty integration', () => {
   it('spawns, echoes input, resizes, and exits', async () => {
     const pty = await import('node-pty');
-    const windows = process.platform === 'win32';
-    const executable = windows
-      ? (process.env.ComSpec ?? 'cmd.exe')
-      : (process.env.SHELL ?? '/bin/bash');
-    const args = windows ? ['/Q'] : ['--noprofile', '--norc'];
+    const executable = process.env.ComSpec ?? 'cmd.exe';
+    const args = ['/Q'];
     const terminal = pty.spawn(executable, args, {
       name: 'xterm-256color',
       cols: 80,
@@ -30,7 +27,7 @@ native('node-pty integration', () => {
       });
     });
     terminal.resize(100, 30);
-    terminal.write(windows ? `echo ${marker}\r` : `printf '${marker}\\n'\r`);
+    terminal.write(`echo ${marker}\r`);
     await seen;
     expect(output).toContain(marker);
     terminal.kill();

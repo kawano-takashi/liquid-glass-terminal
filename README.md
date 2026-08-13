@@ -4,42 +4,36 @@
 
 # Liquid Glass Terminal
 
-A local-first Electron terminal with a neutral frosted-glass interface. It uses a customized Windows App SDK Desktop Acrylic controller on supported Windows 11 systems, Vibrancy on macOS, and a stable opaque treatment on Linux and older Windows versions.
+A local-first Electron terminal with a neutral, COSMIC-inspired frosted-glass interface for Windows 11.
 
-> **Preview:** v0.1.0 is an unsigned, unnotarized preview. Review the source and release checksums before running packaged artifacts.
+> **Preview:** v0.2.0 is an unsigned preview. Review the source and release checksums before running packaged artifacts.
 
 [日本語](README.ja.md) · [Architecture](docs/architecture.md) · [Native QA](docs/native-qa.md) · [Security](SECURITY.md)
 
 ## Highlights
 
 - Real local shells through `node-pty`, rendered by xterm.js with WebGL and DOM fallback.
-- A single window with draggable tabs, shell profile discovery, search, and restartable exited sessions.
-- Windows PowerShell 7/Windows PowerShell/cmd/Git Bash/WSL discovery; `$SHELL`, zsh, and bash discovery on macOS/Linux.
+- Draggable tabs, Windows shell discovery, search, and restartable exited sessions.
+- PowerShell 7, Windows PowerShell, cmd, Git Bash, and WSL profiles.
 - Multiline paste confirmation, mandatory confirmation above 1 MiB, safe external links, and insert-only file/folder drop.
-- English and Japanese UI, system/light/dark themes, live 10–60% glass opacity, and persisted settings/window geometry.
-- Reduced-transparency, high-contrast, reduced-motion, and opt-in screen-reader adaptations.
-- No telemetry, remote content, update checks, crash uploads, or shell-profile injection.
+- English and Japanese UI, system/light/dark themes, and persisted settings/window geometry.
+- No telemetry, remote content, update checks, crash uploads, desktop capture, or shell-profile injection.
 
-## Platform behavior
+## Supported host
 
-| Platform | Minimum                     | Visual material                                          | Architectures                  |
-| -------- | --------------------------- | -------------------------------------------------------- | ------------------------------ |
-| Windows  | Windows 10 x64              | Adjustable Acrylic on Windows 11 22H2+; opaque otherwise | x64                            |
-| macOS    | macOS 12                    | Adjustable native Vibrancy                               | Intel x64, Apple Silicon arm64 |
-| Linux    | Ubuntu 22.04+/Fedora family | Stable opaque neutral surface                            | x64                            |
+Liquid Glass Terminal 0.2.0 supports only the x64 client edition of Windows 11 22H2 or later (build 22621+). Windows 10, Windows Server, Windows on ARM—including x64 emulation—macOS, and Linux are rejected before settings or a PTY are created.
 
-Linux and Windows 10 intentionally do not promise visibility of applications behind the terminal. The native implementations use compositor backdrops rather than desktop capture, so the app does not request screen-recording permission or retain pixels from other windows. A normal resizable window is preserved on every platform.
+The app remains a normal resizable, maximizable, and Snap-compatible window. DWM supplies the system frost, while a self-contained Windows App SDK Desktop Acrylic controller supplies the adjustable neutral tint. No screen-recording permission is requested and pixels from other windows are never captured or retained.
 
-Glass opacity defaults to 60% and changes live in 1% steps. High contrast, reduced transparency, screen-reader mode, an unsupported platform, or a Windows compositor fallback switches to a safe opaque surface, disables the slider with an explanation, and preserves the saved value for later restoration.
+Background opacity ranges from 0% to 50% in 1% steps and defaults to 25%. At 0%, the DWM blur remains visible while tint, luminosity, renderer noise, local blur, decorative fills, and terminal text halo are removed. At 50%, tint opacity is 0.50 and luminosity opacity is 0.59. High contrast, reduced transparency, screen-reader mode, or a native Acrylic failure switches to a safe opaque fallback, disables the slider with an explanation, and preserves the saved value.
 
 ## Develop locally
 
 Requirements:
 
+- An x64 client edition of Windows 11 22H2 or later.
 - Node.js **24.19.0** with npm **11.17.0**.
-- Windows native builds: Visual Studio 2022 Build Tools with Desktop development with C++. `bootstrap:native` restores the pinned Windows App SDK, builds the x64 Node-API addon, and stages its self-contained runtime beside Electron.
-- macOS native builds: current Xcode Command Line Tools.
-- Linux native builds: Python, `make`, a C++ compiler, and the normal Electron runtime libraries.
+- Visual Studio 2022 Build Tools with **Desktop development with C++**.
 
 ```powershell
 npm install
@@ -48,19 +42,21 @@ npm run bootstrap:native
 npm start
 ```
 
-Dependency lifecycle scripts are disabled by `.npmrc`. `audit:install-scripts` verifies the reviewed, version-pinned allowlist, while `bootstrap:native` explicitly obtains Electron and rebuilds the PTY module for the active Electron ABI.
-
-Before a release, `npm audit --omit=dev` must be clean. See the [security policy](SECURITY.md#dependency-audit-scope) for how packaging-only development advisories are handled.
+`bootstrap:native` restores the pinned Windows App SDK, builds the x64 Node-API Acrylic addon, stages its self-contained runtime, and rebuilds `node-pty` for Electron's ABI.
 
 Quality gates:
 
 ```powershell
 npm run check
-npm run package
+$env:LGT_NATIVE_TESTS = '1'; npm run test:run
+npm run package:e2e
 npm run test:e2e
+npm run make
+npm run verify:native-assets
+npm run verify:fuses
 ```
 
-Set `LGT_NATIVE_TESTS=1` when the native PTY has been prepared to include the real-shell integration test.
+The packaged launch/E2E checks are local Windows 11 checks because GitHub-hosted Windows runners use Windows Server, which the application intentionally rejects. Set `LGT_CLIPBOARD_E2E=1` to opt into clipboard tests that temporarily replace and restore plain text on the OS clipboard.
 
 ## Usage
 
@@ -74,24 +70,24 @@ Relative paths resolve from the caller's working directory. An invalid path open
 
 ### Keyboard
 
-| Action              | Windows/Linux              | macOS                     |
-| ------------------- | -------------------------- | ------------------------- |
-| New / close tab     | Ctrl+T / Ctrl+W            | Cmd+T / Cmd+W             |
-| Find                | Ctrl+F                     | Cmd+F                     |
-| Paste               | Ctrl+Shift+V               | Cmd+V                     |
-| Copy                | Ctrl+C with a selection    | Cmd+C                     |
-| Send interrupt      | Ctrl+C without a selection | Ctrl+C                    |
-| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab  | Ctrl+Tab / Ctrl+Shift+Tab |
-| Reorder active tab  | Alt+Shift+Left/Right       | Alt+Shift+Left/Right      |
-| Settings            | Ctrl+,                     | Cmd+,                     |
+| Action              | Shortcut                   |
+| ------------------- | -------------------------- |
+| New / close tab     | Ctrl+T / Ctrl+W            |
+| Find                | Ctrl+F                     |
+| Paste               | Ctrl+Shift+V               |
+| Copy                | Ctrl+C with a selection    |
+| Send interrupt      | Ctrl+C without a selection |
+| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab  |
+| Reorder active tab  | Alt+Shift+Left / Right     |
+| Settings            | Ctrl+,                     |
 
-Links open only with Ctrl/Cmd+click and only for `http:` or `https:` URLs. Dropped paths are quoted for the selected shell and inserted without pressing Enter.
+Links open only with Ctrl+click and only for `http:` or `https:` URLs. Dropped paths are quoted for the selected shell and inserted without pressing Enter.
 
 ## Build and release
 
-Electron Forge produces a Windows Setup EXE, macOS DMG/ZIP, and Linux DEB/RPM. A `v*` tag runs the full matrix and creates a draft GitHub Release with SHA-256 checksums. Signing, notarization, auto-update, session restoration, SSH management, split panes, arbitrary custom profiles, plugins, and inline images are not part of v0.1.0.
+Electron Forge produces an unsigned Windows x64 Setup EXE. A matching `v*` tag runs Windows x64 quality gates and creates a draft GitHub Release with SHA-256 checksums. Signing, auto-update, session restoration, SSH management, split panes, arbitrary custom profiles, plugins, and inline images are not part of v0.2.0.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before changing dependencies or native code. Liquid Glass Terminal is independent software and is not affiliated with Apple or Microsoft.
+See [CONTRIBUTING.md](CONTRIBUTING.md) before changing dependencies or native code.
 
 ## License
 

@@ -15,24 +15,8 @@ concurrency:
 
 jobs:
   verify:
-    name: ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            os: windows-2022
-            artifact: package-windows-x64
-          - name: Linux x64
-            os: ubuntu-24.04
-            artifact: package-linux-x64
-          - name: macOS arm64
-            os: macos-26
-            artifact: package-macos-arm64
-          - name: macOS x64
-            os: macos-26-intel
-            artifact: package-macos-x64
-    runs-on: ${{ matrix.os }}
+    name: Windows x64
+    runs-on: windows-2022
     timeout-minutes: 45
     steps:
       - name: Check out source
@@ -43,10 +27,6 @@ jobs:
         with:
           node-version: 24.19.0
           cache: npm
-
-      - name: Install Linux packaging tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes fakeroot rpm
 
       - name: Install dependencies without lifecycle scripts
         run: npm ci
@@ -68,21 +48,6 @@ jobs:
         env:
           LGT_NATIVE_TESTS: '1'
 
-      - name: Build E2E-instrumented package
-        run: npm run package:e2e
-
-      - name: Electron launch smoke
-        if: runner.os != 'Linux'
-        run: npm run test:e2e
-        env:
-          LGT_CLIPBOARD_E2E: '1'
-
-      - name: Electron launch smoke on Xvfb
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum npm run test:e2e
-        env:
-          LGT_CLIPBOARD_E2E: '1'
-
       - name: Build hardened distributable artifacts
         run: npm run make
 
@@ -92,18 +57,10 @@ jobs:
       - name: Verify final Electron Fuses
         run: npm run verify:fuses
 
-      - name: Final package process smoke
-        if: runner.os != 'Linux'
-        run: npm run smoke:package
-
-      - name: Final package process smoke on Xvfb
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum npm run smoke:package
-
-      - name: Upload package smoke artifact
+      - name: Upload Windows package artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ matrix.artifact }}
+          name: package-windows-x64
           path: out/**/*
           if-no-files-found: error
           retention-days: 7

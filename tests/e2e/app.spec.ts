@@ -109,12 +109,14 @@ test('launches one terminal and opens settings', async () => {
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
     await expect(settingsDialog).toBeVisible();
-    const glassOpacity = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
-    await expect(glassOpacity).toHaveValue('60');
+    const backgroundOpacity = page.getByRole('slider', {
+      name: /Background opacity|背景の不透明度/,
+    });
+    await expect(backgroundOpacity).toHaveValue('25');
     const overlayStyles = await page.evaluate(() => {
       const drawerBackdrop = document.querySelector('.drawer-backdrop');
       const settingsDrawer = document.querySelector('.settings-drawer');
-      if (!drawerBackdrop || !settingsDrawer) throw new Error('Glass overlays not found');
+      if (!drawerBackdrop || !settingsDrawer) throw new Error('Background overlays not found');
       const backdrop = getComputedStyle(drawerBackdrop);
       const drawer = getComputedStyle(settingsDrawer);
       return {
@@ -133,13 +135,11 @@ test('launches one terminal and opens settings', async () => {
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
-    await expect(glassOpacity).toBeDisabled();
+    await expect(backgroundOpacity).toBeDisabled();
     await expect(settingsDialog).toContainText(/accessibility preference|アクセシビリティ設定/);
     const accessibilityTree = page.locator('.xterm-accessibility-tree');
     await expect(accessibilityTree).toBeVisible();
-    if (process.platform !== 'darwin') {
-      await expect(accessibilityTree).toContainText('LGT_E2E_READY');
-    }
+    await expect(accessibilityTree).toContainText('LGT_E2E_READY');
     await screenReader.uncheck();
     await expect(screenReader).not.toBeChecked();
     await page.screenshot({ path: 'test-results/liquid-glass-terminal.png' });
@@ -152,9 +152,7 @@ test('launches one terminal and opens settings', async () => {
   }
 });
 
-test('previews and persists Windows glass opacity', async () => {
-  test.skip(process.platform !== 'win32', 'Adjustable native Acrylic is Windows 11 specific.');
-
+test('migrates, previews, and persists Windows background opacity', async () => {
   const executablePath = await findPackagedExecutable(path.resolve('out'));
   const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-opacity-e2e-'));
   const settingsPath = path.join(userData, 'settings.json');
@@ -176,18 +174,50 @@ test('previews and persists Windows glass opacity', async () => {
     let page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    let slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    let slider = page.getByRole('slider', {
+      name: /Background opacity|背景の不透明度/,
+    });
     test.skip(await slider.isDisabled(), 'The current Windows session is using a system fallback.');
-    await expect(slider).toHaveValue('60');
+    await expect(slider).toHaveValue('50');
     const migratedSettings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
+      schemaVersion?: unknown;
+      backgroundOpacity?: unknown;
       glassOpacity?: unknown;
       fontSize?: unknown;
     };
-    expect(migratedSettings).toMatchObject({ glassOpacity: 60, fontSize: 17 });
+    expect(migratedSettings).toMatchObject({
+      schemaVersion: 3,
+      backgroundOpacity: 50,
+      fontSize: 17,
+    });
+    expect(migratedSettings).not.toHaveProperty('glassOpacity');
 
-    await slider.fill('10');
+    await slider.fill('0');
     await slider.dispatchEvent('pointerup');
-    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.1');
+    await expect(slider).toHaveValue('0');
+    const zeroEffects = await page.locator('.app-shell').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundOpacity: style.getPropertyValue('--background-opacity').trim(),
+        effectStrength: style.getPropertyValue('--effect-strength').trim(),
+        blur: style.getPropertyValue('--effect-blur').trim(),
+        noise: style.getPropertyValue('--background-noise-opacity').trim(),
+        control: style.getPropertyValue('--control-fill').trim(),
+        halo: style.getPropertyValue('--terminal-halo-color').trim(),
+        danger: style.getPropertyValue('--danger-fill-percent').trim(),
+        bell: style.getPropertyValue('--bell-fill-percent').trim(),
+      };
+    });
+    expect(zeroEffects).toMatchObject({
+      backgroundOpacity: '0',
+      effectStrength: '0',
+      blur: '0px',
+      noise: '0',
+      danger: '0%',
+      bell: '0%',
+    });
+    expect(zeroEffects.control).toMatch(/\/ 0\)$/);
+    expect(zeroEffects.halo).toMatch(/\/ 0\)$/);
     await page.waitForTimeout(250);
     await application.close();
 
@@ -198,9 +228,17 @@ test('previews and persists Windows glass opacity', async () => {
     page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    slider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
-    await expect(slider).toHaveValue('10');
-    await expect(page.locator('.app-shell')).toHaveCSS('--glass-opacity', '0.1');
+    slider = page.getByRole('slider', { name: /Background opacity|背景の不透明度/ });
+    await expect(slider).toHaveValue('0');
+    await expect
+      .poll(() =>
+        page
+          .locator('.app-shell')
+          .evaluate((element) =>
+            getComputedStyle(element).getPropertyValue('--effect-strength').trim(),
+          ),
+      )
+      .toBe('0');
   } finally {
     if (application) await application.close().catch(() => undefined);
     await removeTemporaryUserData(userData);
@@ -238,11 +276,11 @@ test('copies and pastes through native clipboard routes', async () => {
 
     const accessibilityTree = terminalPane.locator('.xterm-accessibility-tree');
     const terminalInput = terminalPane.locator('.xterm-helper-textarea');
-    const copyShortcut = process.platform === 'darwin' ? 'Meta+C' : 'Control+C';
-    const terminalPasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+Shift+V';
-    const editablePasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+V';
+    const copyShortcut = 'Control+C';
+    const terminalPasteShortcut = 'Control+Shift+V';
+    const editablePasteShortcut = 'Control+V';
 
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+F' : 'Control+F');
+    await page.keyboard.press('Control+F');
     const searchInput = page.getByRole('searchbox', { name: /Search|検索/ });
     const searchMarker = 'LGT_SEARCH_CLIPBOARD';
     await writeClipboard(application, searchMarker);

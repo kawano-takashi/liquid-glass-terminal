@@ -7,7 +7,7 @@ import type {
   SessionCreateRequest,
   SessionPortPayload,
   SettingsPatch,
-  SettingsV2,
+  SettingsV3,
   WindowAppearance,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
@@ -19,9 +19,9 @@ ipcRenderer.on(IPC_CHANNELS.sessionPort, (event, payload: SessionPortPayload) =>
 const api: PreloadApi = {
   bootstrap: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap) as Promise<BootstrapState>,
   updateSettings: (patch: SettingsPatch) =>
-    ipcRenderer.invoke(IPC_CHANNELS.updateSettings, patch) as Promise<SettingsV2>,
-  previewGlassOpacity: (opacity: number) =>
-    ipcRenderer.send(IPC_CHANNELS.previewGlassOpacity, opacity),
+    ipcRenderer.invoke(IPC_CHANNELS.updateSettings, patch) as Promise<SettingsV3>,
+  previewBackgroundOpacity: (opacity: number) =>
+    ipcRenderer.send(IPC_CHANNELS.previewBackgroundOpacity, opacity),
   requestSession: (request: SessionCreateRequest) =>
     ipcRenderer.send(IPC_CHANNELS.requestSession, request),
   prepareDroppedPath: (sessionId: string, path: string) =>

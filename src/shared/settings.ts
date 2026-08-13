@@ -1,14 +1,14 @@
-import type { SettingsV2 } from './contracts';
+import type { SettingsV3 } from './contracts';
 
-export const GLASS_OPACITY_MIN = 10;
-export const GLASS_OPACITY_MAX = 60;
-export const GLASS_OPACITY_DEFAULT = 60;
+export const BACKGROUND_OPACITY_MIN = 0;
+export const BACKGROUND_OPACITY_MAX = 50;
+export const BACKGROUND_OPACITY_DEFAULT = 25;
 
-export const DEFAULT_SETTINGS: SettingsV2 = {
-  schemaVersion: 2,
+export const DEFAULT_SETTINGS: SettingsV3 = {
+  schemaVersion: 3,
   locale: 'system',
   theme: 'system',
-  glassOpacity: GLASS_OPACITY_DEFAULT,
+  backgroundOpacity: BACKGROUND_OPACITY_DEFAULT,
   defaultProfileId: 'auto',
   fontSize: 14,
   cursorStyle: 'block',
@@ -21,15 +21,15 @@ export const DEFAULT_SETTINGS: SettingsV2 = {
 };
 
 export const SETTINGS_SCHEMA = {
-  schemaVersion: { type: 'number', enum: [2], default: 2 },
+  schemaVersion: { type: 'number', enum: [3], default: 3 },
   locale: { type: 'string', enum: ['system', 'en', 'ja'], default: 'system' },
   theme: { type: 'string', enum: ['system', 'light', 'dark'], default: 'system' },
-  glassOpacity: {
+  backgroundOpacity: {
     type: 'number',
-    minimum: GLASS_OPACITY_MIN,
-    maximum: GLASS_OPACITY_MAX,
+    minimum: BACKGROUND_OPACITY_MIN,
+    maximum: BACKGROUND_OPACITY_MAX,
     multipleOf: 1,
-    default: GLASS_OPACITY_DEFAULT,
+    default: BACKGROUND_OPACITY_DEFAULT,
   },
   defaultProfileId: { type: 'string', maxLength: 200, default: 'auto' },
   fontSize: { type: 'number', minimum: 10, maximum: 32, default: 14 },

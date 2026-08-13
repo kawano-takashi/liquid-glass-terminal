@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { SettingsV2, ShellProfileDescriptor, ShellProfileKind } from '../shared/contracts';
+import type { SettingsV3, ShellProfileDescriptor, ShellProfileKind } from '../shared/contracts';
 import { quotePathForShell } from '../shared/validation';
 
 const execFileAsync = promisify(execFile);
@@ -57,7 +57,7 @@ export class ShellProfileRegistry {
 
   async detect(): Promise<void> {
     this.#profiles.clear();
-    const detected = process.platform === 'win32' ? await this.detectWindows() : this.detectPosix();
+    const detected = await this.detectWindows();
     for (const item of detected) this.#profiles.set(item.id, item);
   }
 
@@ -72,7 +72,7 @@ export class ShellProfileRegistry {
     );
   }
 
-  get(id: string | undefined, settings: SettingsV2): InternalShellProfile | undefined {
+  get(id: string | undefined, settings: SettingsV3): InternalShellProfile | undefined {
     const selected = id && id !== 'auto' ? id : settings.defaultProfileId;
     if (selected && selected !== 'auto' && this.#profiles.has(selected)) {
       return this.#profiles.get(selected);
@@ -97,7 +97,7 @@ export class ShellProfileRegistry {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       TERM_PROGRAM: 'LiquidGlassTerminal',
-      TERM_PROGRAM_VERSION: '0.1.0',
+      TERM_PROGRAM_VERSION: '0.2.0',
     });
 
     if (profile.kind === 'wsl') {
@@ -200,39 +200,6 @@ export class ShellProfileRegistry {
       } catch {
         // WSL is optional; leave it out when enumeration fails.
       }
-    }
-    return result;
-  }
-
-  private detectPosix(): InternalShellProfile[] {
-    const result: InternalShellProfile[] = [];
-    const candidates = [
-      process.env.SHELL,
-      '/bin/zsh',
-      '/usr/bin/zsh',
-      '/bin/bash',
-      '/usr/bin/bash',
-    ];
-    for (const candidate of candidates) {
-      if (
-        !candidate ||
-        !existsSync(candidate) ||
-        result.some((item) => item.executable === candidate)
-      )
-        continue;
-      const base = path.basename(candidate);
-      const kind: ShellProfileKind = base === 'zsh' ? 'zsh' : base === 'bash' ? 'bash' : 'posix';
-      if (result.some((item) => item.id === `posix:${base}`)) continue;
-      const args = process.platform === 'darwin' ? ['-l'] : ['-i'];
-      result.push(
-        profile(
-          `posix:${base}`,
-          base === 'zsh' ? 'Zsh' : base === 'bash' ? 'Bash' : base,
-          kind,
-          candidate,
-          args,
-        ),
-      );
     }
     return result;
   }

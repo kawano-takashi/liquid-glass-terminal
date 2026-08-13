@@ -7,7 +7,7 @@ import type {
   SettingsPatch,
   ThemeMode,
 } from './contracts';
-import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from './settings';
+import { BACKGROUND_OPACITY_MAX, BACKGROUND_OPACITY_MIN } from './settings';
 
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,80}$/;
 const SESSION_ID = /^[a-f0-9-]{20,80}$/;
@@ -73,7 +73,7 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   const allowed = new Set([
     'locale',
     'theme',
-    'glassOpacity',
+    'backgroundOpacity',
     'defaultProfileId',
     'fontSize',
     'cursorStyle',
@@ -97,10 +97,10 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
       return null;
     patch.theme = value.theme as ThemeMode;
   }
-  if (value.glassOpacity !== undefined) {
-    const opacity = validateGlassOpacity(value.glassOpacity);
+  if (value.backgroundOpacity !== undefined) {
+    const opacity = validateBackgroundOpacity(value.backgroundOpacity);
     if (opacity === null) return null;
-    patch.glassOpacity = opacity;
+    patch.backgroundOpacity = opacity;
   }
   if (value.defaultProfileId !== undefined) {
     if (typeof value.defaultProfileId !== 'string' || value.defaultProfileId.length > 200)
@@ -138,13 +138,13 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   return patch;
 }
 
-export function validateGlassOpacity(value: unknown): number | null {
+export function validateBackgroundOpacity(value: unknown): number | null {
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||
     !Number.isInteger(value) ||
-    value < GLASS_OPACITY_MIN ||
-    value > GLASS_OPACITY_MAX
+    value < BACKGROUND_OPACITY_MIN ||
+    value > BACKGROUND_OPACITY_MAX
   ) {
     return null;
   }

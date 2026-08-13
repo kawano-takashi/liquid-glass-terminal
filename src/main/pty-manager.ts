@@ -6,7 +6,7 @@ import type { IPty } from 'node-pty';
 import type {
   PtyToRendererMessage,
   RendererToPtyMessage,
-  SettingsV2,
+  SettingsV3,
   ShellProfileDescriptor,
 } from '../shared/contracts';
 import { isRendererToPtyMessage } from '../shared/validation';
@@ -43,7 +43,7 @@ export class PtyManager {
 
   constructor(
     private readonly profiles: ShellProfileRegistry,
-    private readonly getSettings: () => SettingsV2,
+    private readonly getSettings: () => SettingsV3,
     private readonly countChanged: (ownerId: number, count: number) => void,
   ) {}
 
@@ -184,7 +184,7 @@ export class PtyManager {
         rows,
         cwd: spawn.cwd,
         env: spawn.env,
-        useConpty: process.platform === 'win32',
+        useConpty: true,
       });
       session.pty = pty;
       session.exited = false;

@@ -19,12 +19,12 @@ export const messages = {
     system: 'System',
     light: 'Light',
     dark: 'Dark',
-    glassOpacity: 'Glass opacity',
-    glassUnavailableAccessibility:
+    backgroundOpacity: 'Background opacity',
+    backgroundUnavailableAccessibility:
       'Transparency is disabled by an accessibility preference. Your saved value is kept.',
-    glassUnavailableUnsupported:
-      'Adjustable transparency is unavailable on this platform. An opaque neutral surface is used.',
-    glassUnavailableSystemFallback:
+    backgroundUnavailableUnsupported:
+      'Adjustable transparency is unavailable. An opaque neutral surface is used.',
+    backgroundUnavailableSystemFallback:
       'Windows is temporarily using the safe opaque backdrop. Your saved value is kept.',
     defaultShell: 'Default shell',
     automatic: 'Automatic',
@@ -55,7 +55,7 @@ export const messages = {
     configRecovered: 'Settings were damaged and have been reset. A backup was preserved.',
     dropOne: 'Drop exactly one file or folder.',
     unsupportedDrop: 'That path could not be inserted into this shell.',
-    linkHint: 'Hold Ctrl/Cmd and click to open',
+    linkHint: 'Hold Ctrl and click to open',
     terminal: 'Terminal',
     profileUnavailable: 'That shell profile is no longer available.',
     sessionFailed: 'The shell could not be started.',
@@ -81,12 +81,12 @@ export const messages = {
     system: 'システム',
     light: 'ライト',
     dark: 'ダーク',
-    glassOpacity: 'ガラスの不透明度',
-    glassUnavailableAccessibility:
+    backgroundOpacity: '背景の不透明度',
+    backgroundUnavailableAccessibility:
       'アクセシビリティ設定により透明効果を無効化しています。保存値は維持されます。',
-    glassUnavailableUnsupported:
+    backgroundUnavailableUnsupported:
       'この環境では透明度を調整できません。不透明な中性色の表示を使用します。',
-    glassUnavailableSystemFallback:
+    backgroundUnavailableSystemFallback:
       'Windowsが一時的に安全な不透明背景へ切り替えています。保存値は維持されます。',
     defaultShell: '既定のシェル',
     automatic: '自動',
@@ -117,7 +117,7 @@ export const messages = {
     configRecovered: '設定が破損していたため初期化しました。元ファイルは退避されています。',
     dropOne: 'ファイルまたはフォルダーを1件だけドロップしてください。',
     unsupportedDrop: 'このシェルへパスを挿入できませんでした。',
-    linkHint: 'Ctrl/Cmdを押しながらクリックして開く',
+    linkHint: 'Ctrlを押しながらクリックして開く',
     terminal: 'ターミナル',
     profileUnavailable: 'そのシェルプロファイルは利用できません。',
     sessionFailed: 'シェルを起動できませんでした。',

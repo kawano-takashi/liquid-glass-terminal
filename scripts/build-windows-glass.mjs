@@ -124,8 +124,7 @@ async function stageDevelopmentRuntime(files) {
 }
 
 if (process.platform !== 'win32') {
-  console.log('Windows glass addon build skipped on this platform.');
-  process.exit(0);
+  throw new Error('The Windows Acrylic addon can only be built on Windows.');
 }
 
 const arch = process.env.npm_config_arch ?? process.arch;

@@ -1,9 +1,9 @@
-import os from 'node:os';
 import path from 'node:path';
 import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   ipcMain,
   MessageChannelMain,
   nativeTheme,
@@ -16,7 +16,7 @@ import type {
   BootstrapState,
   GlassAvailability,
   GlassMode,
-  SettingsV2,
+  SettingsV3,
   SystemAppearance,
   WindowAppearance,
   WindowsGlassState,
@@ -28,9 +28,10 @@ import {
   isSessionCreateRequest,
   safeExternalUrl,
   validateSettingsPatch,
-  validateGlassOpacity,
+  validateBackgroundOpacity,
 } from '../shared/validation';
 import { CwdTokenVault, parseLaunchRequest, type LaunchRequest } from './cli';
+import { currentHostEnvironment, resolveHostSupport } from './host-support';
 import {
   installApplicationMenu,
   installClipboardShortcutRouting,
@@ -52,7 +53,6 @@ import { WindowsGlass } from './windows-glass';
 registerPrivilegedScheme();
 
 app.setName('Liquid Glass Terminal');
-if (process.platform === 'win32') app.setAppUserModelId('dev.liquidglass.terminal');
 
 const initialLaunch = parseLaunchRequest(process.argv, process.cwd());
 const singleInstance = app.requestSingleInstanceLock({ launch: initialLaunch });
@@ -74,12 +74,6 @@ let initialLaunchCwdToken: string | undefined;
 let initialStartupNotice: string | undefined;
 const windowsGlass = new WindowsGlass(handleWindowsGlassStateChanged);
 
-function isWindowsAcrylicOsAvailable(): boolean {
-  if (process.platform !== 'win32') return false;
-  const build = Number(os.release().split('.')[2] ?? 0);
-  return Number.isFinite(build) && build >= 22_621;
-}
-
 function appearance(): SystemAppearance {
   return {
     resolvedTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
@@ -90,7 +84,6 @@ function appearance(): SystemAppearance {
 
 function desiredGlassAppearance() {
   return resolveGlassAppearance({
-    platform: process.platform,
     windowsAcrylicAvailable,
     windowsGlassState,
     systemAppearance: appearance(),
@@ -131,37 +124,30 @@ function sendCommand(command: AppCommand): void {
   mainWindow.webContents.send(IPC_CHANNELS.command, command);
 }
 
-function applyNativeAppearance(glassOpacity = settingsStore.value.glassOpacity): void {
+function applyNativeAppearance(backgroundOpacity = settingsStore.value.backgroundOpacity): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const systemAppearance = appearance();
   let resolved = desiredGlassAppearance();
-  if (process.platform === 'win32') {
-    if (resolved.glassMode === 'acrylic') {
-      const state = windowsGlass.apply(mainWindow, systemAppearance, glassOpacity);
-      if (state) {
-        windowsGlassState = state;
-      } else {
-        windowsAcrylicAvailable = false;
-        windowsGlassState = undefined;
-      }
-      resolved = desiredGlassAppearance();
+  if (resolved.glassMode === 'acrylic') {
+    const state = windowsGlass.apply(mainWindow, systemAppearance, backgroundOpacity);
+    if (state) {
+      windowsGlassState = state;
     } else {
-      windowsGlass.detach();
+      windowsAcrylicAvailable = false;
       windowsGlassState = undefined;
     }
-  }
-  if (process.platform === 'darwin') {
-    mainWindow.setVibrancy(resolved.glassMode === 'vibrancy' ? 'under-window' : null);
+    resolved = desiredGlassAppearance();
+  } else {
+    windowsGlass.detach();
+    windowsGlassState = undefined;
   }
   currentGlassMode = resolved.glassMode;
   currentGlassAvailability = resolved.glassAvailability;
-  if (process.platform !== 'darwin') {
-    mainWindow.setTitleBarOverlay({
-      color: '#00000000',
-      symbolColor: nativeTheme.shouldUseDarkColors ? '#f5f5f5' : '#171717',
-      height: 44,
-    });
-  }
+  mainWindow.setTitleBarOverlay({
+    color: '#00000000',
+    symbolColor: nativeTheme.shouldUseDarkColors ? '#f5f5f5' : '#171717',
+    height: 44,
+  });
   publishWindowAppearance();
 }
 
@@ -191,7 +177,6 @@ function installIpc(): void {
     if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
     return {
       appVersion: app.getVersion(),
-      platform: process.platform,
       settings: settingsStore.value,
       profiles: profiles.descriptors(),
       windowAppearance: windowAppearance(),
@@ -200,7 +185,7 @@ function installIpc(): void {
     };
   });
 
-  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV2 => {
+  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV3 => {
     if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
     const patch = validateSettingsPatch(value);
     if (!patch) throw new TypeError('Invalid settings patch');
@@ -211,9 +196,9 @@ function installIpc(): void {
     return next;
   });
 
-  ipcMain.on(IPC_CHANNELS.previewGlassOpacity, (event, value: unknown) => {
+  ipcMain.on(IPC_CHANNELS.previewBackgroundOpacity, (event, value: unknown) => {
     if (!isTrustedFrame(event)) return;
-    const opacity = validateGlassOpacity(value);
+    const opacity = validateBackgroundOpacity(value);
     if (opacity === null) return;
     applyNativeAppearance(opacity);
   });
@@ -323,7 +308,7 @@ function installIpc(): void {
 async function createWindow(): Promise<void> {
   const stateStore = new WindowStateStore();
   const state = stateStore.restore();
-  windowsAcrylicAvailable = isWindowsAcrylicOsAvailable() && windowsGlass.isSupported();
+  windowsAcrylicAvailable = windowsGlass.isSupported();
   const initialGlassAppearance = desiredGlassAppearance();
   currentGlassMode = initialGlassAppearance.glassMode;
   currentGlassAvailability = initialGlassAppearance.glassAvailability;
@@ -337,29 +322,17 @@ async function createWindow(): Promise<void> {
     minWidth: 720,
     minHeight: 420,
     show: false,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
-    ...(process.platform !== 'darwin'
-      ? {
-          titleBarOverlay: {
-            color: '#00000000',
-            symbolColor: isDark ? '#f5f5f5' : '#171717',
-            height: 44,
-          },
-        }
-      : { trafficLightPosition: { x: 14, y: 14 } }),
-    // Electron uses this flag to create an alpha-capable Chromium surface. The Node-API
-    // bridge keeps the transient DWM frost and attaches the adjustable neutral controller.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#00000000',
+      symbolColor: isDark ? '#f5f5f5' : '#171717',
+      height: 44,
+    },
+    // Electron establishes the system-drawn backdrop. The Node-API bridge keeps the
+    // transient DWM frost and attaches the adjustable neutral controller.
     ...(windowsAcrylicAvailable ? { backgroundMaterial: 'acrylic' as const } : {}),
-    ...(process.platform === 'darwin'
-      ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const }
-      : {}),
-    backgroundColor:
-      windowsAcrylicAvailable || process.platform === 'darwin'
-        ? '#00000000'
-        : isDark
-          ? '#181818'
-          : '#f4f4f4',
-    autoHideMenuBar: process.platform !== 'darwin',
+    backgroundColor: windowsAcrylicAvailable ? '#00000000' : isDark ? '#181818' : '#f4f4f4',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -433,6 +406,19 @@ app.on('second-instance', (_event, argv, workingDirectory, additionalData) => {
 void app
   .whenReady()
   .then(async () => {
+    const hostSupport = resolveHostSupport(currentHostEnvironment());
+    if (!hostSupport.supported) {
+      const japanese = app.getLocale().toLowerCase().startsWith('ja');
+      dialog.showErrorBox(
+        japanese ? '対応していない環境です' : 'Unsupported system',
+        japanese
+          ? 'Liquid Glass Terminal 0.2.0には、Windows 11 22H2以降のx64クライアント版が必要です。'
+          : 'Liquid Glass Terminal 0.2.0 requires an x64 client edition of Windows 11 22H2 or later.',
+      );
+      app.quit();
+      return;
+    }
+    app.setAppUserModelId('dev.liquidglass.terminal');
     settingsStore = new SettingsStore();
     profiles = new ShellProfileRegistry();
     await profiles.detect();

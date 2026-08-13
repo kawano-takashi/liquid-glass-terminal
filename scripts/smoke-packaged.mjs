@@ -3,9 +3,6 @@ import { findPackagedExecutable } from './packaged-executable.mjs';
 
 const executable = await findPackagedExecutable();
 const args = ['--cwd', process.cwd()];
-// GitHub-hosted Linux workspaces cannot preserve chrome-sandbox's root/4755 ownership.
-// This flag is limited to the disposable CI smoke process; packaged defaults remain sandboxed.
-if (process.platform === 'linux' && process.env.CI) args.unshift('--no-sandbox');
 const child = spawn(executable, args, {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, LGT_SMOKE_TEST: '1' },
@@ -24,11 +21,7 @@ const result = await new Promise((resolve) => {
 });
 
 if (child.exitCode === null) {
-  if (process.platform === 'win32') {
-    spawnSync('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
-  } else {
-    child.kill('SIGTERM');
-  }
+  spawnSync('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
 }
 
 if (!result.running) {

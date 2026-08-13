@@ -2,6 +2,9 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 export async function findPackagedExecutable(root = path.resolve('out')) {
+  if (process.platform !== 'win32' || process.arch !== 'x64') {
+    throw new Error('Packaged executable discovery requires Windows x64.');
+  }
   const supplied = process.env.LGT_E2E_EXECUTABLE;
   if (supplied) return supplied;
   const candidates = [];
@@ -10,13 +13,7 @@ export async function findPackagedExecutable(root = path.resolve('out')) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const full = path.join(directory, entry.name);
       if (entry.isDirectory()) await walk(full);
-      else if (
-        (process.platform === 'win32' && entry.name === 'liquid-glass-terminal.exe') ||
-        (process.platform === 'darwin' &&
-          full.includes('.app') &&
-          entry.name === 'liquid-glass-terminal') ||
-        (process.platform === 'linux' && entry.name === 'liquid-glass-terminal')
-      ) {
+      else if (entry.name === 'liquid-glass-terminal.exe') {
         candidates.push(full);
       }
     }

@@ -24,13 +24,17 @@
   --text-muted: #b9b9b9;
   --text-faint: #878787;
   --danger: #dc7880;
-  --glass-rgb: 24 24 24;
-  --glass-opacity: 0.6;
-  --control-fill: rgb(255 255 255 / 0.06);
-  --control-fill-hover: rgb(255 255 255 / 0.1);
-  --control-fill-strong: rgb(255 255 255 / 0.14);
-  --terminal-halo-color: rgb(0 0 0 / 0.72);
-  --glass-blur: 30px;
+  --background-rgb: 24 24 24;
+  --background-opacity: 0.25;
+  --effect-strength: 0.5;
+  --effect-blur: 15px;
+  --background-noise-opacity: 0.005;
+  --control-fill: rgb(255 255 255 / 0.03);
+  --control-fill-hover: rgb(255 255 255 / 0.05);
+  --control-fill-strong: rgb(255 255 255 / 0.07);
+  --terminal-halo-color: rgb(0 0 0 / 0.36);
+  --danger-fill-percent: 7%;
+  --bell-fill-percent: 2.5%;
 }
 
 * {
@@ -85,46 +89,42 @@ select:focus-visible {
   --text-muted: #4e4e4e;
   --text-faint: #747474;
   --danger: #a74850;
-  --glass-rgb: 244 244 244;
-  --control-fill: rgb(0 0 0 / 0.055);
-  --control-fill-hover: rgb(0 0 0 / 0.09);
-  --control-fill-strong: rgb(0 0 0 / 0.13);
-  --terminal-halo-color: rgb(255 255 255 / 0.78);
+  --background-rgb: 244 244 244;
+  --control-fill: rgb(0 0 0 / 0.0275);
+  --control-fill-hover: rgb(0 0 0 / 0.045);
+  --control-fill-strong: rgb(0 0 0 / 0.065);
+  --terminal-halo-color: rgb(255 255 255 / 0.39);
 }
 
-.glass-tint,
-.glass-noise {
+.background-tint,
+.background-noise {
   position: absolute;
   inset: 0;
   z-index: -2;
   pointer-events: none;
 }
 
-.glass-tint {
-  background: rgb(var(--glass-rgb) / var(--glass-opacity));
+.background-tint {
+  background: rgb(var(--background-rgb) / var(--background-opacity));
 }
 
-.app-shell[data-native-glass='acrylic'] .glass-tint {
+.app-shell[data-native-glass='acrylic'] .background-tint {
   background: transparent;
 }
 
-.app-shell[data-native-glass='pseudo'] .glass-tint {
-  background: rgb(var(--glass-rgb));
+.app-shell[data-native-glass='pseudo'] .background-tint {
+  background: rgb(var(--background-rgb));
 }
 
-.glass-noise {
+.background-noise {
   z-index: -1;
-  opacity: 0.03;
+  opacity: var(--background-noise-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
   background-size: 180px 180px;
   mix-blend-mode: soft-light;
 }
 
-.app-shell[data-native-glass='acrylic'] .glass-noise {
-  opacity: 0.01;
-}
-
-.app-shell[data-glass-availability='accessibility-disabled'] .glass-noise {
+.app-shell[data-glass-availability='accessibility-disabled'] .background-noise {
   display: none;
 }
 
@@ -142,10 +142,6 @@ select:focus-visible {
   padding-left: 8px;
   background: transparent;
   -webkit-app-region: drag;
-}
-
-.app-shell[data-platform='darwin'] .titlebar {
-  padding-left: 76px;
 }
 
 .window-drag-region {
@@ -313,7 +309,7 @@ select:focus-visible {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: transparent;
-  backdrop-filter: blur(var(--glass-blur)) saturate(1);
+  backdrop-filter: blur(var(--effect-blur)) saturate(1);
 }
 
 .profile-menu button {
@@ -344,10 +340,6 @@ select:focus-visible {
 .window-controls-spacer {
   width: 138px;
   flex: 0 0 138px;
-}
-
-.app-shell[data-platform='darwin'] .window-controls-spacer {
-  display: none;
 }
 
 .terminal-stage {
@@ -414,7 +406,7 @@ select:focus-visible {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: transparent;
-  backdrop-filter: blur(var(--glass-blur)) saturate(1);
+  backdrop-filter: blur(var(--effect-blur)) saturate(1);
 }
 
 .exit-card {
@@ -447,7 +439,7 @@ select:focus-visible {
 }
 
 .button.danger {
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  background: color-mix(in srgb, var(--danger) var(--danger-fill-percent), transparent);
   color: var(--danger);
 }
 
@@ -834,7 +826,7 @@ select:focus-visible {
 }
 
 .app-shell[data-bell='true'] .terminal-stage {
-  background: color-mix(in srgb, var(--text) 5%, transparent);
+  background: color-mix(in srgb, var(--text) var(--bell-fill-percent), transparent);
 }
 
 @media (max-width: 780px) {
@@ -864,11 +856,11 @@ select:focus-visible {
 }
 
 @media (forced-colors: active) {
-  .glass-tint {
+  .background-tint {
     background: Canvas !important;
   }
 
-  .glass-noise {
+  .background-noise {
     display: none;
   }
 

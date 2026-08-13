@@ -1,14 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsDrawer } from '../../src/renderer/components/SettingsDrawer';
-import type { SettingsV2, WindowAppearance } from '../../src/shared/contracts';
+import type { SettingsV3, WindowAppearance } from '../../src/shared/contracts';
 import { messages } from '../../src/shared/i18n';
 
-const settings: SettingsV2 = {
-  schemaVersion: 2,
+const settings: SettingsV3 = {
+  schemaVersion: 3,
   locale: 'en',
   theme: 'system',
-  glassOpacity: 60,
+  backgroundOpacity: 25,
   defaultProfileId: 'auto',
   fontSize: 14,
   cursorStyle: 'block',
@@ -42,40 +42,40 @@ function renderDrawer(
       open
       settings={settings}
       windowAppearance={windowAppearance}
-      glassOpacity={settings.glassOpacity}
+      backgroundOpacity={settings.backgroundOpacity}
       profiles={[]}
       labels={messages.en}
       onClose={vi.fn()}
       onChange={vi.fn()}
-      onGlassPreview={preview}
-      onGlassCommit={commit}
+      onBackgroundPreview={preview}
+      onBackgroundCommit={commit}
     />,
   );
   return { preview, commit };
 }
 
-describe('SettingsDrawer glass opacity', () => {
+describe('SettingsDrawer background opacity', () => {
   it('previews 1% slider changes and commits the final value', () => {
     const { preview, commit } = renderDrawer();
-    const slider = screen.getByRole('slider', { name: 'Glass opacity' });
-    expect(slider).toHaveAttribute('min', '10');
-    expect(slider).toHaveAttribute('max', '60');
+    const slider = screen.getByRole('slider', { name: 'Background opacity' });
+    expect(slider).toHaveAttribute('min', '0');
+    expect(slider).toHaveAttribute('max', '50');
     expect(slider).toHaveAttribute('step', '1');
-    expect(screen.getByText('60%')).toBeVisible();
+    expect(screen.getByText('25%')).toBeVisible();
 
-    fireEvent.change(slider, { target: { value: '59' } });
+    fireEvent.change(slider, { target: { value: '24' } });
     fireEvent.pointerUp(slider);
-    expect(preview).toHaveBeenCalledWith(59);
+    expect(preview).toHaveBeenCalledWith(24);
     expect(commit).toHaveBeenCalled();
   });
 
   it.each([
     ['accessibility-disabled', /accessibility preference/],
-    ['unsupported', /unavailable on this platform/],
+    ['unsupported', /Adjustable transparency is unavailable/],
     ['system-fallback', /Windows is temporarily/],
   ] as const)('disables the slider and explains %s', (glassAvailability, reason) => {
     renderDrawer({ ...activeAppearance, glassAvailability });
-    expect(screen.getByRole('slider', { name: 'Glass opacity' })).toBeDisabled();
+    expect(screen.getByRole('slider', { name: 'Background opacity' })).toBeDisabled();
     expect(screen.getByText(reason)).toBeVisible();
   });
 });

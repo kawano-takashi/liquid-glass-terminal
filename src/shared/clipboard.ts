@@ -9,16 +9,11 @@ export interface ClipboardKeyInput {
   alt: boolean;
 }
 
-function isMacCommand(input: ClipboardKeyInput): boolean {
-  return input.meta && !input.control && !input.shift && !input.alt;
-}
-
 function isControlCommand(input: ClipboardKeyInput): boolean {
   return input.control && !input.meta && !input.alt;
 }
 
 export function clipboardActionForTarget(
-  platform: NodeJS.Platform,
   input: ClipboardKeyInput,
   target: ClipboardTarget,
   terminalHasSelection: boolean,
@@ -26,13 +21,6 @@ export function clipboardActionForTarget(
   if (target === 'blocked') return undefined;
 
   const key = input.key.toLowerCase();
-  if (platform === 'darwin') {
-    if (!isMacCommand(input)) return undefined;
-    if (key === 'c') return 'copy';
-    if (key === 'v') return 'paste';
-    return undefined;
-  }
-
   if (!isControlCommand(input)) return undefined;
   if (key === 'c' && !input.shift) {
     return target === 'editable' || terminalHasSelection ? 'copy' : undefined;
@@ -41,14 +29,8 @@ export function clipboardActionForTarget(
   return undefined;
 }
 
-export function isApplicationClipboardAccelerator(
-  platform: NodeJS.Platform,
-  input: ClipboardKeyInput,
-): boolean {
+export function isApplicationClipboardAccelerator(input: ClipboardKeyInput): boolean {
   const key = input.key.toLowerCase();
-  if (platform === 'darwin') {
-    return isMacCommand(input) && (key === 'c' || key === 'v');
-  }
   if (!isControlCommand(input)) return false;
   return (key === 'c' && !input.shift) || (key === 'v' && input.shift);
 }

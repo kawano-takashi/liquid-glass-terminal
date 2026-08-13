@@ -34,13 +34,14 @@ describe('IPC validation', () => {
     expect(validateSettingsPatch({ nodeIntegration: true })).toBeNull();
   });
 
-  it('accepts only integer glass opacity values in the supported range', () => {
-    expect(validateSettingsPatch({ glassOpacity: 10 })).toEqual({ glassOpacity: 10 });
-    expect(validateSettingsPatch({ glassOpacity: 60 })).toEqual({ glassOpacity: 60 });
-    expect(validateSettingsPatch({ glassOpacity: 9 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 61 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 60.5 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: Number.NaN })).toBeNull();
+  it('accepts only integer background opacity values in the supported range', () => {
+    expect(validateSettingsPatch({ backgroundOpacity: 0 })).toEqual({ backgroundOpacity: 0 });
+    expect(validateSettingsPatch({ backgroundOpacity: 50 })).toEqual({ backgroundOpacity: 50 });
+    expect(validateSettingsPatch({ backgroundOpacity: -1 })).toBeNull();
+    expect(validateSettingsPatch({ backgroundOpacity: 51 })).toBeNull();
+    expect(validateSettingsPatch({ backgroundOpacity: 25.5 })).toBeNull();
+    expect(validateSettingsPatch({ backgroundOpacity: Number.NaN })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 25 })).toBeNull();
     expect(validateSettingsPatch({ glass: 'balanced' })).toBeNull();
   });
 });

@@ -7,34 +7,53 @@ React + xterm renderer
         │ narrow, typed preload API
         │ one MessagePort per terminal
         ▼
-Electron main process ── node-pty ── local shell and children
+Electron main process ── node-pty / ConPTY ── local shell and children
         │
         ├─ electron-store settings/window state
-        └─ OS window material, menu, external browser delegation
+        └─ Windows material, menu, and external-browser delegation
 ```
 
-The renderer is context-isolated, sandboxed, and has no Node integration. It can request a known shell profile ID but never sends an executable or argument list. Main-frame origin, request shape, bounds, ownership, and URL scheme are validated at every IPC boundary.
+The renderer is context-isolated, sandboxed, and has no Node integration. It can request a detected shell profile ID but never sends an executable or argument list. Main-frame origin, request shape, bounds, ownership, and URL scheme are validated at every IPC boundary.
+
+At startup the main process verifies Windows, x64 Electron, native x64 Windows, build 22621+, and `InstallationType=Client`. Unsupported systems receive a native error dialog and exit before settings, profile discovery, or PTY creation.
 
 ## Terminal flow control
 
-Each tab owns one `MessageChannelMain`. The renderer receives its port before the PTY starts, then waits for an explicit `ready` message; this keeps startup output and early input queued instead of racing port transfer. PTY output carries a sequence number and UTF-8 byte count. The main process pauses the PTY at 256 KiB of unacknowledged output; xterm acknowledges from its `write` callback, and the PTY resumes below 64 KiB. Port loss, renderer failure, or tab closure kills the associated PTY tree.
+Each tab owns one `MessageChannelMain`. The renderer receives its port before the PTY starts, then waits for an explicit `ready` message. PTY output carries a sequence number and UTF-8 byte count. The main process pauses the PTY at 256 KiB of unacknowledged output; xterm acknowledges from its `write` callback, and the PTY resumes below 64 KiB. Port loss, renderer failure, or tab closure kills the associated PTY tree.
 
 OSC 0/2 supplies a sanitized, 80-grapheme tab title. OSC 7 is accepted only for a local `file://` host and an existing path in the same shell profile. Only an accepted OSC 7 path may flow into a newly opened tab; shell profiles are never modified or injected.
 
 ## Window material
 
 ```text
-live system + accessibility state
+Windows 11 22H2+ x64 client
         │
-        ├─ Windows 11 build 22621+ ── Node-API HWND bridge ── DesktopAcrylicController
-        ├─ macOS 12+ ─────────────────────────────────────── under-window Vibrancy
-        └─ Windows 10 / Linux / unsupported native path ─── opaque neutral surface
+        ├─ DWM transient system backdrop ───────── fixed frost / blur
+        ├─ Windows App SDK DesktopAcrylicController ─ tint + luminosity
+        └─ renderer effect variables ───────────── noise / local blur / fills / halo
 ```
 
-The window remains a normal resizable window. On Windows, Electron creates an alpha-capable surface. The transient DWM host backdrop supplies the fixed system frost, while the self-contained Windows App SDK 2.3 `DesktopAcrylicController.SetTarget` layer supplies the neutral dark or light tint, 10–60% user opacity, and matching luminosity recipe. Together they form one window-wide substrate; renderer surfaces do not stack their own tint. The controller stays input-active while the window is unfocused. The native bridge reapplies a borderless small-corner policy after selecting the backdrop, preserving resize and snap behavior. A deterministic C++/WinRT DLL alias lets the unpackaged Electron host resolve the bundled backdrop factory without machine-wide registration. macOS uses `under-window` Vibrancy with one neutral tint layer. No branch captures, stores, or redraws the desktop.
+The application uses a normal resizable, maximizable, Snap-compatible BrowserWindow; it does not use Electron's `transparent: true` mode. The native bridge keeps the DWM transient backdrop active and attaches a self-contained Windows App SDK 2.3 Acrylic controller. It reapplies a borderless small-corner policy while preserving standard window behavior. No component captures, stores, or redraws the desktop.
 
-The main process is the source of truth for system appearance, the material actually applied, and its availability state (`active`, accessibility-disabled, unsupported, or system-fallback). It publishes them as one atomic renderer event so native initialization failure cannot leave transparent CSS over an opaque window. The renderer uses one tint layer only; titlebar, terminal, drawers, and dialogs do not accumulate additional tint. High contrast, reduced transparency, or screen-reader mode detaches native material and switches to an opaque treatment. The 10–60% slider is disabled with a reason while the saved value remains intact.
+`backgroundOpacity` is an integer from 0 to 50. Native values are linear:
+
+```text
+strength = backgroundOpacity / 50
+tint opacity = backgroundOpacity / 100
+luminosity opacity = 0.59 × strength
+```
+
+Thus 0% maps to 0/0, the 25% default maps to 0.25/0.295, and 50% maps to 0.50/0.59. The renderer uses the same strength for decorative noise, local `backdrop-filter` blur, translucent control fills, danger/bell fills, and the terminal text halo. All reach zero at the slider's 0% endpoint; functional text, icons, cursor, selection, focus, and error color remain visible.
+
+The main process is the source of truth for system appearance and native material availability. High contrast, reduced transparency, screen-reader mode, an unavailable addon, or a runtime controller failure switches to a safe opaque pseudo material. The renderer then uses full-strength readable controls, the slider is disabled with a reason, and its saved value is retained.
 
 ## Persistence
 
-Settings and window geometry are separate atomic JSON stores. Settings schema v2 stores integer `glassOpacity`; schema v1 Clear, Balanced, and Dense values migrate to 20%, 35%, and 50%. Values saved under the previous 35–85% range are clamped to the new 10–60% bounds without discarding other settings. Only settings, one-time hints, and clamped geometry persist. Tabs, PTYs, output, titles, and order never survive restart.
+Settings and window geometry are separate atomic JSON stores. Settings schema v3 stores integer `backgroundOpacity`. Migration rules are deterministic:
+
+- v2 `glassOpacity` values from 0 to 50 are preserved, values above 50 become 50, and values below 0 become 0.
+- Invalid v2 values become the 25% default.
+- v1 Clear, Balanced, and Dense presets become 10%, 25%, and 40%.
+- Legacy `glass` and `glassOpacity` keys are removed.
+
+Only settings, one-time hints, and clamped geometry persist. Tabs, PTYs, output, titles, and order never survive restart.

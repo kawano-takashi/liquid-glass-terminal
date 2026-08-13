@@ -17,7 +17,7 @@ import type {
   PtyToRendererMessage,
   RendererToPtyMessage,
   ResolvedTheme,
-  SettingsV2,
+  SettingsV3,
   ShellProfileDescriptor,
 } from '../../shared/contracts';
 import { safeExternalUrl, sanitizeTerminalTitle } from '../../shared/validation';
@@ -41,7 +41,7 @@ interface TerminalPaneProps {
   profile: ShellProfileDescriptor;
   port: MessagePort;
   active: boolean;
-  settings: SettingsV2;
+  settings: SettingsV3;
   resolvedTheme: ResolvedTheme;
   reducedMotion: boolean;
   onTitle(title: string): void;

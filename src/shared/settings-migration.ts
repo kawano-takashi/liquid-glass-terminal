@@ -1,10 +1,14 @@
 import type { LegacyGlassPreset } from './contracts';
-import { GLASS_OPACITY_DEFAULT, GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from './settings';
+import {
+  BACKGROUND_OPACITY_DEFAULT,
+  BACKGROUND_OPACITY_MAX,
+  BACKGROUND_OPACITY_MIN,
+} from './settings';
 
-const LEGACY_GLASS_OPACITY: Record<LegacyGlassPreset, number> = {
-  clear: 20,
-  balanced: 35,
-  dense: 50,
+const LEGACY_BACKGROUND_OPACITY: Record<LegacyGlassPreset, number> = {
+  clear: 10,
+  balanced: 25,
+  dense: 40,
 };
 
 function isLegacyGlassPreset(value: unknown): value is LegacyGlassPreset {
@@ -15,22 +19,20 @@ export function migrateSettingsRecord(
   input: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   const output = { ...input };
+  let candidate = output.backgroundOpacity;
   if (output.schemaVersion === 1 || Object.hasOwn(output, 'glass')) {
-    output.glassOpacity = isLegacyGlassPreset(output.glass)
-      ? LEGACY_GLASS_OPACITY[output.glass]
-      : GLASS_OPACITY_DEFAULT;
-    output.schemaVersion = 2;
-    delete output.glass;
+    candidate = isLegacyGlassPreset(output.glass)
+      ? LEGACY_BACKGROUND_OPACITY[output.glass]
+      : BACKGROUND_OPACITY_DEFAULT;
+  } else if (output.schemaVersion !== 3 && Object.hasOwn(output, 'glassOpacity')) {
+    candidate = output.glassOpacity;
   }
-  if (
-    typeof output.glassOpacity === 'number' &&
-    Number.isFinite(output.glassOpacity) &&
-    Number.isInteger(output.glassOpacity)
-  ) {
-    output.glassOpacity = Math.min(
-      GLASS_OPACITY_MAX,
-      Math.max(GLASS_OPACITY_MIN, output.glassOpacity),
-    );
-  }
+  output.backgroundOpacity =
+    typeof candidate === 'number' && Number.isFinite(candidate) && Number.isInteger(candidate)
+      ? Math.min(BACKGROUND_OPACITY_MAX, Math.max(BACKGROUND_OPACITY_MIN, candidate))
+      : BACKGROUND_OPACITY_DEFAULT;
+  output.schemaVersion = 3;
+  delete output.glass;
+  delete output.glassOpacity;
   return output;
 }

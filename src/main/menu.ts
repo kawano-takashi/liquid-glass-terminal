@@ -1,4 +1,4 @@
-import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
+import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron';
 import { isApplicationClipboardAccelerator } from '../shared/clipboard';
 import type { AppCommand } from '../shared/contracts';
 
@@ -45,34 +45,14 @@ export function installApplicationMenu(
   send: (command: AppCommand) => void,
 ): void {
   const t = labels[locale];
-  const mod = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
-  const template: MenuItemConstructorOptions[] = [];
-
-  if (process.platform === 'darwin') {
-    template.push({
-      label: app.name,
-      submenu: [
-        { label: t.settings, accelerator: 'Cmd+,', click: () => send({ type: 'open-settings' }) },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { label: t.quit, accelerator: 'Cmd+Q', click: () => window.close() },
-      ],
-    });
-  }
-
-  template.push(
+  const template: MenuItemConstructorOptions[] = [
     {
       label: t.file,
       submenu: [
-        { label: t.newTab, accelerator: `${mod}+T`, click: () => send({ type: 'new-tab' }) },
-        { label: t.closeTab, accelerator: `${mod}+W`, click: () => send({ type: 'close-tab' }) },
+        { label: t.newTab, accelerator: 'Ctrl+T', click: () => send({ type: 'new-tab' }) },
+        { label: t.closeTab, accelerator: 'Ctrl+W', click: () => send({ type: 'close-tab' }) },
         { type: 'separator' },
-        ...(process.platform === 'darwin'
-          ? []
-          : [{ label: t.quit, accelerator: 'Alt+F4', click: () => window.close() }]),
+        { label: t.quit, accelerator: 'Alt+F4', click: () => window.close() },
       ],
     },
     {
@@ -81,23 +61,23 @@ export function installApplicationMenu(
         {
           id: 'edit-copy',
           label: t.copy,
-          accelerator: `${mod}+C`,
+          accelerator: 'Ctrl+C',
           click: () => send({ type: 'copy' }),
         },
         {
           id: 'edit-paste',
           label: t.paste,
-          accelerator: process.platform === 'darwin' ? 'Cmd+V' : 'Ctrl+Shift+V',
+          accelerator: 'Ctrl+Shift+V',
           click: () => send({ type: 'paste' }),
         },
         {
           id: 'edit-select-all',
           label: t.selectAll,
-          accelerator: `${mod}+A`,
+          accelerator: 'Ctrl+A',
           click: () => send({ type: 'select-all' }),
         },
         { type: 'separator' },
-        { label: t.search, accelerator: `${mod}+F`, click: () => send({ type: 'search' }) },
+        { label: t.search, accelerator: 'Ctrl+F', click: () => send({ type: 'search' }) },
       ],
     },
     {
@@ -112,13 +92,13 @@ export function installApplicationMenu(
         { type: 'separator' },
         {
           label: t.settings,
-          accelerator: `${mod}+,`,
+          accelerator: 'Ctrl+,',
           click: () => send({ type: 'open-settings' }),
         },
       ],
     },
     { label: t.window, role: 'windowMenu' },
-  );
+  ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -126,7 +106,7 @@ export function installApplicationMenu(
 export function installClipboardShortcutRouting(window: BrowserWindow): void {
   window.webContents.on('before-input-event', (_event, input) => {
     window.webContents.setIgnoreMenuShortcuts(
-      isApplicationClipboardAccelerator(process.platform, {
+      isApplicationClipboardAccelerator({
         key: input.key,
         control: input.control,
         meta: input.meta,

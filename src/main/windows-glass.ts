@@ -2,7 +2,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { app, type BrowserWindow } from 'electron';
 import type { SystemAppearance, WindowsGlassState } from '../shared/contracts';
-import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN } from '../shared/settings';
+import { BACKGROUND_OPACITY_MAX, BACKGROUND_OPACITY_MIN } from '../shared/settings';
+
+const MAX_LUMINOSITY_OPACITY = 0.59;
 
 interface WindowsGlassOptions {
   theme: 'light' | 'dark';
@@ -20,15 +22,17 @@ export interface WindowsAcrylicValues {
 
 export function resolveWindowsAcrylicValues(
   theme: 'light' | 'dark',
-  glassOpacity: number,
+  backgroundOpacity: number,
 ): WindowsAcrylicValues {
-  const tintOpacity = Math.min(
-    GLASS_OPACITY_MAX / 100,
-    Math.max(GLASS_OPACITY_MIN / 100, glassOpacity / 100),
+  const boundedOpacity = Math.min(
+    BACKGROUND_OPACITY_MAX,
+    Math.max(BACKGROUND_OPACITY_MIN, backgroundOpacity),
   );
+  const tintOpacity = boundedOpacity / 100;
+  const strength = boundedOpacity / BACKGROUND_OPACITY_MAX;
   return {
     tintOpacity,
-    luminosityOpacity: Math.min(1, Math.max(0, 0.15 + 0.88 * tintOpacity)),
+    luminosityOpacity: MAX_LUMINOSITY_OPACITY * strength,
     neutralTone: theme === 'dark' ? 24 : 244,
   };
 }
@@ -53,7 +57,6 @@ export class WindowsGlass {
   constructor(private readonly onStateChanged: (state: WindowsGlassState) => void) {}
 
   isSupported(): boolean {
-    if (process.platform !== 'win32') return false;
     if (this.supported !== undefined) return this.supported;
     try {
       this.supported = this.loadAddon().isSupported();
@@ -67,7 +70,7 @@ export class WindowsGlass {
   apply(
     window: BrowserWindow,
     appearance: SystemAppearance,
-    glassOpacity: number,
+    backgroundOpacity: number,
   ): WindowsGlassState | undefined {
     if (!this.isSupported()) return undefined;
     try {
@@ -75,7 +78,7 @@ export class WindowsGlass {
       const options: WindowsGlassOptions = {
         theme: appearance.resolvedTheme,
         highContrast: appearance.highContrast,
-        ...resolveWindowsAcrylicValues(appearance.resolvedTheme, glassOpacity),
+        ...resolveWindowsAcrylicValues(appearance.resolvedTheme, backgroundOpacity),
       };
       let state: WindowsGlassState | false;
       if (this.attachedWindowId === window.id && (state = addon.update(options)) !== false) {

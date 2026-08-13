@@ -25,12 +25,13 @@ async function runWithRetries(command, args, attempts = 3) {
 
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error('npm_execpath is unavailable; run this script through npm.');
+if (process.platform !== 'win32' || process.arch !== 'x64') {
+  throw new Error('Native bootstrap requires Windows x64.');
+}
 
 await runWithRetries(process.execPath, [path.resolve('node_modules/electron/install.js')]);
 
-if (process.platform === 'win32') {
-  run(process.execPath, [npmCli, 'rebuild', 'electron-winstaller', '--ignore-scripts=false']);
-}
+run(process.execPath, [npmCli, 'rebuild', 'electron-winstaller', '--ignore-scripts=false']);
 
 run(process.execPath, [
   path.resolve('node_modules/@electron/rebuild/lib/cli.js'),
@@ -39,10 +40,4 @@ run(process.execPath, [
   'node-pty',
 ]);
 
-if (process.platform === 'win32') {
-  run(process.execPath, [path.resolve('scripts/build-windows-glass.mjs'), '--stage-electron']);
-}
-
-if (process.platform === 'darwin') {
-  run(process.execPath, [npmCli, 'rebuild', 'fs-xattr', 'macos-alias', '--ignore-scripts=false']);
-}
+run(process.execPath, [path.resolve('scripts/build-windows-glass.mjs'), '--stage-electron']);

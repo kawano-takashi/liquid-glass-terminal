@@ -6,7 +6,6 @@ import type {
 } from '../shared/contracts';
 
 export interface GlassModeInput {
-  platform: NodeJS.Platform;
   windowsAcrylicAvailable: boolean;
   windowsGlassState?: WindowsGlassState;
   systemAppearance: SystemAppearance;
@@ -26,20 +25,14 @@ export function resolveGlassAppearance(input: GlassModeInput): ResolvedGlassAppe
   ) {
     return { glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' };
   }
-  if (input.platform === 'win32') {
-    if (!input.windowsAcrylicAvailable) {
-      return { glassMode: 'pseudo', glassAvailability: 'unsupported' };
-    }
-    if (input.windowsGlassState === 'fallback') {
-      return { glassMode: 'acrylic', glassAvailability: 'system-fallback' };
-    }
-    if (input.windowsGlassState === 'high-contrast') {
-      return { glassMode: 'acrylic', glassAvailability: 'accessibility-disabled' };
-    }
-    return { glassMode: 'acrylic', glassAvailability: 'active' };
+  if (!input.windowsAcrylicAvailable) {
+    return { glassMode: 'pseudo', glassAvailability: 'unsupported' };
   }
-  if (input.platform === 'darwin') {
-    return { glassMode: 'vibrancy', glassAvailability: 'active' };
+  if (input.windowsGlassState === 'fallback') {
+    return { glassMode: 'acrylic', glassAvailability: 'system-fallback' };
   }
-  return { glassMode: 'pseudo', glassAvailability: 'unsupported' };
+  if (input.windowsGlassState === 'high-contrast') {
+    return { glassMode: 'pseudo', glassAvailability: 'accessibility-disabled' };
+  }
+  return { glassMode: 'acrylic', glassAvailability: 'active' };
 }
