@@ -7,7 +7,14 @@ export const GLASS_OPACITY_DEFAULT = 25;
 export const FROST_STRENGTH_MIN = 0;
 export const FROST_STRENGTH_MAX = 13;
 export const FROST_STRENGTH_DEFAULT = 6;
-export const FROST_BLUR_AMOUNTS = [8, 10, 12, 14, 17, 20, 24, 28, 33, 39, 46, 54, 63, 74] as const;
+export const FROST_BLUR_AMOUNTS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 17, 20, 24] as const;
+
+export function resolveFrostBlurAmount(frostStrength: number): number {
+  const strength = Number.isFinite(frostStrength)
+    ? Math.min(FROST_STRENGTH_MAX, Math.max(FROST_STRENGTH_MIN, Math.trunc(frostStrength)))
+    : FROST_STRENGTH_DEFAULT;
+  return FROST_BLUR_AMOUNTS[strength];
+}
 
 export const DEFAULT_SETTINGS: SettingsV4 = {
   schemaVersion: 4,

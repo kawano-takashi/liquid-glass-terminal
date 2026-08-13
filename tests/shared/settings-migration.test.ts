@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { migrateSettingsRecord } from '../../src/shared/settings-migration';
+import {
+  migrateFrostStrengthRangeRecord,
+  migrateSettingsRecord,
+} from '../../src/shared/settings-migration';
 
 describe('settings migration', () => {
   it.each([
@@ -45,5 +48,22 @@ describe('settings migration', () => {
     const source = { schemaVersion: 3, backgroundOpacity: 25, theme: 'system' } as const;
     migrateSettingsRecord(source);
     expect(source).toEqual({ schemaVersion: 3, backgroundOpacity: 25, theme: 'system' });
+  });
+
+  it('resets only the frost strength for the transparent-first range', () => {
+    const source = {
+      schemaVersion: 4,
+      locale: 'ja',
+      glassOpacity: 0,
+      frostStrength: 13,
+      defaultProfileId: 'pwsh',
+      fontSize: 17,
+    } as const;
+
+    expect(migrateFrostStrengthRangeRecord(source)).toEqual({
+      ...source,
+      frostStrength: 6,
+    });
+    expect(source.frostStrength).toBe(13);
   });
 });

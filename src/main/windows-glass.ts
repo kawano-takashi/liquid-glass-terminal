@@ -8,17 +8,12 @@ import type {
   SettingsV4,
   SystemAppearance,
 } from '../shared/contracts';
-import {
-  FROST_STRENGTH_MAX,
-  FROST_STRENGTH_MIN,
-  GLASS_OPACITY_MAX,
-  GLASS_OPACITY_MIN,
-} from '../shared/settings';
+import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN, resolveFrostBlurAmount } from '../shared/settings';
 
 export interface WindowsBackdropOptions {
   policyEnabled: boolean;
   glassOpacity: number;
-  frostStrength: number;
+  frostBlurAmount: number;
 }
 
 interface BackdropProbeResult {
@@ -59,7 +54,7 @@ export function resolveWindowsBackdropOptions(
   return {
     policyEnabled: !appearance.highContrast && !appearance.reducedTransparency && !screenReaderMode,
     glassOpacity: Math.min(GLASS_OPACITY_MAX, Math.max(GLASS_OPACITY_MIN, glassOpacity)),
-    frostStrength: Math.min(FROST_STRENGTH_MAX, Math.max(FROST_STRENGTH_MIN, frostStrength)),
+    frostBlurAmount: resolveFrostBlurAmount(frostStrength),
   };
 }
 

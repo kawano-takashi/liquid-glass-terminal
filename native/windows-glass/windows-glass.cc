@@ -12,7 +12,6 @@
 #include <roapi.h>
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -49,16 +48,15 @@ constexpr int kCornerDefault = 0;
 constexpr int kCornerSmall = 3;
 constexpr COLORREF kColorDefault = 0xFFFFFFFF;
 constexpr COLORREF kColorNone = 0xFFFFFFFE;
-constexpr std::array<float, 14> kFrostBlurAmounts{
-    8.0f,  10.0f, 12.0f, 14.0f, 17.0f, 20.0f, 24.0f,
-    28.0f, 33.0f, 39.0f, 46.0f, 54.0f, 63.0f, 74.0f};
+constexpr float kFrostBlurAmountMax = 24.0f;
+constexpr float kFrostBlurAmountProbe = 6.0f;
 
 enum class NativeState { Active, PolicyDisabled, CapabilityLost };
 
 struct AppearanceOptions {
   bool policyEnabled;
   std::uint8_t glassOpacity;
-  std::uint8_t frostStrength;
+  float frostBlurAmount;
 };
 
 struct StateCallback {
@@ -249,27 +247,26 @@ AppearanceOptions ReadOptions(const Napi::Value& value) {
   const auto options = value.As<Napi::Object>();
   const auto policyEnabled = options.Get("policyEnabled");
   const auto glassOpacity = options.Get("glassOpacity");
-  const auto frostStrength = options.Get("frostStrength");
-  if (!policyEnabled.IsBoolean() || !glassOpacity.IsNumber() || !frostStrength.IsNumber()) {
+  const auto frostBlurAmount = options.Get("frostBlurAmount");
+  if (!policyEnabled.IsBoolean() || !glassOpacity.IsNumber() || !frostBlurAmount.IsNumber()) {
     throw std::invalid_argument("Expected complete backdrop options");
   }
   const double opacity = glassOpacity.As<Napi::Number>().DoubleValue();
-  const double strength = frostStrength.As<Napi::Number>().DoubleValue();
+  const double blurAmount = frostBlurAmount.As<Napi::Number>().DoubleValue();
   if (!std::isfinite(opacity) || std::floor(opacity) != opacity || opacity < 0.0 ||
       opacity > 100.0 || static_cast<int>(opacity) % 5 != 0) {
     throw std::invalid_argument("Glass opacity must be an integer from 0 to 100 in steps of 5");
   }
-  if (!std::isfinite(strength) || std::floor(strength) != strength || strength < 0.0 ||
-      strength >= static_cast<double>(kFrostBlurAmounts.size())) {
-    throw std::invalid_argument("Frost strength must be an integer from 0 to 13");
+  if (!std::isfinite(blurAmount) || blurAmount < 0.0 || blurAmount > kFrostBlurAmountMax) {
+    throw std::invalid_argument("Frost blur amount must be between 0 and 24 DIPs");
   }
   return AppearanceOptions{policyEnabled.As<Napi::Boolean>().Value(),
                            static_cast<std::uint8_t>(opacity),
-                           static_cast<std::uint8_t>(strength)};
+                           static_cast<float>(blurAmount)};
 }
 
 composition::CompositionEffectFactory CreateFrostFactory(
-    const composition::Compositor& compositor) {
+    const composition::Compositor& compositor, float initialBlurAmount) {
   auto blur = Microsoft::WRL::Make<lgt::effects::GaussianBlurEffect>();
   auto saturation = Microsoft::WRL::Make<lgt::effects::SaturationEffect>();
   if (!blur || !saturation) throw std::bad_alloc();
@@ -278,7 +275,7 @@ composition::CompositionEffectFactory CreateFrostFactory(
   Microsoft::WRL::Wrappers::HStringReference saturationName{L"Saturation"};
   winrt::check_hresult(blur->put_Name(blurName.Get()));
   winrt::check_hresult(saturation->put_Name(saturationName.Get()));
-  blur->BlurAmount(kFrostBlurAmounts[6]);
+  blur->BlurAmount(initialBlurAmount);
 
   const composition::CompositionEffectSourceParameter sourceParameter{L"backdrop"};
   winrt::check_hresult(blur->SetSource(
@@ -340,7 +337,7 @@ NativeState ConfigureAppearance(Session& session) {
       active ? static_cast<float>(session.appearance.glassOpacity) / 100.0f : 1.0f);
   session.tintBrush.Color(winrt::Windows::UI::Color{255, 24, 24, 24});
   session.effectBrush.Properties().InsertScalar(
-      L"Blur.BlurAmount", kFrostBlurAmounts[session.appearance.frostStrength]);
+      L"Blur.BlurAmount", session.appearance.frostBlurAmount);
   return state;
 }
 
@@ -392,7 +389,8 @@ std::optional<NativeState> Attach(
 
   ConfigureDwm(window);
   session->compositor = CreateCompositor();
-  const auto factory = CreateFrostFactory(session->compositor);
+  const auto factory =
+      CreateFrostFactory(session->compositor, session->appearance.frostBlurAmount);
   session->effectBrush = factory.CreateBrush();
   session->effectBrush.SetSourceParameter(
       L"backdrop", session->compositor.CreateHostBackdropBrush());
@@ -450,7 +448,7 @@ Napi::Value Probe(const Napi::CallbackInfo& info) {
     const bool fast = supported && EffectsFast(probe);
     if (supported) {
       probe.compositor = CreateCompositor();
-      static_cast<void>(CreateFrostFactory(probe.compositor));
+      static_cast<void>(CreateFrostFactory(probe.compositor, kFrostBlurAmountProbe));
     }
     const auto result = Napi::Object::New(env);
     result.Set("supported", Napi::Boolean::New(env, supported));

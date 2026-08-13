@@ -32,7 +32,7 @@ Windows 11 22H2+ x64 client
         ├─ DWM system backdrop: NONE
         ├─ Windows.UI.Composition DesktopWindowTarget
         │      HostBackdrop
-        │        → GaussianBlur (Quality + hard border, 8–74 DIPs)
+        │        → GaussianBlur (Quality + hard border, 0–24 DIPs)
         │        → Saturation (1.10)
         │        → fixed dark tint (#181818)
         └─ renderer ── fixed controls + text halo; static 3% terminal-only noise
@@ -44,10 +44,10 @@ The visual source is `CreateHostBackdropBrush()`. A Direct2D Gaussian blur confi
 
 ```text
 index:  0   1   2   3   4   5   6   7   8   9  10  11  12  13
-blur:   8  10  12  14  17  20  24  28  33  39  46  54  63  74 DIPs
+blur:   0   1   2   3   4   5   6   8  10  12  14  17  20  24 DIPs
 ```
 
-The defaults are 25% glass opacity and frost index 6 (shown as 7/14). At 0% the tint is absent but the blur visual remains active. At 100% the tint is fully opaque and the blur visual is hidden so unnecessary blur work is bypassed. There are no local CSS `backdrop-filter` layers. Control fills, danger/bell fills, and the terminal text halo stay fixed for readability; static 3% noise sits behind terminal content only and is removed for opaque policy/failure output.
+The defaults are 25% glass opacity and frost index 6 (shown as 7/14), which resolves to 6 DIPs. The main process converts the saved index to a blur amount before calling the native addon. At frost index 0, the Gaussian blur amount is zero while the HostBackdrop, saturation, and tint visual tree remains attached. At 0% glass opacity the tint is absent but the selected HostBackdrop effect remains active. At 100% the tint is fully opaque and the backdrop visual is hidden so unnecessary effect work is bypassed. There are no local CSS `backdrop-filter` layers. Control fills, danger/bell fills, and the terminal text halo stay fixed for readability; static 3% noise sits behind terminal content only and is removed for opaque policy/failure output.
 
 The native addon uses only Windows system APIs. Its strict capability probe requires active DWM composition, a hardware Direct3D 11 feature-level 11 adapter (software adapters are rejected), and successful creation of the exact Windows.UI.Composition effect graph. This is also run when policy currently disables transparency. Initialization gets two total attempts; failure shows a localized dialog with a stable code and exits before any PTY is created. No Windows App SDK runtime is staged or loaded.
 
@@ -55,6 +55,6 @@ The main process is the source of truth for material status. High contrast, redu
 
 ## Persistence
 
-Settings and window geometry are separate atomic JSON stores. Settings schema v4 stores integer `glassOpacity` and `frostStrength`. Any pre-v4 record resets appearance to the new defaults (25% and index 6) while preserving unrelated settings. Legacy `theme`, `glass`, and `backgroundOpacity` keys are removed. A valid v4 record is idempotent.
+Settings and window geometry are separate atomic JSON stores. Settings schema v4 stores integer `glassOpacity` and `frostStrength`. Any pre-v4 record resets appearance to the new defaults (25% and index 6) while preserving unrelated settings. Legacy `theme`, `glass`, and `backgroundOpacity` keys are removed. Internal migration 4.0.2 resets only `frostStrength` to index 6 once so existing installations adopt the transparent-first range; every other setting is preserved. A migrated v4 record is then stable.
 
 Only settings, one-time hints, and clamped geometry persist. Tabs, PTYs, output, titles, and order never survive restart.

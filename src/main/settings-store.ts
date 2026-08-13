@@ -3,7 +3,10 @@ import path from 'node:path';
 import { app } from 'electron';
 import Store from 'electron-store';
 import type { SettingsPatch, SettingsV4 } from '../shared/contracts';
-import { migrateSettingsRecord } from '../shared/settings-migration';
+import {
+  migrateFrostStrengthRangeRecord,
+  migrateSettingsRecord,
+} from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
 
 export class SettingsStore {
@@ -36,7 +39,7 @@ export class SettingsStore {
       clearInvalidConfig: false,
       // Settings migrations follow the schema version, independently of the app release.
       // This guarantees v4 runs for development builds that already recorded app 0.2.0.
-      ...({ projectVersion: '4.0.1' } as Record<string, unknown>),
+      ...({ projectVersion: '4.0.2' } as Record<string, unknown>),
       migrations: {
         '4.0.0': (store) => {
           store.store = migrateSettingsRecord(store.store);
@@ -44,6 +47,10 @@ export class SettingsStore {
         // Development builds may already have recorded 4.0.0 with a theme key.
         '4.0.1': (store) => {
           store.store = migrateSettingsRecord(store.store);
+        },
+        // The transparent-first frost range intentionally resets only the saved level.
+        '4.0.2': (store) => {
+          store.store = migrateFrostStrengthRangeRecord(store.store);
         },
       },
     });

@@ -16,7 +16,7 @@ describe('Windows frosted-backdrop values', () => {
     ).toEqual({
       policyEnabled: true,
       glassOpacity: 25,
-      frostStrength: 6,
+      frostBlurAmount: 6,
     });
   });
 
@@ -27,8 +27,17 @@ describe('Windows frosted-backdrop values', () => {
         glassOpacity: 0,
         frostStrength: 13,
       }),
-    ).toMatchObject({ glassOpacity: 0, frostStrength: 13 });
+    ).toMatchObject({ glassOpacity: 0, frostBlurAmount: 24 });
     expect(saved).toEqual({ glassOpacity: 25, frostStrength: 6 });
+  });
+
+  it('maps the clear endpoint to zero blur', () => {
+    expect(
+      resolveWindowsBackdropOptions(normalAppearance, false, {
+        glassOpacity: 25,
+        frostStrength: 0,
+      }),
+    ).toMatchObject({ frostBlurAmount: 0 });
   });
 
   it.each([
@@ -55,6 +64,6 @@ describe('Windows frosted-backdrop values', () => {
         glassOpacity: -1,
         frostStrength: 99,
       }),
-    ).toMatchObject({ glassOpacity: 0, frostStrength: 13 });
+    ).toMatchObject({ glassOpacity: 0, frostBlurAmount: 24 });
   });
 });

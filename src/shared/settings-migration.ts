@@ -14,3 +14,9 @@ export function migrateSettingsRecord(
   delete output.theme;
   return output;
 }
+
+export function migrateFrostStrengthRangeRecord(
+  input: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  return { ...input, frostStrength: FROST_STRENGTH_DEFAULT };
+}

@@ -16,10 +16,12 @@ Record the application version, Windows build and edition, display scale, GPU, W
 - [ ] Window opens at 1100×720, honors the 720×420 minimum, resizes smoothly, maximizes, restores, and supports Snap.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
 - [ ] Frost stays active when the window loses focus; switching Windows between light and dark leaves the renderer, titlebar, menus, xterm palette, and `#181818` tint dark without restarting.
-- [ ] At the 25% / 7-of-14 defaults, shapes and colors behind the window remain visible, background prose is unreadable, and terminal text remains readable.
-- [ ] The 0% glass endpoint removes tint but retains the custom HostBackdrop blur; control fills and the terminal text halo remain readable.
+- [ ] At the 25% / 7-of-14 defaults (6 DIPs), shapes, colors, and placement behind the window are clearer; background prose may be partially legible, and terminal text remains readable.
+- [ ] At frost level 1, the background is sharp because Gaussian blur is zero while the HostBackdrop, saturation, and tint visual tree remains attached.
+- [ ] The 0% glass endpoint removes tint but retains the selected HostBackdrop effect; control fills and the terminal text halo remain readable.
 - [ ] The 100% glass endpoint is completely opaque and does not expose stale desktop pixels while resizing.
-- [ ] All 14 frost levels (8, 10, 12, 14, 17, 20, 24, 28, 33, 39, 46, 54, 63, 74 DIPs) differ progressively, preview live, and survive restart.
+- [ ] All 14 frost levels (0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 17, 20, 24 DIPs) differ progressively against the same high-detail background, preview live, and survive restart.
+- [ ] At frost level 14 (24 DIPs), normal-size background prose is unreadable.
 - [ ] Static noise remains approximately 3%, appears behind terminal content only, and does not cover titlebar, settings, search, menus, dialogs, or toasts.
 - [ ] Settings, search, menus, dialogs, and toasts add no local CSS blur, cumulative tint, visible rim, or shadow.
 - [ ] High contrast keeps the app's dark colors, suppresses Windows forced-color replacement, uses a safe opaque surface, hides noise, disables both appearance sliders with a reason, and restores both saved values afterward.

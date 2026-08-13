@@ -222,18 +222,18 @@ test('launches one terminal and opens settings', async () => {
   }
 });
 
-test('migrates, previews, and persists independent frosted-backdrop settings', async () => {
+test('resets the migrated frost range, previews, and persists later choices', async () => {
   const executablePath = await findPackagedExecutable(path.resolve('out'));
   const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-frost-e2e-'));
   const settingsPath = path.join(userData, 'settings.json');
   await writeFile(
     settingsPath,
     JSON.stringify({
-      schemaVersion: 2,
-      theme: 'light',
+      schemaVersion: 4,
       glassOpacity: 85,
+      frostStrength: 13,
       fontSize: 17,
-      __internal__: { migrations: { version: '0.1.0' } },
+      __internal__: { migrations: { version: '4.0.1' } },
     }),
   );
   let application: LaunchedApplication | undefined;
@@ -252,7 +252,7 @@ test('migrates, previews, and persists independent frosted-backdrop settings', a
       name: /Frost strength|曇りの強さ/,
     });
     test.skip(await glassSlider.isDisabled(), 'The current Windows session has disabled effects.');
-    await expect(glassSlider).toHaveValue('25');
+    await expect(glassSlider).toHaveValue('85');
     await expect(frostSlider).toHaveValue('6');
     const migratedSettings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
       schemaVersion?: unknown;
@@ -264,7 +264,7 @@ test('migrates, previews, and persists independent frosted-backdrop settings', a
     };
     expect(migratedSettings).toMatchObject({
       schemaVersion: 4,
-      glassOpacity: 25,
+      glassOpacity: 85,
       frostStrength: 6,
       fontSize: 17,
     });
