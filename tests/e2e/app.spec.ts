@@ -109,13 +109,13 @@ test('launches one terminal and opens settings', async () => {
     await page.getByRole('button', { name: /Settings|設定/ }).click();
     const settingsDialog = page.getByRole('dialog', { name: /Settings|設定/ });
     await expect(settingsDialog).toBeVisible();
-    const glassOpacity = page.getByRole('slider', {
-      name: /Glass opacity|ガラスの不透明度/,
+    const glassContrast = page.getByRole('slider', {
+      name: /Glass contrast|ガラスのコントラスト/,
     });
     const frostStrength = page.getByRole('slider', {
       name: /Frost strength|曇りの強さ/,
     });
-    await expect(glassOpacity).toHaveValue('25');
+    await expect(glassContrast).toHaveValue('0');
     await expect(frostStrength).toHaveValue('6');
     const overlayStyles = await page.evaluate(() => {
       const drawerBackdrop = document.querySelector('.drawer-backdrop');
@@ -180,7 +180,7 @@ test('launches one terminal and opens settings', async () => {
 
     await page.emulateMedia({ forcedColors: 'active' });
     expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true);
-    await expect(page.locator('.background-noise')).toHaveCSS('display', 'none');
+    await expect(page.locator('.background-noise')).toHaveCount(0);
     expect(
       await appShell.evaluate((element) => {
         const tint = document.querySelector('.background-tint');
@@ -204,7 +204,7 @@ test('launches one terminal and opens settings', async () => {
     });
     await screenReader.check();
     await expect(screenReader).toBeChecked();
-    await expect(glassOpacity).toBeDisabled();
+    await expect(glassContrast).toBeDisabled();
     await expect(frostStrength).toBeDisabled();
     await expect(settingsDialog).toContainText(/Windows, accessibility|Windows、アクセシビリティ/);
     const accessibilityTree = page.locator('.xterm-accessibility-tree');
@@ -222,7 +222,7 @@ test('launches one terminal and opens settings', async () => {
   }
 });
 
-test('resets the migrated frost range, previews, and persists later choices', async () => {
+test('migrates appearance v5, previews adaptive contrast, and persists later choices', async () => {
   const executablePath = await findPackagedExecutable(path.resolve('out'));
   const userData = await mkdtemp(path.join(os.tmpdir(), 'liquid-glass-terminal-frost-e2e-'));
   const settingsPath = path.join(userData, 'settings.json');
@@ -244,18 +244,26 @@ test('resets the migrated frost range, previews, and persists later choices', as
     });
     let page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
+    const terminalPane = page.locator('.terminal-pane[data-active="true"]');
+    await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
+    const sessionId = await terminalPane.getAttribute('data-session-id');
+    expect(sessionId).toBeTruthy();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    let glassSlider = page.getByRole('slider', {
-      name: /Glass opacity|ガラスの不透明度/,
+    let contrastSlider = page.getByRole('slider', {
+      name: /Glass contrast|ガラスのコントラスト/,
     });
     let frostSlider = page.getByRole('slider', {
       name: /Frost strength|曇りの強さ/,
     });
-    test.skip(await glassSlider.isDisabled(), 'The current Windows session has disabled effects.');
-    await expect(glassSlider).toHaveValue('85');
+    test.skip(
+      await contrastSlider.isDisabled(),
+      'The current Windows session has disabled effects.',
+    );
+    await expect(contrastSlider).toHaveValue('0');
     await expect(frostSlider).toHaveValue('6');
     const migratedSettings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
       schemaVersion?: unknown;
+      glassContrast?: unknown;
       glassOpacity?: unknown;
       frostStrength?: unknown;
       backgroundOpacity?: unknown;
@@ -263,37 +271,60 @@ test('resets the migrated frost range, previews, and persists later choices', as
       fontSize?: unknown;
     };
     expect(migratedSettings).toMatchObject({
-      schemaVersion: 4,
-      glassOpacity: 85,
+      schemaVersion: 5,
+      glassContrast: 0,
       frostStrength: 6,
       fontSize: 17,
     });
     expect(migratedSettings).not.toHaveProperty('backgroundOpacity');
+    expect(migratedSettings).not.toHaveProperty('glassOpacity');
     expect(migratedSettings).not.toHaveProperty('theme');
 
-    await glassSlider.fill('0');
-    await glassSlider.dispatchEvent('pointerup');
-    await frostSlider.fill('13');
-    await frostSlider.dispatchEvent('pointerup');
-    await expect(glassSlider).toHaveValue('0');
-    await expect(frostSlider).toHaveValue('13');
-    const zeroEffects = await page.locator('.app-shell').evaluate((element) => {
+    await contrastSlider.fill('-50');
+    await contrastSlider.dispatchEvent('pointerup');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
+    const lightSurfaceStyles = await page.locator('.app-shell').evaluate((element) => {
       const style = getComputedStyle(element);
       return {
-        noise: Number.parseFloat(style.getPropertyValue('--background-noise-opacity')),
+        color: style.color,
+        colorScheme: style.colorScheme,
         control: style.getPropertyValue('--control-fill').trim(),
         halo: style.getPropertyValue('--terminal-halo-color').trim(),
-        danger: style.getPropertyValue('--danger-fill-percent').trim(),
-        bell: style.getPropertyValue('--bell-fill-percent').trim(),
       };
     });
-    expect(zeroEffects).toMatchObject({
-      noise: 0.03,
-      danger: '14%',
-      bell: '5%',
+    expect(lightSurfaceStyles).toMatchObject({
+      color: 'rgb(24, 24, 24)',
+      colorScheme: 'light',
     });
-    expect(zeroEffects.control).not.toMatch(/\/ 0\)$/);
-    expect(zeroEffects.halo).not.toMatch(/\/ 0\)$/);
+    expect(lightSurfaceStyles.control).toMatch(/(?:0 0 0|#0000000f)/);
+    expect(lightSurfaceStyles.halo).toMatch(/(?:255 255 255|#ffffffb8)/);
+
+    await frostSlider.fill('0');
+    await frostSlider.dispatchEvent('pointerup');
+    await expect(contrastSlider).toBeEnabled();
+    await expect(contrastSlider).toHaveValue('-50');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
+
+    await contrastSlider.fill('0');
+    await contrastSlider.dispatchEvent('pointerup');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-backdrop-status', 'active');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'light');
+    await contrastSlider.fill('-100');
+    await contrastSlider.dispatchEvent('pointerup');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-backdrop-status', 'active');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
+    await contrastSlider.fill('100');
+    await contrastSlider.dispatchEvent('pointerup');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-backdrop-status', 'active');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'light');
+    await contrastSlider.fill('-75');
+    await contrastSlider.dispatchEvent('pointerup');
+    await expect(contrastSlider).toHaveValue('-75');
+    await expect(frostSlider).toHaveValue('0');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
+    await expect(terminalPane).toHaveAttribute('data-session-id', sessionId!);
+    await expect(terminalPane).toHaveAttribute('data-session-ready', 'true');
+    await expect(page.locator('.background-noise')).toHaveCount(0);
     const localBackdropFilters = await page
       .locator('.settings-drawer, .search-bar, .profile-menu, .modal-panel')
       .evaluateAll((elements) =>
@@ -310,10 +341,14 @@ test('resets the migrated frost range, previews, and persists later choices', as
     page = await application.firstWindow();
     await expect(page.locator('.app-shell')).toBeVisible();
     await page.getByRole('button', { name: /Settings|設定/ }).click();
-    glassSlider = page.getByRole('slider', { name: /Glass opacity|ガラスの不透明度/ });
+    contrastSlider = page.getByRole('slider', {
+      name: /Glass contrast|ガラスのコントラスト/,
+    });
     frostSlider = page.getByRole('slider', { name: /Frost strength|曇りの強さ/ });
-    await expect(glassSlider).toHaveValue('0');
-    await expect(frostSlider).toHaveValue('13');
+    await expect(contrastSlider).toHaveValue('-75');
+    await expect(contrastSlider).toBeEnabled();
+    await expect(frostSlider).toHaveValue('0');
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-foreground-tone', 'dark');
   } finally {
     if (application) await application.close().catch(() => undefined);
     await removeTemporaryUserData(userData);

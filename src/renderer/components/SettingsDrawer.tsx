@@ -3,23 +3,26 @@ import { useEffect, useRef } from 'react';
 import type {
   BackdropPreviewPatch,
   SettingsPatch,
-  SettingsV4,
+  SettingsV5,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../../shared/contracts';
 import {
   FROST_STRENGTH_MAX,
   FROST_STRENGTH_MIN,
-  GLASS_OPACITY_MAX,
-  GLASS_OPACITY_MIN,
-  GLASS_OPACITY_STEP,
+  GLASS_CONTRAST_MAX,
+  GLASS_CONTRAST_MIN,
+  GLASS_CONTRAST_STEP,
 } from '../../shared/settings';
 
 interface SettingsLabels {
   settings: string;
   close: string;
   system: string;
-  glassOpacity: string;
+  glassContrast: string;
+  glassContrastWhite: string;
+  glassContrastNeutral: string;
+  glassContrastBlack: string;
   frostStrength: string;
   backdropUnavailablePolicy: string;
   backdropUnavailableRuntime: string;
@@ -37,9 +40,9 @@ interface SettingsLabels {
 
 interface SettingsDrawerProps {
   open: boolean;
-  settings: SettingsV4;
+  settings: SettingsV5;
   windowAppearance: WindowAppearance;
-  glassOpacity: number;
+  glassContrast: number;
   frostStrength: number;
   profiles: ShellProfileDescriptor[];
   labels: SettingsLabels;
@@ -53,7 +56,7 @@ export function SettingsDrawer({
   open,
   settings,
   windowAppearance,
-  glassOpacity,
+  glassContrast,
   frostStrength,
   profiles,
   labels,
@@ -70,6 +73,12 @@ export function SettingsDrawer({
       : windowAppearance.backdropStatus === 'policy-disabled'
         ? labels.backdropUnavailablePolicy
         : undefined;
+  const contrastOutput =
+    glassContrast < 0
+      ? `${labels.glassContrastWhite} ${Math.abs(glassContrast)}%`
+      : glassContrast > 0
+        ? `${labels.glassContrastBlack} ${glassContrast}%`
+        : labels.glassContrastNeutral;
 
   useEffect(() => {
     if (!open) return;
@@ -122,7 +131,7 @@ export function SettingsDrawer({
             <span>{labels.language}</span>
             <select
               value={settings.locale}
-              onChange={(event) => onChange({ locale: event.target.value as SettingsV4['locale'] })}
+              onChange={(event) => onChange({ locale: event.target.value as SettingsV5['locale'] })}
             >
               <option value="system">{labels.system}</option>
               <option value="en">English</option>
@@ -131,18 +140,18 @@ export function SettingsDrawer({
           </label>
 
           <label className="setting-field range-field" data-disabled={backdropDisabled}>
-            <span>{labels.glassOpacity}</span>
-            <output>{glassOpacity}%</output>
+            <span>{labels.glassContrast}</span>
+            <output>{contrastOutput}</output>
             <input
               type="range"
-              min={GLASS_OPACITY_MIN}
-              max={GLASS_OPACITY_MAX}
-              step={GLASS_OPACITY_STEP}
-              value={glassOpacity}
+              min={GLASS_CONTRAST_MIN}
+              max={GLASS_CONTRAST_MAX}
+              step={GLASS_CONTRAST_STEP}
+              value={glassContrast}
               disabled={backdropDisabled}
-              aria-label={labels.glassOpacity}
+              aria-label={labels.glassContrast}
               aria-describedby={backdropDisabledReason ? 'backdrop-settings-reason' : undefined}
-              onChange={(event) => onBackdropPreview({ glassOpacity: Number(event.target.value) })}
+              onChange={(event) => onBackdropPreview({ glassContrast: Number(event.target.value) })}
               onPointerUp={onBackdropCommit}
               onPointerCancel={onBackdropCommit}
               onKeyUp={onBackdropCommit}
@@ -211,7 +220,7 @@ export function SettingsDrawer({
             <select
               value={settings.cursorStyle}
               onChange={(event) =>
-                onChange({ cursorStyle: event.target.value as SettingsV4['cursorStyle'] })
+                onChange({ cursorStyle: event.target.value as SettingsV5['cursorStyle'] })
               }
             >
               <option value="block">Block</option>

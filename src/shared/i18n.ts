@@ -16,7 +16,10 @@ export const messages = {
     selectAll: 'Select all',
     clear: 'Clear terminal',
     system: 'System',
-    glassOpacity: 'Glass opacity',
+    glassContrast: 'Glass contrast',
+    glassContrastWhite: 'White',
+    glassContrastNeutral: 'Neutral',
+    glassContrastBlack: 'Black',
     frostStrength: 'Frost strength',
     backdropUnavailablePolicy:
       'Frost is disabled by Windows, accessibility, energy-saver, or remote-session policy. Saved values are kept.',
@@ -75,7 +78,10 @@ export const messages = {
     selectAll: 'すべて選択',
     clear: '端末をクリア',
     system: 'システム',
-    glassOpacity: 'ガラスの不透明度',
+    glassContrast: 'ガラスのコントラスト',
+    glassContrastWhite: '白',
+    glassContrastNeutral: '中立',
+    glassContrastBlack: '黒',
     frostStrength: '曇りの強さ',
     backdropUnavailablePolicy:
       'Windows、アクセシビリティ、省電力、またはリモート接続の設定により曇り効果を無効化しています。保存値は維持されます。',

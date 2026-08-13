@@ -5,14 +5,14 @@ import type {
   BackdropFailureCode,
   BackdropPreviewPatch,
   NativeBackdropState,
-  SettingsV4,
+  SettingsV5,
   SystemAppearance,
 } from '../shared/contracts';
-import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN, resolveFrostBlurAmount } from '../shared/settings';
+import { GLASS_CONTRAST_MAX, GLASS_CONTRAST_MIN, resolveFrostBlurAmount } from '../shared/settings';
 
 export interface WindowsBackdropOptions {
   policyEnabled: boolean;
-  glassOpacity: number;
+  glassContrast: number;
   frostBlurAmount: number;
 }
 
@@ -46,14 +46,14 @@ export class BackdropNativeError extends Error {
 export function resolveWindowsBackdropOptions(
   appearance: SystemAppearance,
   screenReaderMode: boolean,
-  settings: Pick<SettingsV4, 'glassOpacity' | 'frostStrength'>,
+  settings: Pick<SettingsV5, 'glassContrast' | 'frostStrength'>,
   preview: BackdropPreviewPatch = {},
 ): WindowsBackdropOptions {
-  const glassOpacity = preview.glassOpacity ?? settings.glassOpacity;
+  const glassContrast = preview.glassContrast ?? settings.glassContrast;
   const frostStrength = preview.frostStrength ?? settings.frostStrength;
   return {
     policyEnabled: !appearance.highContrast && !appearance.reducedTransparency && !screenReaderMode,
-    glassOpacity: Math.min(GLASS_OPACITY_MAX, Math.max(GLASS_OPACITY_MIN, glassOpacity)),
+    glassContrast: Math.min(GLASS_CONTRAST_MAX, Math.max(GLASS_CONTRAST_MIN, glassContrast)),
     frostBlurAmount: resolveFrostBlurAmount(frostStrength),
   };
 }

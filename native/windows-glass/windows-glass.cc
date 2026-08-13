@@ -48,16 +48,42 @@ constexpr int kCornerDefault = 0;
 constexpr int kCornerSmall = 3;
 constexpr COLORREF kColorDefault = 0xFFFFFFFF;
 constexpr COLORREF kColorNone = 0xFFFFFFFE;
-constexpr float kFrostBlurAmountMax = 24.0f;
-constexpr float kFrostBlurAmountProbe = 6.0f;
+constexpr float kFrostBlurAmountMax = 74.0f;
+constexpr float kFrostBlurAmountProbe = 9.0f;
 
 enum class NativeState { Active, PolicyDisabled, CapabilityLost };
 
 struct AppearanceOptions {
   bool policyEnabled;
-  std::uint8_t glassOpacity;
+  std::int16_t glassContrast;
   float frostBlurAmount;
 };
+
+struct VisualPlan {
+  bool backdropVisible;
+  bool contrastVisible;
+};
+
+constexpr int ContrastMagnitude(std::int16_t contrast) {
+  return contrast < 0 ? -static_cast<int>(contrast) : static_cast<int>(contrast);
+}
+
+constexpr VisualPlan ResolveVisualPlan(bool active, std::int16_t glassContrast) {
+  const int contrastMagnitude = ContrastMagnitude(glassContrast);
+  return VisualPlan{
+      active && contrastMagnitude < 100,
+      active ? contrastMagnitude > 0 : true,
+  };
+}
+
+static_assert(ResolveVisualPlan(true, 0).backdropVisible);
+static_assert(!ResolveVisualPlan(true, 0).contrastVisible);
+static_assert(ResolveVisualPlan(true, -75).backdropVisible);
+static_assert(ResolveVisualPlan(true, -75).contrastVisible);
+static_assert(!ResolveVisualPlan(true, 100).backdropVisible);
+static_assert(ResolveVisualPlan(true, 100).contrastVisible);
+static_assert(!ResolveVisualPlan(false, 0).backdropVisible);
+static_assert(ResolveVisualPlan(false, 0).contrastVisible);
 
 struct StateCallback {
   Napi::ThreadSafeFunction function;
@@ -76,10 +102,10 @@ struct Session {
   compositionDesktop::DesktopWindowTarget target{nullptr};
   composition::ContainerVisual root{nullptr};
   composition::SpriteVisual backdropVisual{nullptr};
-  composition::SpriteVisual tintVisual{nullptr};
+  composition::SpriteVisual contrastVisual{nullptr};
   composition::CompositionEffectBrush effectBrush{nullptr};
-  composition::CompositionColorBrush tintBrush{nullptr};
-  AppearanceOptions appearance{true, 25, 6};
+  composition::CompositionColorBrush contrastBrush{nullptr};
+  AppearanceOptions appearance{true, 0, 9};
   winrt::event_token advancedEffectsChangedToken{};
   bool hasAdvancedEffectsChangedToken = false;
   std::shared_ptr<StateCallback> stateCallback;
@@ -105,9 +131,9 @@ struct Session {
       } catch (...) {
       }
     }
-    tintBrush = nullptr;
+    contrastBrush = nullptr;
     effectBrush = nullptr;
-    tintVisual = nullptr;
+    contrastVisual = nullptr;
     backdropVisual = nullptr;
     root = nullptr;
     target = nullptr;
@@ -246,46 +272,40 @@ AppearanceOptions ReadOptions(const Napi::Value& value) {
   if (!value.IsObject()) throw std::invalid_argument("Expected backdrop options");
   const auto options = value.As<Napi::Object>();
   const auto policyEnabled = options.Get("policyEnabled");
-  const auto glassOpacity = options.Get("glassOpacity");
+  const auto glassContrast = options.Get("glassContrast");
   const auto frostBlurAmount = options.Get("frostBlurAmount");
-  if (!policyEnabled.IsBoolean() || !glassOpacity.IsNumber() || !frostBlurAmount.IsNumber()) {
+  if (!policyEnabled.IsBoolean() || !glassContrast.IsNumber() || !frostBlurAmount.IsNumber()) {
     throw std::invalid_argument("Expected complete backdrop options");
   }
-  const double opacity = glassOpacity.As<Napi::Number>().DoubleValue();
+  const double contrast = glassContrast.As<Napi::Number>().DoubleValue();
   const double blurAmount = frostBlurAmount.As<Napi::Number>().DoubleValue();
-  if (!std::isfinite(opacity) || std::floor(opacity) != opacity || opacity < 0.0 ||
-      opacity > 100.0 || static_cast<int>(opacity) % 5 != 0) {
-    throw std::invalid_argument("Glass opacity must be an integer from 0 to 100 in steps of 5");
+  if (!std::isfinite(contrast) || std::floor(contrast) != contrast || contrast < -100.0 ||
+      contrast > 100.0 || static_cast<int>(contrast) % 5 != 0) {
+    throw std::invalid_argument(
+        "Glass contrast must be an integer from -100 to 100 in steps of 5");
   }
   if (!std::isfinite(blurAmount) || blurAmount < 0.0 || blurAmount > kFrostBlurAmountMax) {
-    throw std::invalid_argument("Frost blur amount must be between 0 and 24 DIPs");
+    throw std::invalid_argument("Frost blur amount must be between 0 and 74 DIPs");
   }
   return AppearanceOptions{policyEnabled.As<Napi::Boolean>().Value(),
-                           static_cast<std::uint8_t>(opacity),
+                           static_cast<std::int16_t>(contrast),
                            static_cast<float>(blurAmount)};
 }
 
 composition::CompositionEffectFactory CreateFrostFactory(
     const composition::Compositor& compositor, float initialBlurAmount) {
   auto blur = Microsoft::WRL::Make<lgt::effects::GaussianBlurEffect>();
-  auto saturation = Microsoft::WRL::Make<lgt::effects::SaturationEffect>();
-  if (!blur || !saturation) throw std::bad_alloc();
+  if (!blur) throw std::bad_alloc();
 
   Microsoft::WRL::Wrappers::HStringReference blurName{L"Blur"};
-  Microsoft::WRL::Wrappers::HStringReference saturationName{L"Saturation"};
   winrt::check_hresult(blur->put_Name(blurName.Get()));
-  winrt::check_hresult(saturation->put_Name(saturationName.Get()));
   blur->BlurAmount(initialBlurAmount);
 
   const composition::CompositionEffectSourceParameter sourceParameter{L"backdrop"};
   winrt::check_hresult(blur->SetSource(
       reinterpret_cast<effectsAbi::IGraphicsEffectSource*>(winrt::get_abi(sourceParameter))));
-  Microsoft::WRL::ComPtr<effectsAbi::IGraphicsEffectSource> blurSource;
-  winrt::check_hresult(blur.As(&blurSource));
-  winrt::check_hresult(saturation->SetSource(blurSource.Get()));
-
   Microsoft::WRL::ComPtr<effectsAbi::IGraphicsEffect> graphAbi;
-  winrt::check_hresult(saturation.As(&graphAbi));
+  winrt::check_hresult(blur.As(&graphAbi));
   winrt::Windows::Graphics::Effects::IGraphicsEffect graph{nullptr};
   winrt::copy_from_abi(graph, graphAbi.Get());
 
@@ -331,11 +351,17 @@ NativeState ResolveState(const Session& session) {
 NativeState ConfigureAppearance(Session& session) {
   const NativeState state = ResolveState(session);
   const bool active = state == NativeState::Active;
-  const bool renderBackdrop = active && session.appearance.glassOpacity < 100;
-  session.backdropVisual.IsVisible(renderBackdrop);
-  session.tintVisual.Opacity(
-      active ? static_cast<float>(session.appearance.glassOpacity) / 100.0f : 1.0f);
-  session.tintBrush.Color(winrt::Windows::UI::Color{255, 24, 24, 24});
+  const int contrastMagnitude = ContrastMagnitude(session.appearance.glassContrast);
+  const VisualPlan plan = ResolveVisualPlan(active, session.appearance.glassContrast);
+  session.backdropVisual.IsVisible(plan.backdropVisible);
+  session.contrastVisual.IsVisible(plan.contrastVisible);
+  session.contrastVisual.Opacity(
+      active ? static_cast<float>(contrastMagnitude) / 100.0f : 1.0f);
+  session.contrastBrush.Color(
+      active && session.appearance.glassContrast < 0
+          ? winrt::Windows::UI::Color{255, 255, 255, 255}
+          : active ? winrt::Windows::UI::Color{255, 0, 0, 0}
+                   : winrt::Windows::UI::Color{255, 24, 24, 24});
   session.effectBrush.Properties().InsertScalar(
       L"Blur.BlurAmount", session.appearance.frostBlurAmount);
   return state;
@@ -394,18 +420,18 @@ std::optional<NativeState> Attach(
   session->effectBrush = factory.CreateBrush();
   session->effectBrush.SetSourceParameter(
       L"backdrop", session->compositor.CreateHostBackdropBrush());
-  session->tintBrush = session->compositor.CreateColorBrush();
+  session->contrastBrush = session->compositor.CreateColorBrush();
 
   session->backdropVisual = session->compositor.CreateSpriteVisual();
   session->backdropVisual.RelativeSizeAdjustment({1.0f, 1.0f});
   session->backdropVisual.Brush(session->effectBrush);
-  session->tintVisual = session->compositor.CreateSpriteVisual();
-  session->tintVisual.RelativeSizeAdjustment({1.0f, 1.0f});
-  session->tintVisual.Brush(session->tintBrush);
+  session->contrastVisual = session->compositor.CreateSpriteVisual();
+  session->contrastVisual.RelativeSizeAdjustment({1.0f, 1.0f});
+  session->contrastVisual.Brush(session->contrastBrush);
   session->root = session->compositor.CreateContainerVisual();
   session->root.RelativeSizeAdjustment({1.0f, 1.0f});
   session->root.Children().InsertAtBottom(session->backdropVisual);
-  session->root.Children().InsertAtTop(session->tintVisual);
+  session->root.Children().InsertAtTop(session->contrastVisual);
 
   const auto interop = session->compositor.as<compositionInterop::ICompositorDesktopInterop>();
   winrt::check_hresult(interop->CreateDesktopWindowTarget(

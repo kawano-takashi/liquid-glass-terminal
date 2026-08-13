@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   migrateFrostStrengthRangeRecord,
   migrateSettingsRecord,
+  migrateSettingsV5Record,
 } from '../../src/shared/settings-migration';
 
 describe('settings migration', () => {
@@ -65,5 +66,46 @@ describe('settings migration', () => {
       frostStrength: 6,
     });
     expect(source.frostStrength).toBe(13);
+  });
+
+  it.each([1, 2, 3, 4])(
+    'resets every pre-v5 appearance value while preserving unrelated settings: schema %i',
+    (schemaVersion) => {
+      expect(
+        migrateSettingsV5Record({
+          schemaVersion,
+          locale: 'ja',
+          glass: 'dense',
+          glassOpacity: 85,
+          glassContrast: -75,
+          backgroundOpacity: 40,
+          frostStrength: 13,
+          theme: 'light',
+          fontSize: 17,
+        }),
+      ).toEqual({
+        schemaVersion: 5,
+        locale: 'ja',
+        glassContrast: 0,
+        frostStrength: 6,
+        fontSize: 17,
+      });
+    },
+  );
+
+  it('keeps a current v5 record stable and does not mutate its source', () => {
+    const source = {
+      schemaVersion: 5,
+      glassContrast: -75,
+      frostStrength: 13,
+      locale: 'en',
+    } as const;
+    expect(migrateSettingsV5Record(source)).toEqual(source);
+    expect(source).toEqual({
+      schemaVersion: 5,
+      glassContrast: -75,
+      frostStrength: 13,
+      locale: 'en',
+    });
   });
 });

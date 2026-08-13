@@ -6,7 +6,7 @@ import type { IPty } from 'node-pty';
 import type {
   PtyToRendererMessage,
   RendererToPtyMessage,
-  SettingsV4,
+  SettingsV5,
   ShellProfileDescriptor,
 } from '../shared/contracts';
 import { isRendererToPtyMessage } from '../shared/validation';
@@ -43,7 +43,7 @@ export class PtyManager {
 
   constructor(
     private readonly profiles: ShellProfileRegistry,
-    private readonly getSettings: () => SettingsV4,
+    private readonly getSettings: () => SettingsV5,
     private readonly countChanged: (ownerId: number, count: number) => void,
   ) {}
 

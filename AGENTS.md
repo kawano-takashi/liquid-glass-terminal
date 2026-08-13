@@ -59,8 +59,9 @@ npm run verify:fuses
 ## Conventions
 
 - Changes to PTY framing, IPC, preload APIs, URL/path validation, permissions, CSP, or Electron Fuses require tests for rejected and valid input.
-- Keep terminal text outside decorative distortion and preserve an xterm contrast ratio of at least 4.5.
-- Verify that Windows light and dark settings both keep the app dark, and verify dark high-contrast, reduced-transparency, and reduced-motion modes.
+- Keep terminal text outside decorative distortion and preserve an xterm contrast ratio of at least 4.5 in both foreground palettes.
+- Verify zero blur without an unintended black surface at frost 1/14, consistent contrast and palette behavior across all 14 levels, both opaque contrast endpoints, and the dark-foreground switch at white 50%.
+- Verify that Windows light and dark settings do not override the user-selected surface, and verify opaque dark high-contrast/reduced-transparency fallbacks plus reduced-motion behavior.
 - Update English and Japanese dictionaries and README files together.
 - Set `LGT_CLIPBOARD_E2E=1` only intentionally; the test temporarily replaces and restores the OS clipboard text.
 - Regenerate a normal package after E2E packaging before running final Fuse verification.

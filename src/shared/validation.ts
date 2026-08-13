@@ -10,9 +10,9 @@ import type {
 import {
   FROST_STRENGTH_MAX,
   FROST_STRENGTH_MIN,
-  GLASS_OPACITY_MAX,
-  GLASS_OPACITY_MIN,
-  GLASS_OPACITY_STEP,
+  GLASS_CONTRAST_MAX,
+  GLASS_CONTRAST_MIN,
+  GLASS_CONTRAST_STEP,
 } from './settings';
 
 const REQUEST_ID = /^[a-zA-Z0-9_-]{8,80}$/;
@@ -78,7 +78,7 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   if (!isRecord(value)) return null;
   const allowed = new Set([
     'locale',
-    'glassOpacity',
+    'glassContrast',
     'frostStrength',
     'defaultProfileId',
     'fontSize',
@@ -98,10 +98,10 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
       return null;
     patch.locale = value.locale as LocaleMode;
   }
-  if (value.glassOpacity !== undefined) {
-    const opacity = validateGlassOpacity(value.glassOpacity);
-    if (opacity === null) return null;
-    patch.glassOpacity = opacity;
+  if (value.glassContrast !== undefined) {
+    const contrast = validateGlassContrast(value.glassContrast);
+    if (contrast === null) return null;
+    patch.glassContrast = contrast;
   }
   if (value.frostStrength !== undefined) {
     const strength = validateFrostStrength(value.frostStrength);
@@ -144,14 +144,14 @@ export function validateSettingsPatch(value: unknown): SettingsPatch | null {
   return patch;
 }
 
-export function validateGlassOpacity(value: unknown): number | null {
+export function validateGlassContrast(value: unknown): number | null {
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||
     !Number.isInteger(value) ||
-    value < GLASS_OPACITY_MIN ||
-    value > GLASS_OPACITY_MAX ||
-    value % GLASS_OPACITY_STEP !== 0
+    value < GLASS_CONTRAST_MIN ||
+    value > GLASS_CONTRAST_MAX ||
+    value % GLASS_CONTRAST_STEP !== 0
   ) {
     return null;
   }
@@ -174,14 +174,14 @@ export function validateFrostStrength(value: unknown): number | null {
 export function validateBackdropPreviewPatch(value: unknown): BackdropPreviewPatch | null {
   if (!isRecord(value)) return null;
   const keys = Object.keys(value);
-  if (keys.length === 0 || keys.some((key) => key !== 'glassOpacity' && key !== 'frostStrength')) {
+  if (keys.length === 0 || keys.some((key) => key !== 'glassContrast' && key !== 'frostStrength')) {
     return null;
   }
   const patch: BackdropPreviewPatch = {};
-  if (value.glassOpacity !== undefined) {
-    const opacity = validateGlassOpacity(value.glassOpacity);
-    if (opacity === null) return null;
-    patch.glassOpacity = opacity;
+  if (value.glassContrast !== undefined) {
+    const contrast = validateGlassContrast(value.glassContrast);
+    if (contrast === null) return null;
+    patch.glassContrast = contrast;
   }
   if (value.frostStrength !== undefined) {
     const strength = validateFrostStrength(value.frostStrength);

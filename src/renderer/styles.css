@@ -25,7 +25,6 @@
   --text-faint: #878787;
   --danger: #dc7880;
   --background-rgb: 24 24 24;
-  --background-noise-opacity: 0.03;
   --control-fill: rgb(255 255 255 / 0.06);
   --control-fill-hover: rgb(255 255 255 / 0.1);
   --control-fill-strong: rgb(255 255 255 / 0.14);
@@ -80,6 +79,18 @@ select:focus-visible {
   color: var(--text);
 }
 
+.app-shell[data-foreground-tone='dark'] {
+  color-scheme: light;
+  --text: #181818;
+  --text-muted: #484848;
+  --text-faint: #686868;
+  --danger: #9f1d2d;
+  --control-fill: rgb(0 0 0 / 0.06);
+  --control-fill-hover: rgb(0 0 0 / 0.1);
+  --control-fill-strong: rgb(0 0 0 / 0.14);
+  --terminal-halo-color: rgb(255 255 255 / 0.72);
+}
+
 .background-tint {
   position: absolute;
   inset: 0;
@@ -90,22 +101,6 @@ select:focus-visible {
 
 .app-shell[data-backdrop-mode='opaque'] .background-tint {
   background: rgb(var(--background-rgb));
-}
-
-.background-noise {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: var(--background-noise-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  mix-blend-mode: soft-light;
-}
-
-.app-shell[data-backdrop-status='policy-disabled'] .background-noise,
-.app-shell[data-backdrop-status='runtime-failure'] .background-noise {
-  display: none;
 }
 
 .titlebar {
@@ -862,9 +857,5 @@ select:focus-visible {
 
   .background-tint {
     background: rgb(var(--background-rgb)) !important;
-  }
-
-  .background-noise {
-    display: none;
   }
 }

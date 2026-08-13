@@ -1,6 +1,6 @@
 # Native material QA checklist
 
-Automated tests validate mappings, migration, fallback selection, IPC validation, and dark-only renderer behavior. Frosted-backdrop quality still requires a real interactive Windows 11 desktop.
+Automated tests validate mappings, migration, fallback selection, IPC validation, and both renderer palettes. Frosted-backdrop quality and the zero-blur HostBackdrop still require a real interactive Windows 11 desktop.
 
 Record the application version, Windows build and edition, display scale, GPU, Windows color setting, accessibility state, and result for every run.
 
@@ -15,16 +15,19 @@ Record the application version, Windows build and edition, display scale, GPU, W
 
 - [ ] Window opens at 1100×720, honors the 720×420 minimum, resizes smoothly, maximizes, restores, and supports Snap.
 - [ ] Saved geometry is clamped after disconnecting or rearranging displays.
-- [ ] Frost stays active when the window loses focus; switching Windows between light and dark leaves the renderer, titlebar, menus, xterm palette, and `#181818` tint dark without restarting.
-- [ ] At the 25% / 7-of-14 defaults (6 DIPs), shapes, colors, and placement behind the window are clearer; background prose may be partially legible, and terminal text remains readable.
-- [ ] At frost level 1, the background is sharp because Gaussian blur is zero while the HostBackdrop, saturation, and tint visual tree remains attached.
-- [ ] The 0% glass endpoint removes tint but retains the selected HostBackdrop effect; control fills and the terminal text halo remain readable.
-- [ ] The 100% glass endpoint is completely opaque and does not expose stale desktop pixels while resizing.
-- [ ] All 14 frost levels (0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 17, 20, 24 DIPs) differ progressively against the same high-detail background, preview live, and survive restart.
-- [ ] At frost level 14 (24 DIPs), normal-size background prose is unreadable.
-- [ ] Static noise remains approximately 3%, appears behind terminal content only, and does not cover titlebar, settings, search, menus, dialogs, or toasts.
+- [ ] Frost stays active when the window loses focus; switching Windows between light and dark does not override the surface, renderer palette, titlebar symbols, menus, or xterm palette.
+- [ ] At the neutral / 7-of-14 defaults (9 DIPs), shapes, colors, and placement behind the window remain distinguishable, background prose is softened, and terminal text remains readable.
+- [ ] At neutral contrast and frost level 1, HostBackdrop remains visible with Gaussian blur disabled at 0 DIPs; the background is sharp and never replaced by an unintended black window surface.
+- [ ] Glass contrast remains enabled at frost level 1, previews and persists normally, and produces the same white/black overlays as levels 2–14.
+- [ ] White −100% and black +100% are completely opaque, bypass blur work, and do not expose stale desktop pixels while resizing.
+- [ ] Negative contrast adds only white, positive contrast adds only black, and neutral 0% adds no color sprite.
+- [ ] At every active frost level, crossing from white −45% to −50% switches UI text, titlebar symbols, xterm colors, control fills, and terminal halo together without restarting the shell or losing terminal output.
+- [ ] Returning above white −50% or entering any fallback switches back to light foregrounds.
+- [ ] All 14 frost levels (0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74 DIPs) differ progressively against the same high-detail background, preview live, and survive restart.
+- [ ] At frost level 14 (74 DIPs), normal-size background prose is unreadable and the result is visibly stronger than levels 12 and 13.
+- [ ] No static noise texture appears anywhere in the titlebar, terminal, settings, search, menus, dialogs, or toasts.
 - [ ] Settings, search, menus, dialogs, and toasts add no local CSS blur, cumulative tint, visible rim, or shadow.
-- [ ] High contrast keeps the app's dark colors, suppresses Windows forced-color replacement, uses a safe opaque surface, hides noise, disables both appearance sliders with a reason, and restores both saved values afterward.
+- [ ] High contrast keeps the app's dark fallback colors, suppresses Windows forced-color replacement, uses an opaque `#181818` surface with light foregrounds, disables both appearance sliders with a reason, and restores both saved values afterward.
 - [ ] Reduced transparency and screen-reader mode use the same opaque dark surface and restore both saved values afterward.
 - [ ] Energy saver, Remote Desktop, and disabled Windows transparency follow the same opaque policy and automatically restore frost when policy clears.
 - [ ] An unsupported or non-fast compositor fails startup after two total attempts with a localized stable error code and creates no PTY.

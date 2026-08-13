@@ -35,32 +35,35 @@ describe('IPC validation', () => {
     expect(validateSettingsPatch({ nodeIntegration: true })).toBeNull();
   });
 
-  it('accepts only 5% glass steps and all 14 frost indices', () => {
-    expect(validateSettingsPatch({ glassOpacity: 0 })).toEqual({ glassOpacity: 0 });
-    expect(validateSettingsPatch({ glassOpacity: 100 })).toEqual({ glassOpacity: 100 });
-    expect(validateSettingsPatch({ glassOpacity: -5 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 101 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: 26 })).toBeNull();
-    expect(validateSettingsPatch({ glassOpacity: Number.NaN })).toBeNull();
+  it('accepts only signed 5% contrast steps and all 14 frost indices', () => {
+    expect(validateSettingsPatch({ glassContrast: -100 })).toEqual({ glassContrast: -100 });
+    expect(validateSettingsPatch({ glassContrast: 0 })).toEqual({ glassContrast: 0 });
+    expect(validateSettingsPatch({ glassContrast: 100 })).toEqual({ glassContrast: 100 });
+    expect(validateSettingsPatch({ glassContrast: -105 })).toBeNull();
+    expect(validateSettingsPatch({ glassContrast: 101 })).toBeNull();
+    expect(validateSettingsPatch({ glassContrast: 26 })).toBeNull();
+    expect(validateSettingsPatch({ glassContrast: Number.NaN })).toBeNull();
     expect(validateSettingsPatch({ frostStrength: 0 })).toEqual({ frostStrength: 0 });
     expect(validateSettingsPatch({ frostStrength: 13 })).toEqual({ frostStrength: 13 });
     expect(validateSettingsPatch({ frostStrength: 14 })).toBeNull();
     expect(validateSettingsPatch({ backgroundOpacity: 25 })).toBeNull();
+    expect(validateSettingsPatch({ glassOpacity: 25 })).toBeNull();
     expect(validateSettingsPatch({ glass: 'balanced' })).toBeNull();
     expect(validateSettingsPatch({ theme: 'dark' })).toBeNull();
   });
 
   it('validates structured backdrop preview IPC and rejects ambiguous input', () => {
-    expect(validateBackdropPreviewPatch({ glassOpacity: 50 })).toEqual({ glassOpacity: 50 });
+    expect(validateBackdropPreviewPatch({ glassContrast: -50 })).toEqual({ glassContrast: -50 });
     expect(validateBackdropPreviewPatch({ frostStrength: 9 })).toEqual({ frostStrength: 9 });
-    expect(validateBackdropPreviewPatch({ glassOpacity: 50, frostStrength: 9 })).toEqual({
-      glassOpacity: 50,
+    expect(validateBackdropPreviewPatch({ glassContrast: 50, frostStrength: 9 })).toEqual({
+      glassContrast: 50,
       frostStrength: 9,
     });
     expect(validateBackdropPreviewPatch({})).toBeNull();
-    expect(validateBackdropPreviewPatch({ glassOpacity: 51 })).toBeNull();
+    expect(validateBackdropPreviewPatch({ glassContrast: 51 })).toBeNull();
     expect(validateBackdropPreviewPatch({ frostStrength: -1 })).toBeNull();
-    expect(validateBackdropPreviewPatch({ glassOpacity: 25, rawElectron: true })).toBeNull();
+    expect(validateBackdropPreviewPatch({ glassContrast: 25, rawElectron: true })).toBeNull();
+    expect(validateBackdropPreviewPatch({ glassOpacity: 25 })).toBeNull();
   });
 });
 

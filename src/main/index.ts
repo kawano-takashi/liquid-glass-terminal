@@ -17,12 +17,13 @@ import type {
   BackdropPreviewPatch,
   BootstrapState,
   NativeBackdropState,
-  SettingsV4,
+  SettingsV5,
   SystemAppearance,
   WindowAppearance,
 } from '../shared/contracts';
 import { IPC_CHANNELS } from '../shared/contracts';
 import { resolveLocale } from '../shared/i18n';
+import { resolveForegroundTone } from '../shared/settings';
 import {
   isContextMenuState,
   isSessionCreateRequest,
@@ -132,11 +133,13 @@ function currentBackdropOptions(preview: BackdropPreviewPatch = {}) {
   );
 }
 
-function updateTitleBarOverlay(): void {
+function updateTitleBarOverlay(options = currentBackdropOptions()): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  const darkSymbols =
+    resolveForegroundTone(nativeBackdropState === 'active', options.glassContrast) === 'dark';
   mainWindow.setTitleBarOverlay({
     color: '#00000000',
-    symbolColor: '#f5f5f5',
+    symbolColor: darkSymbols ? '#181818' : '#f5f5f5',
     height: 44,
   });
 }
@@ -176,8 +179,9 @@ function applyNativeAppearance(preview: BackdropPreviewPatch = {}): void {
     return;
   }
   try {
-    nativeBackdropState = windowsGlass.apply(mainWindow, currentBackdropOptions(preview));
-    updateTitleBarOverlay();
+    const options = currentBackdropOptions(preview);
+    nativeBackdropState = windowsGlass.apply(mainWindow, options);
+    updateTitleBarOverlay(options);
     publishWindowAppearance();
   } catch (error: unknown) {
     console.warn('Native backdrop update failed; attempting one rebuild.', error);
@@ -242,7 +246,7 @@ function installIpc(): void {
     };
   });
 
-  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV4 => {
+  ipcMain.handle(IPC_CHANNELS.updateSettings, (event, value: unknown): SettingsV5 => {
     if (!isTrustedFrame(event)) throw new Error('Untrusted IPC sender');
     const patch = validateSettingsPatch(value);
     if (!patch) throw new TypeError('Invalid settings patch');

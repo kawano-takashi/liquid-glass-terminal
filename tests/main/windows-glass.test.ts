@@ -7,34 +7,34 @@ const normalAppearance = {
 };
 
 describe('Windows frosted-backdrop values', () => {
-  it('passes the independent default glass and frost settings', () => {
+  it('passes the independent default contrast and frost settings', () => {
     expect(
       resolveWindowsBackdropOptions(normalAppearance, false, {
-        glassOpacity: 25,
+        glassContrast: 0,
         frostStrength: 6,
       }),
     ).toEqual({
       policyEnabled: true,
-      glassOpacity: 25,
-      frostBlurAmount: 6,
+      glassContrast: 0,
+      frostBlurAmount: 9,
     });
   });
 
   it('applies a structured live preview without mutating saved settings', () => {
-    const saved = { glassOpacity: 25, frostStrength: 6 };
+    const saved = { glassContrast: 0, frostStrength: 6 };
     expect(
       resolveWindowsBackdropOptions(normalAppearance, false, saved, {
-        glassOpacity: 0,
+        glassContrast: -100,
         frostStrength: 13,
       }),
-    ).toMatchObject({ glassOpacity: 0, frostBlurAmount: 24 });
-    expect(saved).toEqual({ glassOpacity: 25, frostStrength: 6 });
+    ).toMatchObject({ glassContrast: -100, frostBlurAmount: 74 });
+    expect(saved).toEqual({ glassContrast: 0, frostStrength: 6 });
   });
 
-  it('maps the clear endpoint to zero blur', () => {
+  it('maps the minimum frost level to zero blur', () => {
     expect(
       resolveWindowsBackdropOptions(normalAppearance, false, {
-        glassOpacity: 25,
+        glassContrast: 0,
         frostStrength: 0,
       }),
     ).toMatchObject({ frostBlurAmount: 0 });
@@ -53,7 +53,7 @@ describe('Windows frosted-backdrop values', () => {
           reducedTransparency: policy.reducedTransparency,
         },
         policy.screenReader,
-        { glassOpacity: 25, frostStrength: 6 },
+        { glassContrast: 0, frostStrength: 6 },
       ).policyEnabled,
     ).toBe(false);
   });
@@ -61,9 +61,9 @@ describe('Windows frosted-backdrop values', () => {
   it('clamps defense-in-depth values to native endpoints', () => {
     expect(
       resolveWindowsBackdropOptions(normalAppearance, false, {
-        glassOpacity: -1,
+        glassContrast: -101,
         frostStrength: 99,
       }),
-    ).toMatchObject({ glassOpacity: 0, frostBlurAmount: 24 });
+    ).toMatchObject({ glassContrast: -100, frostBlurAmount: 74 });
   });
 });

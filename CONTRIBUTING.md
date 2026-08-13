@@ -5,7 +5,7 @@
 Use Node.js 24.19.0 and npm 11.17.0. Install dependencies with scripts disabled, audit the reviewed lifecycle set, then prepare native modules explicitly:
 
 ```text
-npm install
+npm ci
 npm run audit:install-scripts
 npm run bootstrap:native
 ```
@@ -28,8 +28,9 @@ Changes to PTY framing, IPC, preload APIs, URL/path validation, permissions, CSP
 
 ## User interface
 
-- Keep terminal text outside decorative distortion and preserve a minimum xterm contrast ratio of 4.5.
-- Verify that Windows light and dark settings both keep the app dark, and verify dark high-contrast, reduced-transparency, and reduced-motion behavior.
+- Keep terminal text outside decorative distortion and preserve a minimum xterm contrast ratio of 4.5 in both foreground palettes.
+- Verify zero blur without an unintended black surface at frost 1/14, consistent contrast and palette behavior across all 14 levels, both opaque contrast endpoints, and the dark-foreground switch at white 50%.
+- Verify that Windows light and dark settings do not override the user-selected surface, and verify opaque dark high-contrast/reduced-transparency fallbacks plus reduced-motion behavior.
 - Update both English and Japanese dictionaries and README files together.
 - Do not add remote fonts, analytics, update checks, or runtime content delivery.
 

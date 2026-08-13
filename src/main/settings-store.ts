@@ -2,10 +2,11 @@ import { existsSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import Store from 'electron-store';
-import type { SettingsPatch, SettingsV4 } from '../shared/contracts';
+import type { SettingsPatch, SettingsV5 } from '../shared/contracts';
 import {
   migrateFrostStrengthRangeRecord,
   migrateSettingsRecord,
+  migrateSettingsV5Record,
 } from '../shared/settings-migration';
 import { DEFAULT_SETTINGS, SETTINGS_SCHEMA } from '../shared/settings';
 
@@ -38,8 +39,9 @@ export class SettingsStore {
       schema: SETTINGS_SCHEMA,
       clearInvalidConfig: false,
       // Settings migrations follow the schema version, independently of the app release.
-      // This guarantees v4 runs for development builds that already recorded app 0.2.0.
-      ...({ projectVersion: '4.0.2' } as Record<string, unknown>),
+      // This guarantees schema migrations run for development builds that already recorded
+      // a newer application version.
+      ...({ projectVersion: '5.0.0' } as Record<string, unknown>),
       migrations: {
         '4.0.0': (store) => {
           store.store = migrateSettingsRecord(store.store);
@@ -52,16 +54,20 @@ export class SettingsStore {
         '4.0.2': (store) => {
           store.store = migrateFrostStrengthRangeRecord(store.store);
         },
+        // Appearance semantics changed in v5, so every previous appearance value resets.
+        '5.0.0': (store) => {
+          store.store = migrateSettingsV5Record(store.store);
+        },
       },
     });
   }
 
-  get value(): SettingsV4 {
-    const stored = this.#store.store as unknown as SettingsV4;
+  get value(): SettingsV5 {
+    const stored = this.#store.store as unknown as SettingsV5;
     return {
-      schemaVersion: 4,
+      schemaVersion: 5,
       locale: stored.locale,
-      glassOpacity: stored.glassOpacity,
+      glassContrast: stored.glassContrast,
       frostStrength: stored.frostStrength,
       defaultProfileId: stored.defaultProfileId,
       fontSize: stored.fontSize,
@@ -75,7 +81,7 @@ export class SettingsStore {
     };
   }
 
-  update(patch: SettingsPatch): SettingsV4 {
+  update(patch: SettingsPatch): SettingsV5 {
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) this.#store.set(key, value);
     }

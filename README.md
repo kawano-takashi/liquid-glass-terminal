@@ -16,16 +16,16 @@ A local-first Electron terminal with a neutral, COSMIC-inspired frosted-glass in
 - Draggable tabs, Windows shell discovery, search, and restartable exited sessions.
 - PowerShell 7, Windows PowerShell, cmd, Git Bash, and WSL profiles.
 - Multiline paste confirmation, mandatory confirmation above 1 MiB, safe external links, and insert-only file/folder drop.
-- English and Japanese UI, a dark-only appearance, and persisted settings/window geometry.
+- English and Japanese UI, surface-adaptive foreground colors, and persisted settings/window geometry.
 - No telemetry, remote content, update checks, crash uploads, desktop capture, or shell-profile injection.
 
 ## Supported host
 
 Liquid Glass Terminal 0.2.0 supports only the x64 client edition of Windows 11 22H2 or later (build 22621+). Windows 10, Windows Server, Windows on ARM—including x64 emulation—macOS, and Linux are rejected before settings or a PTY are created.
 
-The app remains a normal resizable, maximizable, and Snap-compatible window. A native Windows Composition visual spans the client area and renders `HostBackdrop → GaussianBlur (Quality, hard border) → Saturation 1.10`, followed by a fixed neutral `#181818` tint. The DWM system backdrop is explicitly disabled after Electron creates its translucent surface. No screen-recording permission is requested and pixels from other windows are never captured, copied, or retained.
+The app remains a normal resizable, maximizable, and Snap-compatible window. A native Windows Composition visual spans the client area and renders only `HostBackdrop → GaussianBlur (Quality, hard border)`, with an optional white or black contrast sprite above it. The DWM system backdrop is explicitly disabled after Electron creates its translucent surface. No screen-recording permission is requested and pixels from other windows are never captured, copied, or retained.
 
-Glass opacity ranges from 0% to 100% in 5% steps and defaults to 25%. Frost strength independently selects one of 14 blur amounts (0–24 DIPs) and defaults to level 7 (6 DIPs). Level 1 sets the Gaussian blur to zero while retaining the HostBackdrop effect graph. At 0% opacity the neutral tint disappears while the selected HostBackdrop effect remains; at 100% the surface is fully opaque and the effect is bypassed. Controls and the terminal text halo keep a fixed readable treatment, while static 3% noise is limited to the terminal background.
+Glass contrast ranges from white −100% through neutral 0% to black +100% in 5% steps and defaults to neutral. Frost strength independently selects one of 14 blur amounts (`0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74` DIPs) and defaults to level 7 (9 DIPs). Level 1 sets Gaussian blur to 0 DIPs while keeping the HostBackdrop and applying the same contrast and foreground rules as every other level; neutral contrast shows the sharp, unblurred backdrop. At either ±100% contrast endpoint the surface is fully opaque and the blur is bypassed. From white 50% onward at any frost level, UI, title-bar symbols, and the live xterm palette switch to dark foregrounds without recreating the PTY. Decorative static noise is not applied.
 
 High contrast, reduced transparency, screen-reader mode, energy saver, Remote Desktop, or disabled Windows effects automatically switch to an opaque neutral surface, disable both appearance sliders with an explanation, preserve their values, and restore frost when policy permits. Startup requires supported, fast composition effects and retries initialization once before showing a localized error code and exiting. A later compositor failure rebuilds once, then keeps PTYs alive behind an opaque surface and displays restart guidance.
 
@@ -38,7 +38,7 @@ Requirements:
 - Visual Studio 2022 Build Tools with **Desktop development with C++**.
 
 ```powershell
-npm install
+npm ci
 npm run audit:install-scripts
 npm run bootstrap:native
 npm start

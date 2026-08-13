@@ -119,36 +119,7 @@ class GaussianBlurEffect final : public EffectBase {
   }
 
  private:
-  float blurAmount_ = 24.0f;
-};
-
-class SaturationEffect final : public EffectBase {
-  InspectableClass(L"LiquidGlassTerminal.SaturationEffect", BaseTrust);
-
- public:
-  IFACEMETHODIMP GetEffectId(GUID* value) override {
-    *value = CLSID_D2D1Saturation;
-    return S_OK;
-  }
-  IFACEMETHODIMP GetPropertyCount(UINT* value) override {
-    *value = 1;
-    return S_OK;
-  }
-  IFACEMETHODIMP GetProperty(UINT index, PropertyValue** value) override {
-    return WithPropertyFactory([&](PropertyValueStatics* factory) {
-      return index == D2D1_SATURATION_PROP_SATURATION
-                 ? factory->CreateSingle(1.10f, reinterpret_cast<IInspectable**>(value))
-                 : E_INVALIDARG;
-    });
-  }
-  IFACEMETHODIMP GetNamedPropertyMapping(
-      LPCWSTR name, UINT* index, PropertyMapping* mapping) override {
-    static constexpr NamedProperty properties[] = {
-        {L"Saturation", D2D1_SATURATION_PROP_SATURATION,
-         abi::Graphics::Effects::GRAPHICS_EFFECT_PROPERTY_MAPPING_DIRECT},
-    };
-    return FindNamedProperty(properties, ARRAYSIZE(properties), name, index, mapping);
-  }
+  float blurAmount_ = 9.0f;
 };
 
 }  // namespace lgt::effects

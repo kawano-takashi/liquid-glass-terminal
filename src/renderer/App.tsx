@@ -11,12 +11,16 @@ import type {
   BackdropPreviewPatch,
   BootstrapState,
   SettingsPatch,
-  SettingsV4,
+  SettingsV5,
   ShellProfileDescriptor,
   WindowAppearance,
 } from '../shared/contracts';
 import { formatMessage, isMessageKey, messages, resolveLocale } from '../shared/i18n';
-import { FROST_STRENGTH_DEFAULT, GLASS_OPACITY_DEFAULT } from '../shared/settings';
+import {
+  FROST_STRENGTH_DEFAULT,
+  GLASS_CONTRAST_DEFAULT,
+  resolveForegroundTone,
+} from '../shared/settings';
 import { detectPasteRisk } from '../shared/validation';
 import { Dialog } from './components/Dialog';
 import { SearchBar } from './components/SearchBar';
@@ -108,10 +112,10 @@ function clipboardKeyInput(event: KeyboardEvent): ClipboardKeyInput {
 
 export function App() {
   const [bootstrap, setBootstrap] = useState<BootstrapState>();
-  const [settings, setSettings] = useState<SettingsV4>();
+  const [settings, setSettings] = useState<SettingsV5>();
   const [windowAppearance, setWindowAppearance] = useState<WindowAppearance>();
   const [backdropPreview, setBackdropPreview] = useState({
-    glassOpacity: GLASS_OPACITY_DEFAULT,
+    glassContrast: GLASS_CONTRAST_DEFAULT,
     frostStrength: FROST_STRENGTH_DEFAULT,
   });
   const [tabs, setTabs] = useState<TabState[]>([]);
@@ -127,7 +131,7 @@ export function App() {
   const [linkHover, setLinkHover] = useState<string>();
   const [bellFlash, setBellFlash] = useState(false);
   const terminalRefs = useRef(new Map<string, TerminalPaneHandle>());
-  const settingsRef = useRef<SettingsV4 | undefined>(undefined);
+  const settingsRef = useRef<SettingsV5 | undefined>(undefined);
   const tabsRef = useRef<TabState[]>([]);
   const activeIdRef = useRef<string | undefined>(undefined);
   const initialized = useRef(false);
@@ -328,9 +332,9 @@ export function App() {
         if (previous) {
           settingsRef.current = previous;
           setSettings(previous);
-          if (patch.glassOpacity !== undefined || patch.frostStrength !== undefined) {
+          if (patch.glassContrast !== undefined || patch.frostStrength !== undefined) {
             const restored = {
-              glassOpacity: previous.glassOpacity,
+              glassContrast: previous.glassContrast,
               frostStrength: previous.frostStrength,
             };
             backdropPreviewRef.current = restored;
@@ -353,8 +357,8 @@ export function App() {
     if (!current) return;
     const preview = backdropPreviewRef.current;
     const patch: SettingsPatch = {};
-    if (current.glassOpacity !== preview.glassOpacity) {
-      patch.glassOpacity = preview.glassOpacity;
+    if (current.glassContrast !== preview.glassContrast) {
+      patch.glassContrast = preview.glassContrast;
     }
     if (current.frostStrength !== preview.frostStrength) {
       patch.frostStrength = preview.frostStrength;
@@ -392,7 +396,7 @@ export function App() {
       setSettings(state.settings);
       settingsRef.current = state.settings;
       const initialPreview = {
-        glassOpacity: state.settings.glassOpacity,
+        glassContrast: state.settings.glassContrast,
         frostStrength: state.settings.frostStrength,
       };
       backdropPreviewRef.current = initialPreview;
@@ -543,6 +547,10 @@ export function App() {
   }
 
   const activeTab = tabs.find((tab) => tab.id === activeId);
+  const foregroundTone = resolveForegroundTone(
+    windowAppearance.backdropStatus === 'active',
+    backdropPreview.glassContrast,
+  );
   const handleBell = (id: string) => {
     if (id === activeIdRef.current) {
       setBellFlash(true);
@@ -586,6 +594,7 @@ export function App() {
       className="app-shell"
       data-backdrop-mode={windowAppearance.backdropMode}
       data-backdrop-status={windowAppearance.backdropStatus}
+      data-foreground-tone={foregroundTone}
       data-screen-reader={settings.screenReaderMode}
       data-bell={bellFlash}
     >
@@ -632,7 +641,6 @@ export function App() {
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => void handleDrop(event)}
       >
-        <div className="background-noise" aria-hidden="true" />
         {tabs.map((tab) => (
           <div key={tab.id} className="terminal-slot" data-active={tab.id === activeId}>
             <TerminalPane
@@ -645,6 +653,7 @@ export function App() {
               port={tab.port}
               active={tab.id === activeId}
               settings={settings}
+              foregroundTone={foregroundTone}
               reducedMotion={reducedMotion}
               onTitle={(title) =>
                 setTabs((items) =>
@@ -730,7 +739,7 @@ export function App() {
         open={settingsOpen}
         settings={settings}
         windowAppearance={windowAppearance}
-        glassOpacity={backdropPreview.glassOpacity}
+        glassContrast={backdropPreview.glassContrast}
         frostStrength={backdropPreview.frostStrength}
         profiles={bootstrap.profiles}
         labels={t}

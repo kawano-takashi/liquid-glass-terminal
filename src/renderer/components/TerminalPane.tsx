@@ -16,11 +16,12 @@ import {
 import type {
   PtyToRendererMessage,
   RendererToPtyMessage,
-  SettingsV4,
+  SettingsV5,
   ShellProfileDescriptor,
 } from '../../shared/contracts';
+import type { ForegroundTone } from '../../shared/settings';
 import { safeExternalUrl, sanitizeTerminalTitle } from '../../shared/validation';
-import { terminalTheme } from '../lib/terminal-theme';
+import { resolveTerminalTheme } from '../lib/terminal-theme';
 
 const INPUT_CHUNK = 32 * 1024;
 
@@ -40,7 +41,8 @@ interface TerminalPaneProps {
   profile: ShellProfileDescriptor;
   port: MessagePort;
   active: boolean;
-  settings: SettingsV4;
+  settings: SettingsV5;
+  foregroundTone: ForegroundTone;
   reducedMotion: boolean;
   onTitle(title: string): void;
   onExit(code: number): void;
@@ -66,6 +68,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
     port,
     active,
     settings,
+    foregroundTone,
     reducedMotion,
     onTitle,
     onExit,
@@ -118,7 +121,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       screenReaderMode: settings.screenReaderMode,
       scrollback: settings.scrollback,
       scrollOnUserInput: true,
-      theme: terminalTheme,
+      theme: resolveTerminalTheme(foregroundTone),
       windowOptions: {},
       linkHandler: {
         activate: (event, text) => {
@@ -237,11 +240,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(fu
       settings.cursorBlink && !reducedMotion && !settings.screenReaderMode;
     terminal.options.screenReaderMode = settings.screenReaderMode;
     terminal.options.scrollback = settings.scrollback;
+    terminal.options.theme = resolveTerminalTheme(foregroundTone);
     if (active) {
       fitRef.current?.fit();
       terminal.focus();
     }
-  }, [active, reducedMotion, settings]);
+  }, [active, foregroundTone, reducedMotion, settings]);
 
   const blockNativePaste = (event: ReactClipboardEvent) => {
     event.preventDefault();

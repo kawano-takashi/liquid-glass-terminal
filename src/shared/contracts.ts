@@ -19,7 +19,6 @@ export const IPC_CHANNELS = {
 } as const;
 
 export type LocaleMode = 'system' | 'en' | 'ja';
-export type LegacyGlassPreset = 'clear' | 'balanced' | 'dense';
 export type CursorStyle = 'block' | 'bar' | 'underline';
 export type BackdropMode = 'frosted' | 'opaque';
 export type BackdropStatus = 'active' | 'policy-disabled' | 'runtime-failure';
@@ -33,10 +32,10 @@ export type BackdropFailureCode =
 export type NativeBackdropState = 'active' | 'policy-disabled' | 'capability-lost';
 export type ShellProfileKind = 'powershell' | 'windows-powershell' | 'cmd' | 'git-bash' | 'wsl';
 
-export interface SettingsV4 {
-  schemaVersion: 4;
+export interface SettingsV5 {
+  schemaVersion: 5;
   locale: LocaleMode;
-  glassOpacity: number;
+  glassContrast: number;
   frostStrength: number;
   defaultProfileId: string;
   fontSize: number;
@@ -49,10 +48,10 @@ export interface SettingsV4 {
   firstRunHintsSeen: boolean;
 }
 
-export type SettingsPatch = Partial<Omit<SettingsV4, 'schemaVersion'>>;
+export type SettingsPatch = Partial<Omit<SettingsV5, 'schemaVersion'>>;
 
 export interface BackdropPreviewPatch {
-  glassOpacity?: number;
+  glassContrast?: number;
   frostStrength?: number;
 }
 
@@ -76,7 +75,7 @@ export interface WindowAppearance extends SystemAppearance {
 
 export interface BootstrapState {
   appVersion: string;
-  settings: SettingsV4;
+  settings: SettingsV5;
   profiles: ShellProfileDescriptor[];
   windowAppearance: WindowAppearance;
   launchCwdToken?: string;
@@ -135,7 +134,7 @@ export interface ContextMenuState {
 
 export interface PreloadApi {
   bootstrap(): Promise<BootstrapState>;
-  updateSettings(patch: SettingsPatch): Promise<SettingsV4>;
+  updateSettings(patch: SettingsPatch): Promise<SettingsV5>;
   previewBackdrop(patch: BackdropPreviewPatch): void;
   requestSession(request: SessionCreateRequest): void;
   prepareDroppedPath(sessionId: string, path: string): Promise<string | null>;

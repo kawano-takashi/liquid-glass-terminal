@@ -1,13 +1,14 @@
-import type { SettingsV4 } from './contracts';
+import type { SettingsV5 } from './contracts';
 
-export const GLASS_OPACITY_MIN = 0;
-export const GLASS_OPACITY_MAX = 100;
-export const GLASS_OPACITY_STEP = 5;
-export const GLASS_OPACITY_DEFAULT = 25;
+export const GLASS_CONTRAST_MIN = -100;
+export const GLASS_CONTRAST_MAX = 100;
+export const GLASS_CONTRAST_STEP = 5;
+export const GLASS_CONTRAST_DEFAULT = 0;
+export const LIGHT_SURFACE_CONTRAST_THRESHOLD = -50;
 export const FROST_STRENGTH_MIN = 0;
 export const FROST_STRENGTH_MAX = 13;
 export const FROST_STRENGTH_DEFAULT = 6;
-export const FROST_BLUR_AMOUNTS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 17, 20, 24] as const;
+export const FROST_BLUR_AMOUNTS = [0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74] as const;
 
 export function resolveFrostBlurAmount(frostStrength: number): number {
   const strength = Number.isFinite(frostStrength)
@@ -16,10 +17,19 @@ export function resolveFrostBlurAmount(frostStrength: number): number {
   return FROST_BLUR_AMOUNTS[strength];
 }
 
-export const DEFAULT_SETTINGS: SettingsV4 = {
-  schemaVersion: 4,
+export type ForegroundTone = 'light' | 'dark';
+
+export function resolveForegroundTone(
+  backdropActive: boolean,
+  glassContrast: number,
+): ForegroundTone {
+  return backdropActive && glassContrast <= LIGHT_SURFACE_CONTRAST_THRESHOLD ? 'dark' : 'light';
+}
+
+export const DEFAULT_SETTINGS: SettingsV5 = {
+  schemaVersion: 5,
   locale: 'system',
-  glassOpacity: GLASS_OPACITY_DEFAULT,
+  glassContrast: GLASS_CONTRAST_DEFAULT,
   frostStrength: FROST_STRENGTH_DEFAULT,
   defaultProfileId: 'auto',
   fontSize: 14,
@@ -33,14 +43,14 @@ export const DEFAULT_SETTINGS: SettingsV4 = {
 };
 
 export const SETTINGS_SCHEMA = {
-  schemaVersion: { type: 'number', enum: [4], default: 4 },
+  schemaVersion: { type: 'number', enum: [5], default: 5 },
   locale: { type: 'string', enum: ['system', 'en', 'ja'], default: 'system' },
-  glassOpacity: {
+  glassContrast: {
     type: 'number',
-    minimum: GLASS_OPACITY_MIN,
-    maximum: GLASS_OPACITY_MAX,
-    multipleOf: GLASS_OPACITY_STEP,
-    default: GLASS_OPACITY_DEFAULT,
+    minimum: GLASS_CONTRAST_MIN,
+    maximum: GLASS_CONTRAST_MAX,
+    multipleOf: GLASS_CONTRAST_STEP,
+    default: GLASS_CONTRAST_DEFAULT,
   },
   frostStrength: {
     type: 'number',

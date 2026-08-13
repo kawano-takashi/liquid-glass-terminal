@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { SettingsV4, ShellProfileDescriptor, ShellProfileKind } from '../shared/contracts';
+import type { SettingsV5, ShellProfileDescriptor, ShellProfileKind } from '../shared/contracts';
 import { quotePathForShell } from '../shared/validation';
 
 const execFileAsync = promisify(execFile);
@@ -72,7 +72,7 @@ export class ShellProfileRegistry {
     );
   }
 
-  get(id: string | undefined, settings: SettingsV4): InternalShellProfile | undefined {
+  get(id: string | undefined, settings: SettingsV5): InternalShellProfile | undefined {
     const selected = id && id !== 'auto' ? id : settings.defaultProfileId;
     if (selected && selected !== 'auto' && this.#profiles.has(selected)) {
       return this.#profiles.get(selected);

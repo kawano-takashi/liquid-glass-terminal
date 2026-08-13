@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { SettingsDrawer } from '../../src/renderer/components/SettingsDrawer';
 import type {
   BackdropPreviewPatch,
-  SettingsV4,
+  SettingsV5,
   WindowAppearance,
 } from '../../src/shared/contracts';
 import { messages } from '../../src/shared/i18n';
 
-const settings: SettingsV4 = {
-  schemaVersion: 4,
+const settings: SettingsV5 = {
+  schemaVersion: 5,
   locale: 'en',
-  glassOpacity: 25,
+  glassContrast: 0,
   frostStrength: 6,
   defaultProfileId: 'auto',
   fontSize: 14,
@@ -36,6 +36,8 @@ function renderDrawer(
   handlers: {
     preview?: (patch: BackdropPreviewPatch) => void;
     commit?: () => void;
+    glassContrast?: number;
+    frostStrength?: number;
   } = {},
 ) {
   const preview = handlers.preview ?? vi.fn();
@@ -45,8 +47,8 @@ function renderDrawer(
       open
       settings={settings}
       windowAppearance={windowAppearance}
-      glassOpacity={settings.glassOpacity}
-      frostStrength={settings.frostStrength}
+      glassContrast={handlers.glassContrast ?? settings.glassContrast}
+      frostStrength={handlers.frostStrength ?? settings.frostStrength}
       profiles={[]}
       labels={messages.en}
       onClose={vi.fn()}
@@ -66,17 +68,17 @@ describe('SettingsDrawer frosted backdrop controls', () => {
     expect(screen.queryByRole('button', { name: 'Dark' })).not.toBeInTheDocument();
   });
 
-  it('previews 5% opacity steps and commits the final value', () => {
+  it('previews signed 5% contrast steps and commits the final value', () => {
     const { preview, commit } = renderDrawer();
-    const slider = screen.getByRole('slider', { name: 'Glass opacity' });
-    expect(slider).toHaveAttribute('min', '0');
+    const slider = screen.getByRole('slider', { name: 'Glass contrast' });
+    expect(slider).toHaveAttribute('min', '-100');
     expect(slider).toHaveAttribute('max', '100');
     expect(slider).toHaveAttribute('step', '5');
-    expect(screen.getByText('25%')).toBeVisible();
+    expect(screen.getByText('Neutral')).toBeVisible();
 
-    fireEvent.change(slider, { target: { value: '20' } });
+    fireEvent.change(slider, { target: { value: '-20' } });
     fireEvent.pointerUp(slider);
-    expect(preview).toHaveBeenCalledWith({ glassOpacity: 20 });
+    expect(preview).toHaveBeenCalledWith({ glassContrast: -20 });
     expect(commit).toHaveBeenCalled();
   });
 
@@ -103,8 +105,24 @@ describe('SettingsDrawer frosted backdrop controls', () => {
         ? { backdropFailureCode: 'runtime-rebuild-failed' as const }
         : {}),
     });
-    expect(screen.getByRole('slider', { name: 'Glass opacity' })).toBeDisabled();
+    expect(screen.getByRole('slider', { name: 'Glass contrast' })).toBeDisabled();
     expect(screen.getByRole('slider', { name: 'Frost strength' })).toBeDisabled();
     expect(screen.getByText(reason)).toBeVisible();
+  });
+
+  it('keeps contrast enabled and previewable at the zero-blur frost endpoint', () => {
+    const { preview, commit } = renderDrawer(activeAppearance, {
+      glassContrast: -75,
+      frostStrength: 0,
+    });
+    const contrast = screen.getByRole('slider', { name: 'Glass contrast' });
+    expect(contrast).toBeEnabled();
+    expect(contrast).toHaveValue('-75');
+    expect(screen.getByText('White 75%')).toBeVisible();
+    fireEvent.change(contrast, { target: { value: '25' } });
+    fireEvent.pointerUp(contrast);
+    expect(preview).toHaveBeenCalledWith({ glassContrast: 25 });
+    expect(commit).toHaveBeenCalled();
+    expect(screen.getByRole('slider', { name: 'Frost strength' })).toBeEnabled();
   });
 });
