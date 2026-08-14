@@ -1,5 +1,14 @@
 import { Settings as SettingsIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import {
   LIMITS,
   type AppearanceState,
@@ -14,8 +23,12 @@ import { BridgeContext } from './bridge/context';
 import { ContextMenu } from './components/ContextMenu';
 import { PasteDialog } from './components/PasteDialog';
 import { SettingsDrawer } from './components/SettingsDrawer';
-import { TerminalView, type TerminalViewHandle } from './components/TerminalView';
+import type { TerminalViewHandle } from './components/TerminalView';
 import { messages, resolveLocale } from './i18n';
+
+const TerminalView = lazy(() =>
+  import('./components/TerminalView').then((module) => ({ default: module.TerminalView })),
+);
 
 const TITLEBAR_DIP = 44;
 const DEFAULT_SETTINGS: Settings = {
@@ -368,7 +381,9 @@ export function App() {
           }}
         >
           {accepted ? (
-            <TerminalView ref={terminal} settings={draft} capabilities={capabilities} />
+            <Suspense fallback={<div className="loading">Liquid Glass Terminal</div>}>
+              <TerminalView ref={terminal} settings={draft} capabilities={capabilities} />
+            </Suspense>
           ) : (
             <div className="loading">Liquid Glass Terminal</div>
           )}

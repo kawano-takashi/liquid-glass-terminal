@@ -1,5 +1,4 @@
 import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import {
@@ -96,13 +95,17 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host.current);
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => webgl.dispose());
-      terminal.loadAddon(webgl);
-    } catch {
-      // xterm keeps the DOM renderer when WebGL is unavailable.
-    }
+    let disposed = false;
+    void import('@xterm/addon-webgl')
+      .then(({ WebglAddon }) => {
+        if (disposed) return;
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        terminal.loadAddon(webgl);
+      })
+      .catch(() => {
+        // xterm keeps the DOM renderer when WebGL is unavailable.
+      });
     terminalRef.current = terminal;
     fitRef.current = fit;
 
@@ -128,6 +131,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     terminal.focus();
 
     return () => {
+      disposed = true;
       resize.disconnect();
       cancelAnimationFrame(frame);
       data.dispose();
