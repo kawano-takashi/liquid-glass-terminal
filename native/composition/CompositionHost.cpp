@@ -192,7 +192,7 @@ bool CompositionHost::Initialize(HWND window) {
   window_ = window;
   try {
     EnsureDispatcherQueue();
-    ConfigureDwm();
+    ConfigureDwm(true);
     const D2D1_FACTORY_OPTIONS factoryOptions{};
     winrt::check_hresult(D2D1CreateFactory(
         D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &factoryOptions,
@@ -256,11 +256,15 @@ void CompositionHost::Reset() noexcept {
     const DWM_SYSTEMBACKDROP_TYPE backdrop = DWMSBT_NONE;
     const DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_DEFAULT;
     const COLORREF border = DWMWA_COLOR_DEFAULT;
+    const MARGINS margins{};
     DwmSetWindowAttribute(window_, DWMWA_USE_HOSTBACKDROPBRUSH, &disabled, sizeof(disabled));
     DwmSetWindowAttribute(window_, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof(backdrop));
     DwmSetWindowAttribute(window_, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
     DwmSetWindowAttribute(window_, DWMWA_BORDER_COLOR, &border, sizeof(border));
+    DwmExtendFrameIntoClientArea(window_, &margins);
   }
+  dwmFrameExtensionConfigured_ = false;
+  dwmFrameExtended_ = false;
   window_ = nullptr;
 }
 
@@ -295,7 +299,7 @@ void CompositionHost::EnsureDispatcherQueue() {
                    winrt::put_abi(dispatcher_))));
 }
 
-void CompositionHost::ConfigureDwm() {
+void CompositionHost::ConfigureDwm(bool extendedFrame) {
   const BOOL enabled = TRUE;
   const DWM_SYSTEMBACKDROP_TYPE backdrop = DWMSBT_NONE;
   const DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUND;
@@ -307,8 +311,16 @@ void CompositionHost::ConfigureDwm() {
   winrt::check_hresult(DwmSetWindowAttribute(window_, DWMWA_WINDOW_CORNER_PREFERENCE, &corner,
                                              sizeof(corner)));
   DwmSetWindowAttribute(window_, DWMWA_BORDER_COLOR, &border, sizeof(border));
-  const MARGINS margins{-1, -1, -1, -1};
+  dwmFrameExtensionConfigured_ = false;
+  SetDwmFrameExtension(extendedFrame);
+}
+
+void CompositionHost::SetDwmFrameExtension(bool extended) {
+  if (dwmFrameExtensionConfigured_ && dwmFrameExtended_ == extended) return;
+  const MARGINS margins = extended ? MARGINS{-1, -1, -1, -1} : MARGINS{};
   winrt::check_hresult(DwmExtendFrameIntoClientArea(window_, &margins));
+  dwmFrameExtended_ = extended;
+  dwmFrameExtensionConfigured_ = true;
 }
 
 void CompositionHost::RefreshCapabilities() {
@@ -556,6 +568,10 @@ void CompositionHost::MarkFailure(std::wstring_view stage, HRESULT error) noexce
   state_ = AppearanceState::Safe;
   stateReason_ = L"composition-" + std::wstring(stage) + L"-" + code;
   try {
+    SetDwmFrameExtension(true);
+  } catch (...) {
+  }
+  try {
     if (solidLayer_) solidLayer_.IsVisible(true);
     if (glassLayer_) glassLayer_.IsVisible(false);
     if (tintLayer_) tintLayer_.IsVisible(false);
@@ -723,6 +739,8 @@ void CompositionHost::SetAppearance(const settings::Settings& settings,
     RefreshCapabilities();
     const bool glassAllowed = settings.glass.enabled && policy.AllowsGlass() &&
                               effectsSupported_ && effectsFast_;
+    const bool extendedFrame = NeedsExtendedDwmFrame(glassAllowed, settings.glass.opacity);
+    if (!extendedFrame) SetDwmFrameExtension(false);
     state_ = glassAllowed ? AppearanceState::Glass : AppearanceState::Solid;
     if (glassAllowed) {
       stateReason_.clear();
@@ -758,10 +776,23 @@ void CompositionHost::SetAppearance(const settings::Settings& settings,
     }
     RebuildShapes();
     RebuildTitleBar();
+    SetDwmFrameExtension(
+        NeedsExtendedDwmFrame(state_ == AppearanceState::Glass, settings.glass.opacity));
   } catch (const winrt::hresult_error& error) {
     MarkFailure(L"appearance", error.code());
   } catch (...) {
     MarkFailure(L"appearance", E_FAIL);
+  }
+}
+
+void CompositionHost::RefreshDwm() {
+  try {
+    ConfigureDwm(
+        NeedsExtendedDwmFrame(state_ == AppearanceState::Glass, settings_.glass.opacity));
+  } catch (const winrt::hresult_error& error) {
+    MarkFailure(L"dwm", error.code());
+  } catch (...) {
+    MarkFailure(L"dwm", E_FAIL);
   }
 }
 

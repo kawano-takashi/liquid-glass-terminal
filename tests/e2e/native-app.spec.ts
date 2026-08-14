@@ -16,8 +16,14 @@ const executable = path.join(
 const profile = path.join(root, 'build', 'e2e-data');
 
 let app: ChildProcess | undefined;
+let backdrop: ChildProcess | undefined;
 let browser: Browser | undefined;
 let page: Page;
+
+interface PixelProbe {
+  visible: number[];
+  hidden: number[];
+}
 
 interface StartOptions {
   resetProfile?: boolean;
@@ -63,6 +69,114 @@ async function stopApplication(): Promise<void> {
   app = undefined;
 }
 
+async function startBackdrop(): Promise<void> {
+  const script = `
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Liquid Glass Terminal E2E Backdrop'
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+$form.WindowState = [System.Windows.Forms.FormWindowState]::Maximized
+$form.TopMost = $true
+$form.BackColor = [System.Drawing.Color]::FromArgb(31, 93, 157)
+[System.Windows.Forms.Application]::Run($form)
+`;
+  const backdropProcess = spawn(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Sta', '-Command', script],
+    { stdio: 'ignore', windowsHide: true },
+  );
+  backdrop = backdropProcess;
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (backdropProcess.exitCode !== null)
+      throw new Error(`Backdrop exited with ${backdropProcess.exitCode}.`);
+    const handle = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `(Get-Process -Id ${backdropProcess.pid}).MainWindowHandle.ToInt64()`,
+      ],
+      { encoding: 'utf8', windowsHide: true },
+    );
+    if (handle.status === 0 && Number.parseInt(handle.stdout.trim(), 10) !== 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('Timed out waiting for the E2E backdrop window.');
+}
+
+function stopBackdrop(): void {
+  if (backdrop?.pid && backdrop.exitCode === null) {
+    spawnSync('taskkill.exe', ['/pid', String(backdrop.pid), '/t', '/f'], { stdio: 'ignore' });
+  }
+  backdrop = undefined;
+}
+
+function makeApplicationTopmost(): void {
+  if (!app?.pid) throw new Error('Native application is not running.');
+  const script = `
+Add-Type -Namespace LgtE2E -Name WindowOrder -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetWindowPos(System.IntPtr hWnd, System.IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);'
+$target = Get-Process -Id ${app.pid}
+if ($target.MainWindowHandle -eq 0) { exit 2 }
+[LgtE2E.WindowOrder]::SetWindowPos($target.MainWindowHandle, [System.IntPtr](-1), 0, 0, 0, 0, 0x53) | Out-Null
+`;
+  const result = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Command', script],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Could not raise the application above the E2E backdrop: ${result.stderr}`);
+  }
+}
+
+function probeWindowPixels(): PixelProbe {
+  if (!app?.pid) throw new Error('Native application is not running.');
+  const script = `
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class LgtPixelProbe { [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; } [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect); [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command); [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hWnd); [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hWnd, IntPtr dc); [DllImport("gdi32.dll")] public static extern uint GetPixel(IntPtr dc, int x, int y); [DllImport("dwmapi.dll")] public static extern int DwmFlush(); }'
+function Read-Pixels($points) {
+  $dc = [LgtPixelProbe]::GetDC([IntPtr]::Zero)
+  try { return @($points | ForEach-Object { [uint32][LgtPixelProbe]::GetPixel($dc, $_[0], $_[1]) }) }
+  finally { [LgtPixelProbe]::ReleaseDC([IntPtr]::Zero, $dc) | Out-Null }
+}
+$target = Get-Process -Id ${app.pid}
+$handle = $target.MainWindowHandle
+if ($handle -eq 0) { exit 2 }
+$rect = New-Object LgtPixelProbe+RECT
+if (-not [LgtPixelProbe]::GetWindowRect($handle, [ref]$rect)) { exit 3 }
+$width = $rect.Right - $rect.Left
+$height = $rect.Bottom - $rect.Top
+$points = @(
+  @([int]($rect.Left + $width * 0.22), [int]($rect.Top + $height * 0.48)),
+  @([int]($rect.Left + $width * 0.45), [int]($rect.Top + $height * 0.72)),
+  @([int]($rect.Left + $width * 0.24), [int]($rect.Top + $height * 0.84))
+)
+[LgtPixelProbe]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x53) | Out-Null
+[LgtPixelProbe]::DwmFlush() | Out-Null
+Start-Sleep -Milliseconds 120
+$visible = Read-Pixels $points
+[LgtPixelProbe]::ShowWindow($handle, 0) | Out-Null
+[LgtPixelProbe]::DwmFlush() | Out-Null
+Start-Sleep -Milliseconds 120
+$hidden = Read-Pixels $points
+[LgtPixelProbe]::ShowWindow($handle, 8) | Out-Null
+[LgtPixelProbe]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x53) | Out-Null
+[LgtPixelProbe]::DwmFlush() | Out-Null
+[pscustomobject]@{ visible = $visible; hidden = $hidden } | ConvertTo-Json -Compress
+`;
+  const result = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Command', script],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Could not probe the composed window: ${result.stderr || result.stdout}`);
+  }
+  return JSON.parse(result.stdout.trim()) as PixelProbe;
+}
+
 async function startApplication(options: StartOptions = {}): Promise<void> {
   if (options.resetProfile) await rm(profile, { recursive: true, force: true });
   await mkdir(profile, { recursive: true });
@@ -84,6 +198,7 @@ async function startApplication(options: StartOptions = {}): Promise<void> {
   page = context.pages()[0] ?? (await context.waitForEvent('page'));
   await page.waitForURL('https://app.liquid-glass-terminal.invalid/index.html');
   await expect(page.locator('.terminal-mount')).toBeVisible();
+  makeApplicationTopmost();
 }
 
 function sendVirtualKey(key: number): void {
@@ -108,24 +223,29 @@ Start-Sleep -Milliseconds 40
 
 test.beforeAll(async () => {
   await access(executable);
+  await startBackdrop();
   await startApplication({ resetProfile: true });
 });
 
 test.afterAll(async () => {
-  await stopApplication();
-  await expect
-    .poll(
-      async () => {
-        try {
-          await rm(profile, { recursive: true, force: true });
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
+  try {
+    await stopApplication();
+    await expect
+      .poll(
+        async () => {
+          try {
+            await rm(profile, { recursive: true, force: true });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+  } finally {
+    stopBackdrop();
+  }
 });
 
 test.describe.serial('native WebView2 application', () => {
@@ -288,16 +408,7 @@ test.describe.serial('native WebView2 application', () => {
     expect(nextTransaction).toMatchObject({ operation: 'cancel', ok: true });
   });
 
-  test('carries terminal input and output through the native ConPTY bridge', async () => {
-    await page.locator('.terminal-mount').click();
-    await page.keyboard.type("Write-Output ([string]::Concat('__LGT_', 'E2E_OK__'))");
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('listitem').filter({ hasText: '__LGT_E2E_OK__' })).toHaveCount(1, {
-      timeout: 15_000,
-    });
-  });
-
-  test('previews zero Glass opacity without leaving transparent composition', async () => {
+  test('renders zero-opacity Glass as true native transparency and persists it', async () => {
     const appSurface = page.locator('.app');
     test.skip(
       (await appSurface.getAttribute('data-appearance')) !== 'glass',
@@ -330,8 +441,57 @@ test.describe.serial('native WebView2 application', () => {
     expect(decoration.activeBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(decoration.panelShadow).toContain('rgba(0, 0, 0, 0)');
 
-    await drawer.locator('footer .button.ghost').click();
-    await expect(appSurface).toHaveCSS('--glass-opacity', '0.35');
+    await page.waitForTimeout(250);
+    const firstZeroProbe = probeWindowPixels();
+    expect(firstZeroProbe.visible).toEqual(firstZeroProbe.hidden);
+
+    await opacity.fill('5');
+    await expect(appSurface).toHaveCSS('--glass-opacity', '0.05');
+    await page.waitForTimeout(250);
+    const nonzeroProbe = probeWindowPixels();
+    expect(nonzeroProbe.visible.some((pixel, index) => pixel !== nonzeroProbe.hidden[index])).toBe(
+      true,
+    );
+
+    await opacity.fill('0');
+    await expect(appSurface).toHaveCSS('--glass-opacity', '0');
+    await page.waitForTimeout(250);
+    const secondZeroProbe = probeWindowPixels();
+    expect(secondZeroProbe.visible).toEqual(secondZeroProbe.hidden);
+
+    await drawer.locator('footer .button.primary').click();
+    await expect(drawer).toHaveAttribute('data-open', 'false');
+
+    await stopApplication();
+    await startApplication();
+    const restartedSurface = page.locator('.app');
+    await expect(restartedSurface).toHaveAttribute('data-appearance', 'glass');
+    await expect(restartedSurface).toHaveCSS('--glass-opacity', '0');
+    await page.waitForTimeout(250);
+    const restartedProbe = probeWindowPixels();
+    expect(restartedProbe.visible).toEqual(restartedProbe.hidden);
+
+    await page.locator('.settings-trigger').click();
+    const restartedDrawer = page.locator('.settings-drawer');
+    const restartedOpacity = restartedDrawer
+      .locator('.settings-section')
+      .first()
+      .locator('input[type="range"]')
+      .nth(1);
+    await expect(restartedOpacity).toHaveValue('0');
+    await restartedOpacity.fill('35');
+    await restartedDrawer.locator('footer .button.primary').click();
+    await expect(restartedDrawer).toHaveAttribute('data-open', 'false');
+    await expect(restartedSurface).toHaveCSS('--glass-opacity', '0.35');
+  });
+
+  test('carries terminal input and output through the native ConPTY bridge', async () => {
+    await page.locator('.terminal-mount').click();
+    await page.keyboard.type("Write-Output ([string]::Concat('__LGT_', 'E2E_OK__'))");
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('listitem').filter({ hasText: '__LGT_E2E_OK__' })).toHaveCount(1, {
+      timeout: 15_000,
+    });
   });
 
   test('previews, cancels, atomically applies, and reloads native settings', async () => {

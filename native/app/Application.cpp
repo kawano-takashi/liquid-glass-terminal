@@ -387,9 +387,12 @@ std::optional<LRESULT> Application::OnWindowMessage(UINT message, WPARAM wParam,
       break;
     case WM_SETTINGCHANGE:
     case WM_THEMECHANGED:
-    case WM_DWMCOMPOSITIONCHANGED:
     case WM_POWERBROADCAST:
     case WM_WTSSESSION_CHANGE:
+      UpdatePolicy();
+      break;
+    case WM_DWMCOMPOSITIONCHANGED:
+      if (compositionMode_) composition_.RefreshDwm();
       UpdatePolicy();
       break;
     case platform::kSystemPolicyChangedMessage:

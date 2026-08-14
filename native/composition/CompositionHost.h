@@ -57,6 +57,7 @@ class CompositionHost final {
   void SetFullscreen(bool fullscreen);
   void SetCaptionState(window::CaptionButton hovered, window::CaptionButton pressed,
                        bool maximized);
+  void RefreshDwm();
 
   [[nodiscard]] winrt::Windows::UI::Composition::ContainerVisual WebRoot() const noexcept;
   [[nodiscard]] AppearanceState State() const noexcept;
@@ -64,7 +65,8 @@ class CompositionHost final {
 
  private:
   void EnsureDispatcherQueue();
-  void ConfigureDwm();
+  void ConfigureDwm(bool extendedFrame);
+  void SetDwmFrameExtension(bool extended);
   void CreateVisualTree();
   void RefreshCapabilities();
   void EnsureBackdropBrush();
@@ -94,6 +96,8 @@ class CompositionHost final {
   bool fullscreen_ = false;
   bool effectsSupported_ = true;
   bool effectsFast_ = true;
+  bool dwmFrameExtensionConfigured_ = false;
+  bool dwmFrameExtended_ = false;
   bool maximized_ = false;
   window::CaptionButton hoveredCaptionButton_ = window::CaptionButton::None;
   window::CaptionButton pressedCaptionButton_ = window::CaptionButton::None;

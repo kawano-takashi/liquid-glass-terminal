@@ -215,6 +215,9 @@ void TestMaterials() {
   Expect(!NeedsGrainSurface(0, 35) && !NeedsGrainSurface(1, 0) &&
              NeedsGrainSurface(1, 5) && NeedsGrainSurface(100, 100),
          "zero material or grain opacity must skip lazy noise allocation");
+  Expect(!NeedsExtendedDwmFrame(true, 0) && NeedsExtendedDwmFrame(true, 5) &&
+             NeedsExtendedDwmFrame(true, 100) && NeedsExtendedDwmFrame(false, 0),
+         "only zero-opacity Glass must remove the extended DWM frame");
 }
 
 void TestWindowMetrics() {

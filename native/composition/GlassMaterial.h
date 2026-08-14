@@ -55,4 +55,9 @@ inline constexpr float kMaximumGrainOpacity = protocol::kGrainMaximumOpacity;
          opacity > protocol::kOpacityConstraint.minimum;
 }
 
+[[nodiscard]] inline constexpr bool NeedsExtendedDwmFrame(bool glass,
+                                                           std::uint32_t opacity) noexcept {
+  return !glass || opacity > protocol::kOpacityConstraint.minimum;
+}
+
 }  // namespace lgt::composition
