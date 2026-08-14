@@ -1,25 +1,34 @@
 # Third-party notices
 
-Liquid Glass Terminal includes open-source dependencies recorded in `package-lock.json`. Their copyright and license files are preserved in installed packages and packaged application notices as required.
+Liquid Glass Terminal includes or compiles open-source components whose exact versions are recorded in `package-lock.json` and `native/packages.config`. Copyright and license files remain available in the corresponding source packages. This summary does not replace their license text.
 
 ## Cascadia Mono PL 2407.24
 
 - Project: [Microsoft Cascadia Code](https://github.com/microsoft/cascadia-code)
 - Copyright: Microsoft Corporation and contributors
 - License: SIL Open Font License 1.1
-- Bundled file: `src/renderer/assets/fonts/CascadiaMonoPL.ttf`
+- Bundled file: `web/src/assets/fonts/CascadiaMonoPL.ttf`
 - License text: `third_party/cascadia-code/OFL.txt`
 
-## Primary runtime projects
+## Packaged web runtime
 
-- Electron — MIT
-- React — MIT
-- xterm.js and official addons — MIT
-- node-pty — MIT
-- electron-store — MIT
-- dnd-kit — MIT
+- React and React DOM — MIT
+- xterm.js, addon-fit, and addon-webgl — MIT
 - Lucide — ISC
-- C++/WinRT and Windows Implementation Library build components — MIT
-- Microsoft Windows.UI.Composition Win32 Samples (effect-descriptor implementation reference) — MIT
 
-This notice is informational and does not replace the license text shipped by each dependency.
+## Native build inputs
+
+- Microsoft WebView2 SDK and static loader — Microsoft Software License Terms
+- C++/WinRT — MIT
+- Windows Implementation Library (WIL) — MIT
+- Microsoft Windows.UI.Composition Win32 sample effect-descriptor approach — MIT
+
+The Microsoft Edge WebView2 Evergreen Runtime and Windows system libraries are prerequisites supplied by Microsoft; they are not redistributed in the application package.
+
+## Development and packaging tools
+
+- TypeScript, Vite, React plugin, ESLint, typescript-eslint, Vitest, jsdom, Testing Library, and Prettier — licenses recorded in `package-lock.json`
+- Playwright — Apache License 2.0
+- WiX Toolset — Microsoft Reciprocal License
+
+For the complete transitive npm dependency inventory and integrity hashes, see `package-lock.json`.

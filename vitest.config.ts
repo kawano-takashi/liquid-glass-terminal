@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/**/*.{ts,tsx}'],
+      include: ['web/src/**/*.{ts,tsx}', 'contracts/generated/**/*.ts'],
     },
   },
 });

@@ -1,51 +1,90 @@
-# Native material QA checklist
+# Windows 11 native acceptance checklist
 
-Automated tests validate mappings, migration, fallback selection, IPC validation, and both renderer palettes. Frosted-backdrop quality and the zero-blur HostBackdrop still require a real interactive Windows 11 desktop.
+Automated tests cover protocol validation, settings persistence/rollback, foreground contrast, bridge/shared-buffer behavior, shell quoting, clipboard boundaries, real ConPTY startup, packaging integrity, and basic packaged interaction. Backdrop quality, IME placement, compositor timing, monitor transitions, and accessibility behavior still require an interactive Windows 11 client.
 
-Record the application version, Windows build and edition, display scale, GPU, Windows color setting, accessibility state, and result for every run.
+For each run record the application version, Windows build/edition, WebView2 Runtime, GPU and driver, monitor layout, DPI and refresh rates, HDR state, power state, accessibility settings, and result. Attach `%LOCALAPPDATA%\Liquid Glass Terminal\logs\app.log` for failures.
 
-## Host gate
+## Host and startup
 
-- [ ] Windows 11 22H2+ x64 client launches normally.
-- [ ] Windows 10 exits with the localized native unsupported-system dialog before creating settings or a PTY.
-- [ ] Windows Server exits through the same gate.
-- [ ] Windows on ARM, including an x64-emulated process, exits through the same gate.
+- [ ] Windows 11 24H2+ x64 client starts normally with WebView2 Runtime 150.0.4078.44 or later.
+- [ ] Windows 10, pre-24H2 Windows 11, Windows Server, and Windows on ARM are rejected before settings or ConPTY are created.
+- [ ] A missing/old WebView2 Runtime shows the native requirement dialog and exits without downloading content.
+- [ ] A normal package starts without Electron, Node.js, Windows App SDK, or a machine-wide developer environment.
+- [ ] Settings, window state, WebView profile, and logs are created only under the local application-data directory.
 
-## Window and material
+## Window behavior
 
-- [ ] Window opens at 1100×720, honors the 720×420 minimum, resizes smoothly, maximizes, restores, and supports Snap.
-- [ ] Saved geometry is clamped after disconnecting or rearranging displays.
-- [ ] Frost stays active when the window loses focus; switching Windows between light and dark does not override the surface, renderer palette, titlebar symbols, menus, or xterm palette.
-- [ ] At the neutral / 7-of-14 defaults (9 DIPs), shapes, colors, and placement behind the window remain distinguishable, background prose is softened, and terminal text remains readable.
-- [ ] At neutral contrast and frost level 1, HostBackdrop remains visible with Gaussian blur disabled at 0 DIPs; the background is sharp and never replaced by an unintended black window surface.
-- [ ] Glass contrast remains enabled at frost level 1, previews and persists normally, and produces the same white/black overlays as levels 2–14.
-- [ ] White −100% and black +100% are completely opaque, bypass blur work, and do not expose stale desktop pixels while resizing.
-- [ ] Negative contrast adds only white, positive contrast adds only black, and neutral 0% adds no color sprite.
-- [ ] At every active frost level, crossing from white −45% to −50% switches UI text, titlebar symbols, xterm colors, control fills, and terminal halo together without restarting the shell or losing terminal output.
-- [ ] Returning above white −50% or entering any fallback switches back to light foregrounds.
-- [ ] All 14 frost levels (0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74 DIPs) differ progressively against the same high-detail background, preview live, and survive restart.
-- [ ] At frost level 14 (74 DIPs), normal-size background prose is unreadable and the result is visibly stronger than levels 12 and 13.
-- [ ] No static noise texture appears anywhere in the titlebar, terminal, settings, search, menus, dialogs, or toasts.
-- [ ] Settings, search, menus, dialogs, and toasts add no local CSS blur, cumulative tint, visible rim, or shadow.
-- [ ] High contrast keeps the app's dark fallback colors, suppresses Windows forced-color replacement, uses an opaque `#181818` surface with light foregrounds, disables both appearance sliders with a reason, and restores both saved values afterward.
-- [ ] Reduced transparency and screen-reader mode use the same opaque dark surface and restore both saved values afterward.
-- [ ] Energy saver, Remote Desktop, and disabled Windows transparency follow the same opaque policy and automatically restore frost when policy clears.
-- [ ] An unavailable addon, unsupported compositor, or non-fast compositor gets two total startup attempts, then opens an opaque `#181818` terminal with light foregrounds, disabled appearance sliders, persistent restart guidance, and the corresponding stable error code.
-- [ ] The startup fallback creates a working PTY, stays unavailable without further native retries, and remains resizable, maximizable, and Snap-compatible.
-- [ ] A forced runtime effect failure rebuilds once; a failed rebuild keeps every PTY alive, uses an opaque surface, and shows persistent restart guidance.
-- [ ] The DWM colored rim is absent, corners use the small preference, and resize/Snap/maximize remain functional.
-- [ ] No screen-capture or screen-recording permission prompt appears.
-- [ ] A package works without a machine-wide Windows App Runtime and does not stage Windows App SDK DLLs beside the executable.
-- [ ] 100%, 150%, and 200% scale show a sharp icon, titlebar controls, xterm glyphs, and drag targets.
+- [ ] Move, all-edge/corner resize, minimize, maximize, restore, Alt+Space system menu, keyboard window commands, and taskbar activation work.
+- [ ] Hovering the maximize control exposes Snap Layout; snapped windows resize and restore correctly.
+- [ ] F11 enters fullscreen and Escape restores the previous placement.
+- [ ] The 480×320-DIP minimum and saved normal/maximized placement are honored.
+- [ ] Reconnecting, removing, or rearranging monitors never restores the window entirely off-screen.
+- [ ] Moving between 100%, 125%, 150%, and 200% DPI monitors keeps visuals, clicks, cursors, IME, drag targets, and title-bar controls aligned.
+- [ ] 60 Hz, 120 Hz, and the highest available refresh rate show no obvious Glass lag, black flash, or stale frame during move/resize.
 
-## Terminal and input
+## Glass material
 
-- [ ] PowerShell 7, Windows PowerShell, cmd, Git Bash, and installed non-system WSL distributions are detected correctly.
-- [ ] Ctrl+C copies only with a selection; otherwise it reaches the PTY as interrupt.
-- [ ] Ctrl+Shift+V and both menus paste exactly once; Ctrl+V remains available to the PTY.
-- [ ] Multiline paste always shows its preview, cancel inserts nothing, and payloads above 1 MiB still require confirmation.
-- [ ] Copy and paste in the search field preserve its selection and do not send data to the terminal.
+- [ ] Desktop wallpaper and another application behind the window are blurred live without a capture/recording prompt.
+- [ ] Fully transparent areas and masked Glass regions coexist in one window.
+- [ ] Terminal, settings drawer, and context menu create the expected rounded regions; opening/closing overlays leaves no stale mask.
+- [ ] Nonuniform corner radii render without clipping gaps or crashes.
+- [ ] Clear, Regular, and Dense are visibly distinct and switch without restarting or losing terminal output.
+- [ ] Tint, saturation, local noise, border highlight, inner highlight, shadow, and active/inactive states are visible but do not distort terminal glyphs.
+- [ ] Multiple panels do not multiply blur cost linearly; GPU traces show the shared backdrop effect rather than one blur graph per panel.
+- [ ] White, black, saturated, text-heavy, moving-video, SDR, and HDR backgrounds remain readable.
+- [ ] Automatic and explicit light/dark foreground choices retain at least 4.5:1 terminal contrast; unsafe explicit choices are corrected.
+- [ ] Deactivating and reactivating the window transitions smoothly when motion is enabled and changes immediately when it is reduced.
 
-## Status for v0.2.0 Preview
+## WebView2 and input
 
-GitHub CI builds and statically verifies the Windows x64 package on Windows Server but does not launch it. Package launch, E2E, compositor behavior, and final visual checks must be completed locally on a supported Windows 11 x64 client before publishing the draft release.
+- [ ] The WebView background is completely transparent in Glass state and opaque in solid/safe state.
+- [ ] Mouse move/buttons/double-click, vertical/horizontal wheel, capture outside the window, cursor changes, and context menu work at every tested DPI.
+- [ ] Touch scrolling/tapping and pen input work without duplicated events or coordinate drift.
+- [ ] Keyboard focus traverses controls and returns to the terminal after dialogs/settings close.
+- [ ] Japanese IME input, conversion, reconversion, candidate selection, and candidate-window placement remain correct while moved, resized, maximized, snapped, fullscreen, and across DPI monitors.
+- [ ] Clipboard copy/paste works once per command; `Ctrl+C` without a selection reaches the shell.
+- [ ] Multiline paste is never sent before confirmation, and cancel sends nothing.
+- [ ] File drops insert exactly one correctly quoted path containing spaces, apostrophes, ampersands, percent signs, and Unicode.
+- [ ] No remote navigation, download, permission prompt, popup, default browser menu, or DevTools entry is available in a normal build.
+
+## Terminal transport
+
+- [ ] PowerShell 7 is selected when installed; otherwise Windows PowerShell, then Command Prompt.
+- [ ] Unicode, ANSI color, resize, full-screen console applications, and rapid output render correctly.
+- [ ] Large output remains responsive, ordering is preserved, and memory does not grow without bound.
+- [ ] Closing the window terminates the shell and all descendants.
+- [ ] Malformed Web Messages, stale buffer generations/sequences, invalid terminal dimensions, duplicate Glass IDs, and oversized clipboard payloads are rejected without terminating the UI or shell.
+
+## Policy and accessibility
+
+- [ ] Turning Windows transparency off selects a solid surface and automatically restores Glass when re-enabled.
+- [ ] High contrast uses opaque Windows system window/text colors and retains keyboard/screen-reader operability.
+- [ ] Remote Desktop and energy saver select the solid fallback and restore Glass after the condition clears.
+- [ ] Disabling Glass in settings selects a solid surface without changing the information hierarchy.
+- [ ] Reduced client-area animations or an active screen reader suppresses decorative transitions and cursor blinking.
+- [ ] Narrator reads terminal content in xterm screen-reader mode and does not lose focus when settings or paste confirmation closes.
+- [ ] Windows light/dark preference does not silently override the user-selected Tint and foreground policy.
+
+## Recovery
+
+- [ ] Forced Composition initialization failure retries once, recreates an opaque non-Composition window, and still starts a working shell.
+- [ ] Forced device loss rebuilds the Composition tree and WebView without losing the shell or reordering buffered output.
+- [ ] Failed device recovery recreates the window in safe mode, keeps the shell alive, and exposes a stable failure reason.
+- [ ] WebView renderer/process termination pauses output, recreates the WebView, rejects stale shared-buffer commits, and resumes the existing shell.
+- [ ] More than three WebView failures in 60 seconds prompts for explicit retry or quit rather than looping.
+- [ ] Sleep/resume, display-driver reset, monitor hot-plug, and DWM policy changes do not crash or leave a black surface.
+
+## Packaging and release
+
+- [ ] `npm run package:e2e`, `node scripts/verify-native-assets.mjs --e2e`, and `npm run test:e2e` pass on the supported client.
+- [ ] If explicitly enabled, the clipboard E2E restores the original plain text even after a failed assertion.
+- [ ] A fresh `npm run package` follows E2E packaging.
+- [ ] `npm run verify:native-assets` confirms an x64 GUI PE, exact SHA-256 manifest, no forbidden runtime assets, and no E2E switch/marker.
+- [ ] `npm run smoke:package` keeps the normal package healthy for five seconds.
+- [ ] `npm run audit:production`, `npm run make`, and `npm run verify:installer` pass.
+- [ ] The MSI installs per-machine, launches from Start, upgrades the previous version, and uninstalls without deleting user data.
+- [ ] The draft release contains only the unsigned normal MSI and matching SHA-256 checksum; no `package-e2e` output is uploaded.
+
+## Status for 0.3.0 Preview
+
+GitHub-hosted Windows Server runners build and statically verify the x64 package and MSI but cannot perform the supported-client launch or visual checks. Complete every applicable item above on a Windows 11 24H2+ x64 client before publishing the draft release.

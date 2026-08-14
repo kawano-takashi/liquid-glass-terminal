@@ -9,11 +9,15 @@ const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
 export default tseslint.config(
   {
     ignores: [
-      '**/.vite/**',
       '.tools/**',
+      '.vite/**',
+      '**/.vite/**',
+      '.winapp/**',
+      'build/**',
       'coverage/**',
       'node_modules/**',
       'out/**',
+      'packages/**',
       'playwright-report/**',
       'test-results/**',
     ],

@@ -2,4 +2,6 @@
 out
 coverage
 node_modules
-src/renderer/assets/fonts
+installer/*.wixproj
+installer/*.wxs
+web/src/assets/fonts

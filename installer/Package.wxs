@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Liquid Glass Terminal"
+    Manufacturer="Liquid Glass Terminal contributors"
+    Version="$(ProductVersion)"
+    UpgradeCode="{74DBD625-50AD-445E-8A06-ABF8D6035B34}"
+    Scope="perMachine"
+    InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Liquid Glass Terminal is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AppIcon" SourceFile="$(StageDir)\LiquidGlassTerminal.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Liquid Glass Terminal">
+        <Component Id="MainExecutable" Guid="{0514174E-E6C0-423D-8FD6-C76E4CD4CA46}">
+          <File Id="MainExecutableFile" Source="$(StageDir)\LiquidGlassTerminal.exe" KeyPath="yes">
+            <Shortcut
+              Id="StartMenuShortcut"
+              Directory="ProgramMenuFolder"
+              Name="Liquid Glass Terminal"
+              WorkingDirectory="INSTALLFOLDER"
+              Advertise="yes" />
+          </File>
+        </Component>
+        <Files Include="$(StageDir)\**">
+          <Exclude Files="$(StageDir)\LiquidGlassTerminal.exe" />
+          <Exclude Files="$(StageDir)\E2E-ONLY.json" />
+        </Files>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+  </Package>
+</Wix>

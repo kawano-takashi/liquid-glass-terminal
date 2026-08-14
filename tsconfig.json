@@ -18,10 +18,10 @@
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": [
-    "src",
+    "contracts/generated",
+    "web/src",
     "tests",
-    "forge.config.ts",
-    "vite.*.config.ts",
+    "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
     "eslint.config.js"

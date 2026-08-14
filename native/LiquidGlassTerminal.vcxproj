@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{B3CE7D89-02AD-4A5C-B903-816901A59440}</ProjectGuid>
+    <RootNamespace>LiquidGlassTerminal</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <ProjectName>LiquidGlassTerminal</ProjectName>
+    <NuGetPackageRoot>$(SolutionDir)packages\</NuGetPackageRoot>
+    <RestorePackagesConfig>true</RestorePackagesConfig>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(NuGetPackageRoot)Microsoft.Windows.CppWinRT.3.0.260520.1\build\native\Microsoft.Windows.CppWinRT.props" Condition="Exists('$(NuGetPackageRoot)Microsoft.Windows.CppWinRT.3.0.260520.1\build\native\Microsoft.Windows.CppWinRT.props')" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)..\build\native\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\build\obj\$(Configuration)\</IntDir>
+    <TargetName>LiquidGlassTerminal</TargetName>
+    <WebView2LoaderPreference>Static</WebView2LoaderPreference>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_WIN32_WINNT=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(NuGetPackageRoot)Microsoft.Web.WebView2.1.0.4078.44\build\native\include;$(NuGetPackageRoot)Microsoft.Windows.ImplementationLibrary.1.0.260126.7\include;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>windowsapp.lib;dwmapi.lib;d3d11.lib;dxgi.lib;dxguid.lib;d2d1.lib;dwrite.lib;shcore.lib;shell32.lib;ole32.lib;comctl32.lib;userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_WIN32_WINNT=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(NuGetPackageRoot)Microsoft.Web.WebView2.1.0.4078.44\build\native\include;$(NuGetPackageRoot)Microsoft.Windows.ImplementationLibrary.1.0.260126.7\include;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>windowsapp.lib;dwmapi.lib;d3d11.lib;dxgi.lib;dxguid.lib;d2d1.lib;dwrite.lib;shcore.lib;shell32.lib;ole32.lib;comctl32.lib;userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(LgtE2E)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>LGT_E2E_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="app\Application.cpp" />
+    <ClCompile Include="app\main.cpp" />
+    <ClCompile Include="composition\CompositionHost.cpp" />
+    <ClCompile Include="diagnostics\Logger.cpp" />
+    <ClCompile Include="platform\ClipboardService.cpp" />
+    <ClCompile Include="platform\FileDropTarget.cpp" />
+    <ClCompile Include="platform\SystemPolicy.cpp" />
+    <ClCompile Include="settings\SettingsStore.cpp" />
+    <ClCompile Include="terminal\ConPtySession.cpp" />
+    <ClCompile Include="terminal\SharedBufferTransport.cpp" />
+    <ClCompile Include="webview\WebViewBridge.cpp" />
+    <ClCompile Include="webview\WebViewHost.cpp" />
+    <ClCompile Include="webview\WebViewInputRouter.cpp" />
+    <ClCompile Include="window\NativeWindow.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="app\Application.h" />
+    <ClInclude Include="composition\CompositionHost.h" />
+    <ClInclude Include="composition\Effects.h" />
+    <ClInclude Include="composition\GeometrySource.h" />
+    <ClInclude Include="composition\GlassMaterial.h" />
+    <ClInclude Include="contracts\generated\Protocol.generated.h" />
+    <ClInclude Include="diagnostics\Logger.h" />
+    <ClInclude Include="platform\ClipboardService.h" />
+    <ClInclude Include="platform\FileDropTarget.h" />
+    <ClInclude Include="platform\SystemPolicy.h" />
+    <ClInclude Include="settings\SettingsStore.h" />
+    <ClInclude Include="terminal\ConPtySession.h" />
+    <ClInclude Include="terminal\SharedBufferTransport.h" />
+    <ClInclude Include="webview\WebViewBridge.h" />
+    <ClInclude Include="webview\WebViewHost.h" />
+    <ClInclude Include="webview\WebViewInputRouter.h" />
+    <ClInclude Include="window\NativeWindow.h" />
+    <ClInclude Include="resources\resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resources\app.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="resources\app.manifest" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(NuGetPackageRoot)Microsoft.Web.WebView2.1.0.4078.44\build\native\Microsoft.Web.WebView2.targets" Condition="Exists('$(NuGetPackageRoot)Microsoft.Web.WebView2.1.0.4078.44\build\native\Microsoft.Web.WebView2.targets')" />
+    <Import Project="$(NuGetPackageRoot)Microsoft.Windows.CppWinRT.3.0.260520.1\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('$(NuGetPackageRoot)Microsoft.Windows.CppWinRT.3.0.260520.1\build\native\Microsoft.Windows.CppWinRT.targets')" />
+    <Import Project="$(NuGetPackageRoot)Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets" Condition="Exists('$(NuGetPackageRoot)Microsoft.Windows.ImplementationLibrary.1.0.260126.7\build\native\Microsoft.Windows.ImplementationLibrary.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackages" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(NuGetPackageRoot)Microsoft.Web.WebView2.1.0.4078.44\build\native\Microsoft.Web.WebView2.targets')" Text="NuGet packages are missing. Run npm run bootstrap:native." />
+  </Target>
+</Project>

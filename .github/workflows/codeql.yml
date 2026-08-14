@@ -13,7 +13,8 @@ permissions:
   security-events: write
 
 jobs:
-  analyze:
+  web:
+    name: JavaScript and TypeScript
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -24,6 +25,35 @@ jobs:
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
           languages: javascript-typescript
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+
+  native:
+    name: C++20
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        with:
+          languages: c-cpp
+          build-mode: manual
+
+      - name: Restore and build native solution
+        run: npm run bootstrap:native
 
       - name: Analyze
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4

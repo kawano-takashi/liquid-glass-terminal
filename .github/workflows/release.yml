@@ -28,7 +28,7 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:production
 
-      - name: Prepare Electron and native modules
+      - name: Restore and build native dependencies
         run: npm run bootstrap:native
 
       - name: Verify release tag
@@ -37,25 +37,22 @@ jobs:
       - name: Run quality gates
         run: npm run check
 
-      - name: Run real PTY integration test
+      - name: Run real ConPTY integration test
         run: npm run test:run
         env:
           LGT_NATIVE_TESTS: '1'
 
-      - name: Build hardened distributable artifacts
+      - name: Build normal package and MSI
         run: npm run make
 
-      - name: Verify packaged native assets
-        run: npm run verify:native-assets
-
-      - name: Verify final Electron Fuses
-        run: npm run verify:fuses
+      - name: Verify package and installer
+        run: npm run verify:native-assets && npm run verify:installer
 
       - name: Upload distributables
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-windows-x64
-          path: out/make/**/*
+          path: build/artifacts/*.msi
           if-no-files-found: error
           retention-days: 14
 
@@ -95,5 +92,5 @@ jobs:
             --draft `
             --verify-tag `
             --title "Liquid Glass Terminal $env:GITHUB_REF_NAME" `
-            --notes "Unsigned Windows x64 preview artifacts. Review SHA256SUMS.txt and the native QA status before publishing."
+            --notes "Unsigned Windows x64 preview MSI. Review SHA256SUMS.txt and complete docs/native-qa.md on Windows 11 24H2+ before publishing."
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

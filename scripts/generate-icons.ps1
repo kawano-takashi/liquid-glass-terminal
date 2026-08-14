@@ -1,6 +1,6 @@
 param(
   [string]$Source = 'assets/icons/icon-source.png',
-  [string]$Font = 'src/renderer/assets/fonts/CascadiaMonoPL.ttf',
+  [string]$Font = 'web/src/assets/fonts/CascadiaMonoPL.ttf',
   [string]$Output = 'assets/icons/icon.png'
 )
 

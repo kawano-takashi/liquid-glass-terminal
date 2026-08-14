@@ -1,0 +1,47 @@
+{
+  "name": "LiquidGlassTerminalProtocol",
+  "version": 1,
+  "origin": "https://app.liquid-glass-terminal.invalid/",
+  "limits": {
+    "maxGlassRegions": 32,
+    "maxTerminalChunkBytes": 65536,
+    "maxTerminalOutstandingBytes": 262144,
+    "resumeTerminalBelowBytes": 65536,
+    "maxClipboardBytes": 1048576
+  },
+  "enums": {
+    "glassRole": ["terminal", "overlay", "decorative"],
+    "glassPreset": ["clear", "regular", "dense"],
+    "foreground": ["auto", "light", "dark"],
+    "locale": ["system", "en", "ja"],
+    "appearanceState": ["glass", "solid", "safe"]
+  },
+  "messages": {
+    "webToNative": [
+      "bridge.ready",
+      "terminal.resize",
+      "terminal.input.commit",
+      "terminal.output.ack",
+      "glass.layout.set",
+      "settings.preview",
+      "settings.apply",
+      "settings.cancel",
+      "clipboard.read",
+      "clipboard.write"
+    ],
+    "nativeToWeb": [
+      "bridge.accepted",
+      "capabilities.changed",
+      "terminal.buffer.attach",
+      "terminal.input.ack",
+      "terminal.output.ready",
+      "terminal.recovered",
+      "settings.snapshot",
+      "settings.result",
+      "appearance.changed",
+      "clipboard.result",
+      "drop.path",
+      "app.notice"
+    ]
+  }
+}

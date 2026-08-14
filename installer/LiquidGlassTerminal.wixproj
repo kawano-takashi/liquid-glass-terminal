@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <AcceptEula>wix7</AcceptEula>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.3.0</ProductVersion>
+    <StageDir Condition="'$(StageDir)' == ''">$(MSBuildThisFileDirectory)..\build\package\LiquidGlassTerminal</StageDir>
+    <DefineConstants>StageDir=$(StageDir);ProductVersion=$(ProductVersion)</DefineConstants>
+    <OutputName>LiquidGlassTerminal-$(ProductVersion)-win-x64</OutputName>
+    <SuppressIces>ICE60</SuppressIces>
+    <OutputPath>$(MSBuildThisFileDirectory)..\build\artifacts\</OutputPath>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)..\build\wix-obj\</IntermediateOutputPath>
+  </PropertyGroup>
+</Project>

@@ -1,61 +1,159 @@
 # Architecture
 
-## Processes and trust boundaries
+Liquid Glass Terminal is a native Windows application with a web-authored content layer. Electron, layered transparent windows, Mica/Acrylic presets, and screen capture are not part of the runtime.
+
+## Runtime topology
 
 ```text
-React + xterm renderer
-        │ narrow, typed preload API
-        │ one MessagePort per terminal
-        ▼
-Electron main process ── node-pty / ConPTY ── local shell and children
-        │
-        ├─ electron-store settings/window state
-        └─ Windows material, menu, and external-browser delegation
+Win32 HWND (C++20)
+│
+├─ Windows.UI.Composition / DesktopWindowTarget
+│  └─ Root ContainerVisual
+│     ├─ opaque safe-mode surface
+│     ├─ shared HostBackdrop effect visual, clipped to all Glass regions
+│     ├─ per-region tint and noise masks
+│     ├─ per-region shadows, borders, and highlights
+│     ├─ WebView2 composition visual
+│     └─ native title-bar glyphs and hit-test overlay
+│
+├─ CoreWebView2CompositionController
+│  └─ bundled React / TypeScript / xterm.js UI
+│
+├─ ConPTY + kill-on-close Job Object
+│  └─ PowerShell 7, Windows PowerShell, or cmd
+│
+└─ Native services
+   ├─ typed Web Message bridge
+   ├─ WebView2 shared-buffer transport
+   ├─ settings and window state
+   ├─ clipboard and file drop
+   ├─ system policy and DPI
+   └─ diagnostics and recovery
 ```
 
-The renderer is context-isolated, sandboxed, and has no Node integration. It can request a detected shell profile ID but never sends an executable or argument list. Main-frame origin, request shape, bounds, ownership, and URL scheme are validated at every IPC boundary.
+The top-level window is always a C++ Win32 `HWND`. Composition mode uses `WS_EX_NOREDIRECTIONBITMAP` and publishes the visual tree through `DesktopWindowTarget`. If Composition cannot initialize, the window is recreated without that extended style and hosts an opaque windowed WebView2 controller. Standard `WS_OVERLAPPEDWINDOW` capabilities remain available in both modes.
 
-At startup the main process verifies Windows, x64 Electron, native x64 Windows, build 22621+, and `InstallationType=Client`. Unsupported systems receive a native error dialog and exit before settings, profile discovery, or PTY creation.
+## Glass renderer
 
-## Terminal flow control
-
-Each tab owns one `MessageChannelMain`. The renderer receives its port before the PTY starts, then waits for an explicit `ready` message. PTY output carries a sequence number and UTF-8 byte count. The main process pauses the PTY at 256 KiB of unacknowledged output; xterm acknowledges from its `write` callback, and the PTY resumes below 64 KiB. Port loss, renderer failure, or tab closure kills the associated PTY tree.
-
-OSC 0/2 supplies a sanitized, 80-grapheme tab title. OSC 7 is accepted only for a local `file://` host and an existing path in the same shell profile. Only an accepted OSC 7 path may flow into a newly opened tab; shell profiles are never modified or injected.
-
-## Window material
+The renderer uses `Windows.UI.Composition` rather than CSS or a captured image:
 
 ```text
-Windows 11 22H2+ x64 client
-        │
-        ├─ Electron backgroundMaterial: acrylic ── translucent Chromium surface only
-        ├─ DWM system backdrop: NONE
-        ├─ Windows.UI.Composition DesktopWindowTarget
-        │      HostBackdrop
-        │        → GaussianBlur (Quality + hard border, 0–74 DIPs)
-        │        → optional white/black contrast sprite
-        └─ renderer ── adaptive controls, terminal palette, and text halo
+HostBackdropBrush
+      ↓
+GaussianBlurEffect
+      ↓
+SaturationEffect
+      ↓
+one full-window SpriteVisual
+      ↓
+combined geometry clip for all visible Glass regions
 ```
 
-The application uses a normal resizable, maximizable, Snap-compatible BrowserWindow; it does not use Electron's `transparent: true` mode. Electron's `backgroundMaterial: 'acrylic'` is used only to establish Chromium's internal translucent surface. Native code immediately sets `DWMWA_SYSTEMBACKDROP_TYPE` to `NONE`, extends the frame, and attaches one client-sized Composition visual tree. The active and policy-disabled paths never call Electron's material setter with `none`; a sticky native failure does so before switching to the opaque fallback. No component captures, stores, or redraws desktop pixels.
+Blur and saturation execute once for the visible region set. Each region then receives independent tint, a generated local noise brush, border, highlight, and shadow. Uniform rounded rectangles use `CompositionRoundedRectangleGeometry`; nonuniform corner radii use a Direct2D geometry exposed through `CompositionPath`. The protocol accepts at most 32 unique regions.
 
-The visual source is `CreateHostBackdropBrush()`, and the only effect is a Direct2D Gaussian blur configured for Quality optimization and hard borders. Electron exposes system-material selection but not a blur-amount control, so the adjustable Composition graph, HWND validation, DWM policy, and OS capability queries remain isolated in the C++ Node-API addon. A separate color sprite implements signed `glassContrast`: negative values overlay white, zero hides the sprite, and positive values overlay black. It is an integer from −100 to 100 in steps of 5. `frostStrength` is an integer index from 0 to 13:
+Material parameters are native, fixed presets:
+
+| Preset  |    Blur | Saturation | Tint opacity | Noise opacity |
+| ------- | ------: | ---------: | -----------: | ------------: |
+| Clear   |  6 DIPs |       1.05 |         0.64 |         0.015 |
+| Regular | 16 DIPs |       1.10 |         0.72 |         0.020 |
+| Dense   | 30 DIPs |       1.15 |         0.82 |         0.025 |
+
+The React layout reports only bounded region geometry and semantic roles. It cannot create effects or supply arbitrary effect values. Regions are converted from WebView DIPs to physical Composition coordinates in one native path. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
+
+The DWM host-backdrop attribute and `CreateHostBackdropBrush()` provide the pixels already owned by desktop composition. The application never captures, copies, stores, or replays pixels belonging to the desktop or another process.
+
+## Window and input
+
+The native window owns non-client behavior. `WM_NCHITTEST` returns standard resize, caption, minimize, maximize, and close hit-test values; DWM therefore retains Snap Layout behavior on the maximize control. Alt+Space opens the system menu, F11 toggles fullscreen, and `WM_DPICHANGED` applies the suggested monitor bounds.
+
+The WebView occupies the client area below the 44-DIP native title bar. In Composition mode there is no child WebView window, so `WebViewInputRouter` forwards:
+
+- mouse move, buttons, double-click, horizontal/vertical wheel, capture, and leave;
+- Pointer messages for touch and pen using `ICoreWebView2PointerInfo`;
+- focus and cursor updates;
+- coordinates relative to the WebView bounds, with DPI and zoom handled centrally.
+
+Keyboard and IME remain attached to the controller focus path. Input routing is intentionally centralized; Glass rendering and React components do not call Composition Controller input APIs.
+
+## WebView2 host and web UI
+
+`CoreWebView2CompositionController` places WebView output in the native visual tree. Its default background and `html`/`body`/`#root` are transparent while Glass is active. Solid and safe states switch the controller to an opaque background before hiding native Glass.
+
+The host maps packaged `web/` assets to `https://app.liquid-glass-terminal.invalid/`. Only the exact `index.html` main-frame navigation is permitted. All other resource origins receive a synthetic 403 response. New windows, permissions, downloads, host objects, browser accelerator keys, default context menus, and release-build DevTools are disabled.
+
+React owns ordinary application UI, localization, layout, settings, paste confirmation, and xterm.js. It never receives Node.js, COM, Win32, or raw WebView2 objects.
+
+## Native/web protocol
+
+`contracts/protocol.idl.json` is the source of truth. `npm run contracts:generate` creates both:
+
+- `contracts/generated/protocol.ts` with discriminated unions and exact validators;
+- `native/contracts/generated/Protocol.generated.h` with message names, bounds, and enum helpers.
+
+Every envelope contains protocol version, type, and a type-specific payload. Unknown keys, invalid enum values, stale layout revisions, invalid buffer sequences, out-of-range terminal sizes, duplicate region IDs, oversized clipboard content, and messages from any other source are rejected.
+
+Low-frequency control traffic uses JSON Web Messages. Terminal bytes do not:
 
 ```text
-index:  0   1   2   3   4   5   6   7   8   9  10  11  12  13
-blur:   0   2   3   4   5   6   9  12  16  22  30  41  55  74 DIPs
+ConPTY output
+  → bounded native queue
+  → four 64-KiB read-only WebView2 shared buffers
+  → terminal.output.ready
+  → xterm write callback
+  → terminal.output.ack
+
+xterm input
+  → two 64-KiB writable shared buffers
+  → terminal.input.commit
+  → native sequence/length validation
+  → ConPTY input pipe
+  → terminal.input.ack
 ```
 
-The defaults are neutral contrast and frost index 6 (shown as 7/14), which resolves to 9 DIPs. The main process converts the saved index to a blur amount before calling the native addon. Frost index 0 keeps the backdrop visual attached and sets Gaussian blur to 0 DIPs, which disables the blur effect; contrast remains enabled and follows the same rules as indices 1–13. At neutral contrast this passes through a sharp HostBackdrop. At either ±100% contrast endpoint, the contrast sprite is fully opaque and the backdrop visual is hidden to bypass unnecessary effect work. There are no local CSS `backdrop-filter` layers and no renderer noise texture.
+Outstanding terminal data is capped at 256 KiB and resumes below 64 KiB. Buffer slots carry generation and sequence numbers so stale commits after WebView recovery cannot be replayed.
 
-When the native backdrop is active and contrast is white −50% or stronger, the renderer uses a dark-foreground/light-surface palette at every frost level. Every other active combination uses the light-foreground palette. xterm changes theme in place, retains its 4.5 minimum contrast correction, and uses transparent `#808080` as the conservative contrast reference at the −50% switch point. UI variables, terminal text halo, and title-bar symbols switch together. Policy-disabled and unavailable states always use an opaque `#181818` fallback with light foregrounds. Windows light/dark color preference does not select the palette; the user's contrast value does.
+## Shell lifecycle
 
-The native addon uses only Windows system APIs. Its strict capability probe requires active DWM composition, a hardware Direct3D 11 feature-level 11 adapter (software adapters are rejected), and successful creation of the exact Windows.UI.Composition effect graph. This is also run when policy currently disables transparency. Initialization gets two total attempts. If both fail, the main process retains the stable failure code, detaches native state, disables Electron's material, and continues startup with an opaque `#181818` surface. The unavailable state is sticky until restart, but the renderer and new PTYs remain usable. No Windows App SDK runtime is staged or loaded.
+The native ConPTY host selects PowerShell 7 when installed, then Windows PowerShell, then `cmd.exe`. It does not accept an executable or argument list from the web UI. The shell starts suspended, is assigned to a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, and only then resumes. Closing the app terminates the complete shell tree.
 
-The main process is the source of truth for material status. High contrast, reduced transparency, screen-reader mode, disabled advanced effects, energy saver, or Remote Desktop switches the attached tree and renderer to an opaque dark surface without replacing the app's colors with Windows forced colors. Both appearance sliders are disabled with a reason, saved values remain untouched, and polling plus native change notifications restore frost automatically. A runtime exception or capability loss permits one detach/probe/reattach cycle. If that fails—or a later failure occurs—the app enters the same sticky unavailable state, existing PTYs stay alive, and the renderer displays persistent nonmodal guidance with the stable failure code.
+Dropped paths are accepted only from the native OLE drop target and are quoted for the active PowerShell or Command Prompt grammar before being sent to React for insertion. Clipboard reads and writes are bounded native operations; multiline paste requires an explicit web confirmation.
 
-## Persistence
+## Settings and local data
 
-Settings and window geometry are separate atomic JSON stores. Settings schema v5 stores integer `glassContrast` and `frostStrength`. Every pre-v5 record resets appearance to the new defaults (neutral contrast and index 6) while preserving unrelated settings. Legacy `theme`, `glass`, `glassOpacity`, and `backgroundOpacity` keys are removed. A migrated v5 record is then stable.
+Settings and window state live under `%LOCALAPPDATA%\Liquid Glass Terminal`. The settings drawer starts a native transaction:
 
-Only settings, one-time hints, and clamped geometry persist. Tabs, PTYs, output, titles, and order never survive restart.
+1. preview applies an in-memory candidate;
+2. apply writes a temporary file and atomically replaces `settings-v1.json`;
+3. cancel restores the committed value;
+4. invalid persisted JSON is isolated with an `.invalid-*` suffix.
+
+The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
+
+## Policy and fallback
+
+`SystemPolicy` observes:
+
+- Windows transparency and overlapped-content policy;
+- high contrast;
+- client-area animation and active UI Automation clients;
+- Remote Desktop;
+- energy saver.
+
+Disabled transparency, high contrast, Remote Desktop, energy saver, or user opt-out selects a solid surface without changing saved Glass preferences. High contrast uses Windows system window/text colors. Reduced animation and screen-reader state stop decorative motion and cursor blinking. Policy changes are sent to React through `capabilities.changed`.
+
+Three runtime appearance states are exposed:
+
+| State   | Meaning                                                                           |
+| ------- | --------------------------------------------------------------------------------- |
+| `glass` | Host backdrop and native material are active.                                     |
+| `solid` | Expected policy/user fallback; application remains fully usable.                  |
+| `safe`  | Composition update or device recovery failed; opaque emergency surface is active. |
+
+Composition initialization gets two attempts. Device loss first rebuilds the Composition tree and WebView target; if that fails, the `HWND` and WebView are recreated in opaque mode while the ConPTY session and shared transport remain alive. WebView process failure pauses transport and recreates the UI; repeated failures within 60 seconds require an explicit retry or quit choice.
+
+## Packaging
+
+Vite emits static UI assets and MSBuild links one x64 GUI executable with the static WebView2 loader. The staged package contains the executable, web assets, licenses, metadata, and a SHA-256 file manifest—no Electron, Node.js, `.node` module, or application DLL. WiX 7 creates a per-machine MSI.
+
+The E2E configuration is separately compiled with loopback WebView inspection support and an `E2E-ONLY.json` marker. Release verification fails if that switch or marker appears in the normal package.

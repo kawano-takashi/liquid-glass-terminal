@@ -1,8 +1,15 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { findPackagedExecutable } from './packaged-executable.mjs';
+import path from 'node:path';
+import { root } from './lib/native-toolchain.mjs';
 
-const executable = await findPackagedExecutable();
-const args = ['--cwd', process.cwd()];
+const executable = path.join(
+  root,
+  'build',
+  'package',
+  'LiquidGlassTerminal',
+  'LiquidGlassTerminal.exe',
+);
+const args = [];
 const child = spawn(executable, args, {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, LGT_SMOKE_TEST: '1' },

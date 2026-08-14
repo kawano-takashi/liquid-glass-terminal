@@ -1,96 +1,94 @@
-<p align="center">
-  <img src="assets/icons/icon.png" width="128" height="128" alt="Liquid Glass Terminal アイコン">
-</p>
-
 # Liquid Glass Terminal
 
-Windows 11向けの、中性でCOSMIC風のフロステッドグラス表現を備えたローカル完結型Electronターミナルです。
+[English](README.md)
 
-> **プレビュー版:** v0.2.0の成果物は未署名です。実行前にソースとリリースのchecksumを確認してください。
+ウィンドウ、Glassマテリアル、入力経路、シェルのライフサイクルをネイティブC++で実装した、Windows 11向けローカル完結型ターミナルです。Reactとxterm.jsは透明なWebView2 Composition Visual内で動作し、Electronは使用しません。
 
-[English](README.md) · [アーキテクチャ](docs/architecture.md) · [実機QA](docs/native-qa.md) · [セキュリティ](SECURITY.md)
+> **プレビュー:** バージョン0.3.0は、x64クライアント版Windows 11 24H2以降を対象とします。現在のインストーラーは未署名です。
 
-## 特長
+## 0.3で変更した構成
 
-- `node-pty`による実ローカルシェルと、WebGL／DOM fallback対応のxterm.js描画。
-- ドラッグ可能な複数タブ、Windows shell自動検出、検索、終了したshellの再起動。
-- PowerShell 7、Windows PowerShell、cmd、Git Bash、WSL profile。
-- 複数行paste確認、1 MiB超の必須確認、安全な外部リンク、実行しないファイル／フォルダーdrop。
-- 日本語・英語、surfaceに応じて切り替わる前景色、設定とwindow位置の保存。
-- telemetry、リモートコンテンツ、更新確認、crash upload、desktop capture、shell profileへのコード注入は一切なし。
+- Win32の`HWND`と`WS_EX_NOREDIRECTIONBITMAP`がトップレベルウィンドウを所有し、リサイズ、最大化／復元、Snap Layout、システムメニュー、DPI、フルスクリーンを維持します。
+- Windows.UI.Compositionが、共有された`HostBackdropBrush → Gaussian blur → saturation`グラフ、領域マスク、Tint、ノイズ、境界、ハイライト、影、アクティブ／非アクティブ遷移を描画します。
+- `CoreWebView2CompositionController`により、透明なReact UIをネイティブVisualツリーへ直接配置します。マウス、ホイール、Pointer、Touch／Pen、Cursor、Focus、DPI、Drag & Drop、IMEに関係する入力はネイティブ側で転送します。
+- C++20のConPTYホストが、kill-on-close Job Object内でローカルシェルを起動します。ターミナルデータは、上限付きQueue、Sequence検証、ACK、Recovery Generationを備えたWebView2 Shared Bufferで転送します。
+- Clear／Regular／DenseのGlassプリセットは、表示中の全領域でBlur処理を共有します。CSSでデスクトップをCaptureまたはBlurしません。
+- High Contrast、透明効果無効、Remote Desktop、省電力、Composition障害、ユーザーによる無効化では、操作可能な単色表示へ切り替えます。可能な限りシェルを維持したままWebView2とGPUを復旧します。
+- WebViewは同梱ファイルを`https://app.liquid-glass-terminal.invalid/`からのみ読み込みます。Navigation、Download、Permission、New Window、Remote Request、Host Object、およびRelease BuildのDevToolsは拒否します。
 
-## 対応環境
+実装の詳細は[docs/architecture.md](docs/architecture.md)、ネイティブReleaseの合格基準は[docs/native-qa.md](docs/native-qa.md)を参照してください。
 
-Liquid Glass Terminal 0.2.0は、Windows 11 22H2以降（build 22621以上）のx64クライアント版だけに対応します。Windows 10、Windows Server、Windows on ARM（x64 emulationを含む）、macOS、Linuxは、設定storeやPTYを作成する前に拒否します。
+## 動作要件
 
-windowは通常どおりresize、maximize、Snapが可能です。client領域全体を覆うnative Windows Composition visualは`HostBackdrop → GaussianBlur（Quality、hard border）`だけを描画し、必要に応じて白または黒のcontrast spriteを重ねます。Electronはsystem materialを選択できますがblur量を指定できないため、この可変効果だけを小さなC++ Node-API境界に隔離しています。Electronが透過surfaceを作った直後にDWM system backdropを明示的に無効化します。画面収録の許可は要求せず、他windowのpixelをcapture、copy、保持しません。
+### 実行
 
-「ガラスのコントラスト」は白−100%から中立0%、黒+100%まで5%刻みで変更でき、既定値は中立です。「曇りの強さ」は`0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74` DIPの14段階から独立して選択でき、既定値は7段階目（9 DIP）です。1段階目はHostBackdropを維持したままGaussian blurを0 DIPにし、他の全段階と同じcontrastと前景色の規則を適用します。中立contrastではsharpでblurのない背後を表示します。contrastが±100%の両端では完全な不透明面となり、blurを迂回します。どの曇り段階でも白50%以上ではUI、titlebar symbol、xterm paletteをPTYの再作成なしで暗い前景色へ切り替えます。装飾用の静的noiseは表示しません。
+- x64クライアント版Windows 11 24H2（build 26100）以降。
+- Microsoft Edge WebView2 Evergreen Runtime 150.0.4078.44以降。
+- GlassにはHardware Accelerationが利用できるDesktop Composition環境。未対応またはPolicyで無効な環境では単色Fallbackを使用します。
 
-高コントラスト、透明効果の低減、スクリーンリーダーモード、省電力、Remote Desktop、Windows効果の無効化時は、不透明な中性色面へ自動的に切り替えます。2本のappearance sliderには理由を表示して無効化し、保存値を維持して、policy解除時にfrostを復元します。起動時のnative初期化は1回だけ再試行し、2回とも失敗した場合も端末を不透明表示で起動して、再起動までlocalized error codeを常設表示します。実行中のcompositor障害では1回だけ再構築し、失敗後も既存PTYを維持したまま同じfallbackへ切り替えます。
+Windows 10、Windows Server、Windows on ARM（x64 Emulationを含む）、macOS、Linuxには対応しません。
 
-## ローカル開発
+### 開発
 
-必要な環境：
+- Node.js 24.19.0およびnpm 11.17.0を厳密に使用。
+- Visual Studio 2022の**Desktop development with C++** workload。
+- Windows SDK 10.0.26100.0。
 
-- Windows 11 22H2以降のx64クライアント版。
-- Node.js **24.19.0** と npm **11.17.0**。
-- Visual Studio 2022 Build Toolsの「C++によるデスクトップ開発」。
+## ビルドと起動
 
 ```powershell
 npm ci
+npm run verify:toolchain
 npm run audit:install-scripts
 npm run bootstrap:native
 npm start
 ```
 
-`bootstrap:native`は固定versionのWindows SDK／C++/WinRT build headerを復元し、x64 Node-API frosted-backdrop addonをbuildして、`node-pty`をElectron ABI向けにrebuildします。package版はWindows 11のsystem Composition／Direct3D libraryだけを使い、Windows App SDK runtimeを同梱しません。
+`.npmrc`によりLifecycle Scriptは常に無効です。`bootstrap:native`が固定VersionのWebView2、C++/WinRT、WIL packageを明示的にRestoreし、Native SolutionをBuildします。Release PackageはStatic WebView2 LoaderとWindows System APIを使用し、Electron、Node.js、Windows App SDK Runtime、Remote Contentを同梱しません。
 
-品質チェック：
+## 品質ゲート
 
 ```powershell
+# Format、Lint、TypeScript、Contract、Unit Test
 npm run check
-$env:LGT_NATIVE_TESTS = '1'; npm run test:run
+
+# Native Settings、Quoting、Clipboard、実ConPTY Test
+$env:LGT_NATIVE_TESTS = '1'
+npm run test:run
+
+# 計測機能付きLocal E2E Package（Windows 11 Clientのみ）
 npm run package:e2e
+node scripts/verify-native-assets.mjs --e2e
 npm run test:e2e
-npm run make
+
+# Release検証前に計測機能なしPackageを再生成
+npm run package
 npm run verify:native-assets
-npm run verify:fuses
+npm run smoke:package
+npm run audit:production
+npm run make
+npm run verify:installer
 ```
 
-GitHub-hosted Windows runnerはWindows Serverであり、applicationが意図的に拒否するため、package版の起動／E2EはローカルWindows 11で実行します。OS clipboardのplain textを一時的に置換して復元するtestは、`LGT_CLIPBOARD_E2E=1`で有効になります。
+実Clipboard Testを意図的に実行する場合だけ`LGT_CLIPBOARD_E2E=1`を設定してください。OS ClipboardのPlain Textを一時的に置換し、終了時に復元します。`package:e2e`は別Compileされた実行ファイルでLoopback Inspectionを有効にするため、Release入力には使用できません。
 
-## 使い方
+Release用Stageは`build/package/LiquidGlassTerminal/`、`npm run make`で生成するMSIは`build/artifacts/LiquidGlassTerminal-0.3.0-win-x64.msi`です。
 
-package版が公開する引数は1つだけです。
+## 操作
 
-```text
-liquid-glass-terminal --cwd <directory>
-```
+- `Ctrl+Shift+C`: Terminal SelectionをCopy。
+- `Ctrl+Shift+V`: Paste。複数行の場合は確認Dialogを表示。
+- `Ctrl+C`: SelectionがあればCopy、なければShellへInterruptを送信。
+- `Ctrl+,`: Settingsを開く。
+- `F11`: Fullscreenの切り替え。`Esc`でFullscreenを終了。
+- Local FileをTerminalへDropすると、Shellに適したQuote済みPathを挿入。
 
-相対pathは呼び出し元の作業directoryから解決します。無効なpathはhomeへfallbackし、通知を表示します。二重起動時は既存windowを前面へ出し、指定directoryで新しいtabを開きます。
+Settings、Window State、WebView2 Profile、Rotation付きDiagnostic Logは`%LOCALAPPDATA%\Liquid Glass Terminal`の下だけに保存します。Telemetry、Analytics、Update Check、Runtime Content Downloadは行いません。
 
-### キーボード
+## Release状況
 
-| 操作               | shortcut                  |
-| ------------------ | ------------------------- |
-| tab追加／終了      | Ctrl+T / Ctrl+W           |
-| 検索               | Ctrl+F                    |
-| paste              | Ctrl+Shift+V              |
-| copy               | 選択中のCtrl+C            |
-| interrupt送信      | 未選択時のCtrl+C          |
-| 次／前のtab        | Ctrl+Tab / Ctrl+Shift+Tab |
-| active tab並べ替え | Alt+Shift+Left / Right    |
-| 設定               | Ctrl+,                    |
-
-リンクはCtrl+click時のみ、かつ`http:`／`https:`だけを開きます。dropしたpathはshell別にquoteされ、Enterを送らず現在位置へ挿入されます。
-
-## buildとrelease
-
-Electron Forgeは未署名のWindows x64 Setup EXEを生成します。一致する`v*` tagでWindows x64の品質checkを実行し、SHA-256 checksum付きDraft GitHub Releaseを作成します。署名、auto-update、session復元、SSH管理、split pane、任意custom profile、plugin、inline imageはv0.2.0の対象外です。
-
-依存関係やnative codeを変更する前に[CONTRIBUTING.md](CONTRIBUTING.md)を確認してください。
+`v*` Tagは未署名x64 MSIをBuildし、SHA-256 Checksum付きDraft GitHub Releaseを作成します。公開前に、Maintainerが[docs/native-qa.md](docs/native-qa.md)の対応Client上Checklistを完了する必要があります。
 
 ## License
 
-application codeは[MIT License](LICENSE)です。同梱するCascadia Mono PLはSIL Open Font Licenseです。[third-party notices](THIRD_PARTY_NOTICES.md)を参照してください。
+[MIT](LICENSE)。Cascadia Mono PLはSIL Open Font License 1.1で配布します。詳細は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照してください。

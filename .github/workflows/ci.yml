@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Windows x64
+    name: Windows x64 native
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -37,30 +37,27 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:production
 
-      - name: Prepare Electron and native modules
+      - name: Restore and build native dependencies
         run: npm run bootstrap:native
 
       - name: Static checks and unit tests
         run: npm run check
 
-      - name: Real PTY integration test
+      - name: Real ConPTY integration test
         run: npm run test:run
         env:
           LGT_NATIVE_TESTS: '1'
 
-      - name: Build hardened distributable artifacts
+      - name: Build normal package and MSI
         run: npm run make
 
-      - name: Verify packaged native assets
-        run: npm run verify:native-assets
+      - name: Verify package and installer
+        run: npm run verify:native-assets && npm run verify:installer
 
-      - name: Verify final Electron Fuses
-        run: npm run verify:fuses
-
-      - name: Upload Windows package artifact
+      - name: Upload Windows installer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: package-windows-x64
-          path: out/**/*
+          name: installer-windows-x64
+          path: build/artifacts/*.msi
           if-no-files-found: error
           retention-days: 7

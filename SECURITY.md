@@ -2,20 +2,35 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest preview release on a best-effort basis. v0.2.x is pre-stable and may contain breaking changes.
+Security fixes are provided for the latest 0.3.x preview on a best-effort basis. Preview releases may contain breaking changes.
 
 ## Reporting a vulnerability
 
-Use GitHub's **Report a vulnerability** / private vulnerability reporting flow for this repository. Do not open a public issue containing exploit details, secrets, or personally identifiable information.
+Use GitHub private vulnerability reporting for this repository. Do not open a public issue containing exploit details, secrets, terminal history, local paths, or personally identifiable information.
 
-Include the affected version and OS, a minimal reproduction, impact, and any suggested mitigation. Maintainers will acknowledge a report when received and coordinate disclosure after a fix is available.
+Include the affected version, Windows and WebView2 versions, a minimal reproduction, impact, and any suggested mitigation. Maintainers will acknowledge the report when received and coordinate disclosure after a fix is available.
 
 ## Trust boundary
 
-The renderer cannot choose arbitrary executables; it requests detected profile IDs from the main process. The selected shell and all of its child processes run with the same operating-system privileges as Liquid Glass Terminal. This application is a terminal, not a sandbox for commands entered by the user.
+Liquid Glass Terminal is a terminal, not a sandbox. Commands entered by the user and every descendant of the selected shell run with the same Windows privileges as the application.
 
-The application loads no remote UI, sends no telemetry, and denies runtime network requests. Explicit Ctrl+click on validated HTTP(S) links delegates the URL to Windows' default browser.
+The React/xterm UI is treated as an unprivileged presentation layer:
 
-## Dependency audit scope
+- It loads bundled assets only from the fixed virtual origin `https://app.liquid-glass-terminal.invalid/`.
+- Native code permits only the exact application navigation and returns 403 for every non-application resource origin.
+- New windows, downloads, WebView permissions, host objects, default context menus, browser accelerators, and release-build DevTools are disabled.
+- It receives no Node.js, COM, Win32, raw WebView2, executable-selection, or argument-building API.
+- Every Web Message is source-checked, versioned, exact-key validated, bounded, and dispatched by a closed message-type set.
+- Terminal data uses direction-limited WebView2 shared buffers with validated slot, generation, sequence, and length fields. Bounded queues apply backpressure.
 
-`npm audit --omit=dev` must report no known production vulnerabilities before release. The full development-tree audit may contain upstream advisories in Electron Forge packaging tools that process only repository-controlled assets. These are reviewed separately and are not shipped in `app.asar`; forced major-version overrides are not accepted without exercising the Windows maker and native packaging checks.
+The native host chooses only trusted local PowerShell/cmd locations. The shell starts suspended, enters a kill-on-close Job Object, and then resumes. Native OLE file drops are quoted for the active shell grammar. Clipboard data is limited to 1 MiB; multiline paste requires confirmation.
+
+Settings, window state, WebView2 data, and rotating diagnostic event logs remain under `%LOCALAPPDATA%\Liquid Glass Terminal`. The application performs no telemetry, analytics, update check, remote UI load, or background download. Logs contain event names and numeric error codes, not terminal input/output.
+
+## Packaging and dependencies
+
+`npm audit --omit=dev` must report no known production npm vulnerabilities before release. Lifecycle scripts are globally disabled and audited before native restore. Direct dependencies are exact-pinned.
+
+Release verification checks an x64 Windows GUI PE, every staged file's SHA-256 hash, the exact manifest file set, absence of Electron/Node/native-addon runtime assets, and absence of the E2E-only inspection switch and marker. E2E packages are test-only and must never be distributed.
+
+The MSI is currently unsigned. Verify its checksum from the draft release before installing and treat SmartScreen warnings accordingly.

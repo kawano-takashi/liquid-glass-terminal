@@ -1,0 +1,27 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37531.7
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "LiquidGlassTerminal", "LiquidGlassTerminal.vcxproj", "{B3CE7D89-02AD-4A5C-B903-816901A59440}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "LiquidGlassTerminal.NativeTests", "LiquidGlassTerminal.NativeTests.vcxproj", "{15A64105-3F4B-44B5-A761-B966195C8768}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B3CE7D89-02AD-4A5C-B903-816901A59440}.Debug|x64.ActiveCfg = Debug|x64
+		{B3CE7D89-02AD-4A5C-B903-816901A59440}.Debug|x64.Build.0 = Debug|x64
+		{B3CE7D89-02AD-4A5C-B903-816901A59440}.Release|x64.ActiveCfg = Release|x64
+		{B3CE7D89-02AD-4A5C-B903-816901A59440}.Release|x64.Build.0 = Release|x64
+		{15A64105-3F4B-44B5-A761-B966195C8768}.Debug|x64.ActiveCfg = Debug|x64
+		{15A64105-3F4B-44B5-A761-B966195C8768}.Debug|x64.Build.0 = Debug|x64
+		{15A64105-3F4B-44B5-A761-B966195C8768}.Release|x64.ActiveCfg = Release|x64
+		{15A64105-3F4B-44B5-A761-B966195C8768}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,14 +1,15 @@
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { root, run } from './lib/native-toolchain.mjs';
 
-const forgeCli = path.resolve('node_modules/@electron-forge/cli/dist/electron-forge.js');
-if (process.platform !== 'win32' || process.arch !== 'x64') {
-  throw new Error('Distributables can only be built on Windows x64.');
-}
-
-const result = spawnSync(process.execPath, [forgeCli, 'make'], {
-  env: process.env,
-  stdio: 'inherit',
-});
-if (result.error) throw result.error;
-process.exit(result.status ?? 1);
+const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+run(process.execPath, [path.join(root, 'scripts', 'package.mjs')]);
+run('dotnet.exe', [
+  'build',
+  path.join(root, 'installer', 'LiquidGlassTerminal.wixproj'),
+  '--configuration',
+  'Release',
+  `-p:ProductVersion=${manifest.version}`,
+  `-p:StageDir=${path.join(root, 'build', 'package', 'LiquidGlassTerminal')}`,
+  '--nologo',
+]);
