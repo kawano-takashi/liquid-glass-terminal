@@ -1,38 +1,58 @@
 #pragma once
 
-#include "settings/SettingsStore.h"
+#include <algorithm>
+#include <cstdint>
+
+#include "contracts/generated/Protocol.generated.h"
 
 namespace lgt::composition {
 
-struct GlassMaterial {
-  float blurRadius;
-  float saturation;
-  float luminosity;
-  float tintOpacity;
-  float noiseOpacity;
-  float borderOpacity;
-  float highlightIntensity;
-  float inactiveOpacity;
-  float cornerRadius;
-};
+inline constexpr float kOverlayOpacityBoostPercent = 18.0F;
+inline constexpr float kMaximumGrainOpacity = protocol::kGrainMaximumOpacity;
 
-inline constexpr GlassMaterial kClearMaterial{6.0F, 1.05F, 0.02F, 0.64F, 0.015F,
-                                               0.20F, 0.18F, 0.82F, 16.0F};
-inline constexpr GlassMaterial kRegularMaterial{16.0F, 1.10F, 0.01F, 0.72F, 0.020F,
-                                                 0.28F, 0.24F, 0.82F, 16.0F};
-inline constexpr GlassMaterial kDenseMaterial{30.0F, 1.15F, 0.00F, 0.82F, 0.025F,
-                                               0.36F, 0.30F, 0.82F, 16.0F};
+[[nodiscard]] inline constexpr std::uint8_t ToneChannel(std::uint32_t tone) noexcept {
+  return static_cast<std::uint8_t>(protocol::ToneChannel(
+      std::min(tone, protocol::kToneConstraint.maximum)));
+}
 
-inline constexpr const GlassMaterial& Material(settings::GlassPreset preset) noexcept {
-  switch (preset) {
-    case settings::GlassPreset::Clear:
-      return kClearMaterial;
-    case settings::GlassPreset::Regular:
-      return kRegularMaterial;
-    case settings::GlassPreset::Dense:
-      return kDenseMaterial;
-  }
-  return kRegularMaterial;
+[[nodiscard]] inline constexpr std::uint32_t ToneRgb(std::uint32_t tone) noexcept {
+  return protocol::ToneRgb(std::min(tone, protocol::kToneConstraint.maximum));
+}
+
+[[nodiscard]] inline constexpr float FrostBlurDips(std::uint32_t thickness) noexcept {
+  return protocol::FrostBlurDip(
+      std::min(thickness, protocol::kFrostThicknessConstraint.maximum));
+}
+
+[[nodiscard]] inline constexpr float MaterialOpacity(std::uint32_t opacity) noexcept {
+  return static_cast<float>(std::min(opacity, protocol::kOpacityConstraint.maximum)) /
+         static_cast<float>(protocol::kOpacityConstraint.maximum);
+}
+
+[[nodiscard]] inline constexpr float OverlayOpacity(std::uint32_t opacity) noexcept {
+  const float base = MaterialOpacity(opacity);
+  return std::min(1.0F, base * (1.0F + kOverlayOpacityBoostPercent / 100.0F));
+}
+
+[[nodiscard]] inline constexpr float OverlayAdditionalOpacity(std::uint32_t opacity) noexcept {
+  const float base = MaterialOpacity(opacity);
+  if (base >= 1.0F) return 0.0F;
+  return (OverlayOpacity(opacity) - base) / (1.0F - base);
+}
+
+[[nodiscard]] inline constexpr float GrainOpacity(std::uint32_t grain) noexcept {
+  return protocol::GrainOpacity(std::min(grain, protocol::kGrainConstraint.maximum));
+}
+
+[[nodiscard]] inline constexpr float MaterialGrainOpacity(std::uint32_t grain,
+                                                          std::uint32_t opacity) noexcept {
+  return GrainOpacity(grain) * MaterialOpacity(opacity);
+}
+
+[[nodiscard]] inline constexpr bool NeedsGrainSurface(std::uint32_t grain,
+                                                      std::uint32_t opacity) noexcept {
+  return grain > protocol::kGrainConstraint.minimum &&
+         opacity > protocol::kOpacityConstraint.minimum;
 }
 
 }  // namespace lgt::composition

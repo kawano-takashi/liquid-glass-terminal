@@ -33,8 +33,9 @@ bool SharedBufferTransport::Attach(webview::WebViewHost& host, InputCallback inp
   attached_ = true;
   if (recovering_) {
     std::wostringstream json;
-    json << L"{\"v\":1,\"type\":\"terminal.recovered\",\"payload\":{\"generation\":"
-         << generation_ << L",\"droppedBytes\":" << droppedBytes_ << L"}}";
+    json << L"{\"v\":" << protocol::kVersion
+         << L",\"type\":\"terminal.recovered\",\"payload\":{\"generation\":" << generation_
+         << L",\"droppedBytes\":" << droppedBytes_ << L"}}";
     host_->PostJson(json.str());
     recovering_ = false;
     droppedBytes_ = 0;
@@ -206,7 +207,8 @@ std::uint32_t SharedBufferTransport::Generation() const noexcept {
 std::wstring SharedBufferTransport::AttachmentJson(std::wstring_view direction,
                                                    std::size_t index) const {
   std::wostringstream json;
-  json << L"{\"v\":1,\"type\":\"terminal.buffer.attach\",\"payload\":{\"direction\":\""
+  json << L"{\"v\":" << protocol::kVersion
+       << L",\"type\":\"terminal.buffer.attach\",\"payload\":{\"direction\":\""
        << direction << L"\",\"buffer\":" << index << L",\"generation\":" << generation_
        << L",\"capacity\":" << protocol::kTerminalChunkBytes << L"}}";
   return json.str();
@@ -215,7 +217,8 @@ std::wstring SharedBufferTransport::AttachmentJson(std::wstring_view direction,
 std::wstring SharedBufferTransport::CommitJson(std::wstring_view type,
                                                const BufferCommit& commit) {
   std::wostringstream json;
-  json << L"{\"v\":1,\"type\":\"" << type << L"\",\"payload\":{\"buffer\":"
+  json << L"{\"v\":" << protocol::kVersion << L",\"type\":\"" << type
+       << L"\",\"payload\":{\"buffer\":"
        << commit.buffer << L",\"generation\":" << commit.generation << L",\"sequence\":"
        << commit.sequence << L",\"length\":" << commit.length << L"}}";
   return json.str();

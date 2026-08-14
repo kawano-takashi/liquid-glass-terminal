@@ -1,6 +1,7 @@
 #include "webview/WebViewHost.h"
 
 #include <WebView2EnvironmentOptions.h>
+#include <uiautomation.h>
 #include <wil/com.h>
 
 #include <algorithm>
@@ -138,8 +139,12 @@ HRESULT WebViewHost::ConfigureController(
   RETURN_IF_FAILED(controller_->get_CoreWebView2(&core_));
   ComPtr<ICoreWebView2Controller2> controller2;
   if (SUCCEEDED(controller_.As(&controller2))) {
-    const COREWEBVIEW2_COLOR transparent{0, 0, 0, 0};
-    RETURN_IF_FAILED(controller2->put_DefaultBackgroundColor(transparent));
+    const COREWEBVIEW2_COLOR color{
+        opaqueBackground_ ? static_cast<BYTE>(255) : static_cast<BYTE>(0),
+        static_cast<BYTE>((backgroundColor_ >> 16) & 0xFF),
+        static_cast<BYTE>((backgroundColor_ >> 8) & 0xFF),
+        static_cast<BYTE>(backgroundColor_ & 0xFF)};
+    RETURN_IF_FAILED(controller2->put_DefaultBackgroundColor(color));
   }
   ComPtr<ICoreWebView2Controller4> controller4;
   if (SUCCEEDED(controller_.As(&controller4))) controller4->put_AllowExternalDrop(FALSE);
@@ -165,6 +170,11 @@ HRESULT WebViewHost::ConfigureSecurity() {
   settings->put_IsBuiltInErrorPageEnabled(FALSE);
   ComPtr<ICoreWebView2Settings3> settings3;
   if (SUCCEEDED(settings.As(&settings3))) settings3->put_AreBrowserAcceleratorKeysEnabled(FALSE);
+  if (compositionMode_) {
+    ComPtr<ICoreWebView2Settings9> settings9;
+    RETURN_IF_FAILED(settings.As(&settings9));
+    RETURN_IF_FAILED(settings9->put_IsNonClientRegionSupportEnabled(TRUE));
+  }
 
   ComPtr<ICoreWebView2_3> core3;
   RETURN_IF_FAILED(core_.As(&core3));
@@ -287,6 +297,9 @@ void WebViewHost::NotifyParentPositionChanged() {
 }
 
 void WebViewHost::SetOpaqueBackground(std::uint32_t tint) {
+  opaqueBackground_ = true;
+  backgroundColor_ = tint;
+  if (!controller_) return;
   ComPtr<ICoreWebView2Controller2> controller2;
   if (FAILED(controller_.As(&controller2))) return;
   const COREWEBVIEW2_COLOR color{255, static_cast<BYTE>((tint >> 16) & 0xFF),
@@ -296,6 +309,8 @@ void WebViewHost::SetOpaqueBackground(std::uint32_t tint) {
 }
 
 void WebViewHost::SetTransparentBackground() {
+  opaqueBackground_ = false;
+  if (!controller_) return;
   ComPtr<ICoreWebView2Controller2> controller2;
   if (FAILED(controller_.As(&controller2))) return;
   const COREWEBVIEW2_COLOR transparent{0, 0, 0, 0};
@@ -306,8 +321,31 @@ void WebViewHost::SetVisible(bool visible) {
   if (controller_) controller_->put_IsVisible(visible ? TRUE : FALSE);
 }
 
+std::optional<LRESULT> WebViewHost::NonClientHitTest(POINT parentClientPoint) const {
+  if (!compositionController_ || !PtInRect(&bounds_, parentClientPoint)) return std::nullopt;
+  ComPtr<ICoreWebView2CompositionController4> controller4;
+  if (FAILED(compositionController_.As(&controller4))) return std::nullopt;
+  POINT webPoint{parentClientPoint.x - bounds_.left, parentClientPoint.y - bounds_.top};
+  COREWEBVIEW2_NON_CLIENT_REGION_KIND kind = COREWEBVIEW2_NON_CLIENT_REGION_KIND_NOWHERE;
+  if (FAILED(controller4->GetNonClientRegionAtPoint(webPoint, &kind))) return std::nullopt;
+  if (kind == COREWEBVIEW2_NON_CLIENT_REGION_KIND_CAPTION) return HTCAPTION;
+  return HTCLIENT;
+}
+
 std::optional<LRESULT> WebViewHost::HandleWindowMessage(UINT message, WPARAM wParam,
-                                                        LPARAM lParam) {
+                                                         LPARAM lParam) {
+  if (message == WM_GETOBJECT && compositionController_ &&
+      static_cast<LONG>(static_cast<LONG_PTR>(lParam)) == UiaRootObjectId) {
+    ComPtr<ICoreWebView2CompositionController2> controller2;
+    ComPtr<IUnknown> provider;
+    if (SUCCEEDED(compositionController_.As(&controller2)) &&
+        SUCCEEDED(controller2->get_AutomationProvider(&provider)) && provider) {
+      ComPtr<IRawElementProviderSimple> rawProvider;
+      if (SUCCEEDED(provider.As(&rawProvider)) && rawProvider) {
+        return UiaReturnRawElementProvider(parent_, wParam, lParam, rawProvider.Get());
+      }
+    }
+  }
   return inputRouter_.Handle(message, wParam, lParam);
 }
 

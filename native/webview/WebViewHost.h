@@ -40,6 +40,8 @@ class WebViewHost final {
   void SetTransparentBackground();
   void SetVisible(bool visible);
 
+  [[nodiscard]] std::optional<LRESULT> NonClientHitTest(POINT parentClientPoint) const;
+
   [[nodiscard]] std::optional<LRESULT> HandleWindowMessage(UINT message, WPARAM wParam,
                                                             LPARAM lParam);
   [[nodiscard]] ICoreWebView2* Core() const noexcept;
@@ -71,6 +73,8 @@ class WebViewHost final {
   RECT bounds_{};
   UINT dpi_ = 96;
   double zoomFactor_ = 1.0;
+  bool opaqueBackground_ = false;
+  std::uint32_t backgroundColor_ = 0xEBEBEB;
   std::filesystem::path userDataDirectory_;
   std::filesystem::path webRoot_;
   ReadyCallback readyCallback_;

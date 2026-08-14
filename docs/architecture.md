@@ -10,9 +10,9 @@ Win32 HWND (C++20)
 ├─ Windows.UI.Composition / DesktopWindowTarget
 │  └─ Root ContainerVisual
 │     ├─ opaque safe-mode surface
-│     ├─ shared HostBackdrop effect visual, clipped to all Glass regions
-│     ├─ per-region tint and noise masks
-│     ├─ per-region shadows, borders, and highlights
+│     ├─ one full-client HostBackdrop effect visual
+│     ├─ full-client grayscale tone and optional grain
+│     ├─ overlay tone, grain, border, and shadow masks
 │     ├─ WebView2 composition visual
 │     └─ native title-bar glyphs and hit-test overlay
 │
@@ -42,37 +42,40 @@ HostBackdropBrush
       ↓
 GaussianBlurEffect
       ↓
-SaturationEffect
+SaturationEffect (fixed at 1.0)
       ↓
-one full-window SpriteVisual
-      ↓
-combined geometry clip for all visible Glass regions
+one full-client SpriteVisual
 ```
 
-Blur and saturation execute once for the visible region set. Each region then receives independent tint, a generated local noise brush, border, highlight, and shadow. Uniform rounded rectangles use `CompositionRoundedRectangleGeometry`; nonuniform corner radii use a Direct2D geometry exposed through `CompositionPath`. The protocol accepts at most 32 unique regions.
+Blur and saturation execute once for the entire client. Glass opacity linearly controls the contribution of that blurred visual while retaining the Frost-selected blur radius. The base grayscale tone uses the same opacity, grain alpha is multiplied by it, and overlay density is a proportional 1.18× boost. Settings, context menus, paste confirmation, notices, and toasts report WebView-local geometry so native masks can add density and borders without another blur pass. Uniform rounded rectangles use `CompositionRoundedRectangleGeometry`; nonuniform corner radii use a Direct2D geometry exposed through `CompositionPath`. The protocol accepts at most 32 unique overlay regions.
 
-Material parameters are native, fixed presets:
+Frost thickness selects one of the COSMIC-compatible blur values below. Presets are exact tuples and become `Custom` in the UI when any value differs.
 
-| Preset  |    Blur | Saturation | Tint opacity | Noise opacity |
-| ------- | ------: | ---------: | -----------: | ------------: |
-| Clear   |  6 DIPs |       1.05 |         0.64 |         0.015 |
-| Regular | 16 DIPs |       1.10 |         0.72 |         0.020 |
-| Dense   | 30 DIPs |       1.15 |         0.82 |         0.025 |
+```text
+index:     0  1  2  3  4  5  6   7   8   9  10  11  12  13
+blur DIP:  0  2  3  4  5  6  9  12  16  22  30  41  55  74
+```
 
-The React layout reports only bounded region geometry and semantic roles. It cannot create effects or supply arbitrary effect values. Regions are converted from WebView DIPs to physical Composition coordinates in one native path. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
+| Preset  | Frost | Opacity | Tone | Grain |
+| ------- | ----: | ------: | ---: | ----: |
+| Clear   |     5 |     20% |   92 |     0 |
+| Regular |    10 |     35% |   92 |     0 |
+| Dense   |    12 |     50% |   92 |     0 |
+
+Tone 0–100 maps to equal sRGB channels; grain 0–100 maps to 0–3% alpha before Glass opacity is applied. At 0%, the backdrop, tint, grain, overlay masks, and passive borders are hidden and their unnecessary resources are released; at 100%, the opaque tone suppresses backdrop sampling. React scales only passive control surfaces, separators, scrollbars, shadows, and modal scrims by the same value. Text, terminal glyphs, focus, hover, selection, and error feedback remain visible, and CSS never creates a desktop effect. Regions are converted from WebView CSS coordinates to physical Composition coordinates in one native path. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
 
 The DWM host-backdrop attribute and `CreateHostBackdropBrush()` provide the pixels already owned by desktop composition. The application never captures, copies, stores, or replays pixels belonging to the desktop or another process.
 
 ## Window and input
 
-The native window owns non-client behavior. `WM_NCHITTEST` returns standard resize, caption, minimize, maximize, and close hit-test values; DWM therefore retains Snap Layout behavior on the maximize control. Alt+Space opens the system menu, F11 toggles fullscreen, and `WM_DPICHANGED` applies the suggested monitor bounds.
+The native window owns non-client behavior. In Composition mode `WM_NCHITTEST` gives DWM and resize edges priority, then native caption controls, then WebView2 app regions. The maximize control returns `HTMAXBUTTON`, preserving Snap Layout. Alt+Space opens the system menu, F11 toggles fullscreen, and `WM_DPICHANGED` applies the suggested monitor bounds. Non-Composition fallback delegates non-client behavior to the standard Windows frame.
 
-The WebView occupies the client area below the 44-DIP native title bar. In Composition mode there is no child WebView window, so `WebViewInputRouter` forwards:
+The WebView occupies the full client in Composition mode. React draws the centered title and settings button in a fixed 56-DIP header, while native Composition draws the three 46-DIP caption controls above it. WebView2 app regions mark draggable and interactive areas. In Composition mode there is no child WebView window, so `WebViewInputRouter` forwards:
 
 - mouse move, buttons, double-click, horizontal/vertical wheel, capture, and leave;
 - Pointer messages for touch and pen using `ICoreWebView2PointerInfo`;
 - focus and cursor updates;
-- coordinates relative to the WebView bounds, with DPI and zoom handled centrally.
+- coordinates relative to the WebView bounds without reapplying DPI or zoom to physical pointer input.
 
 Keyboard and IME remain attached to the controller focus path. Input routing is intentionally centralized; Glass rendering and React components do not call Composition Controller input APIs.
 
@@ -86,10 +89,10 @@ React owns ordinary application UI, localization, layout, settings, paste confir
 
 ## Native/web protocol
 
-`contracts/protocol.idl.json` is the source of truth. `npm run contracts:generate` creates both:
+`contracts/protocol.idl.json` is the source of truth for protocol messages, settings fields and bounds, defaults, preset tuples, blur values, and shared chrome metrics. `npm run contracts:generate` creates both:
 
 - `contracts/generated/protocol.ts` with discriminated unions and exact validators;
-- `native/contracts/generated/Protocol.generated.h` with message names, bounds, and enum helpers.
+- `native/contracts/generated/Protocol.generated.h` with message names, bounds, settings metadata, material tables, and validation helpers.
 
 Every envelope contains protocol version, type, and a type-specific payload. Unknown keys, invalid enum values, stale layout revisions, invalid buffer sequences, out-of-range terminal sizes, duplicate region IDs, oversized clipboard content, and messages from any other source are rejected.
 
@@ -124,17 +127,18 @@ Dropped paths are accepted only from the native OLE drop target and are quoted f
 Settings and window state live under `%LOCALAPPDATA%\Liquid Glass Terminal`. The settings drawer starts a native transaction:
 
 1. preview applies an in-memory candidate;
-2. apply writes a temporary file and atomically replaces `settings-v1.json`;
+2. apply writes a temporary file and atomically replaces `settings-v2.json`;
 3. cancel restores the committed value;
 4. invalid persisted JSON is isolated with an `.invalid-*` suffix.
 
-The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
+Window placement uses `window-state-v2.json`; v1 files are neither imported nor deleted. The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
 
 ## Policy and fallback
 
 `SystemPolicy` observes:
 
 - Windows transparency and overlapped-content policy;
+- `UISettings.AdvancedEffectsEnabled` and Composition effect capability;
 - high contrast;
 - client-area animation and active UI Automation clients;
 - Remote Desktop;

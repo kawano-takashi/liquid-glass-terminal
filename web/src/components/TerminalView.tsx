@@ -9,7 +9,7 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
 import type { Capabilities, Settings } from '../../../contracts/generated/protocol';
-import { resolveForeground } from '../appearance';
+import { resolveForeground, toneToHex } from '../appearance';
 import { useBridge } from '../bridge/context';
 
 export interface TerminalViewHandle {
@@ -36,18 +36,19 @@ function terminalTheme(settings: Settings, capabilities: Capabilities, host: HTM
       selectionBackground: '#80808080',
     };
   }
-  const foreground = resolveForeground(settings.glass.tint, settings.foreground);
-  return foreground === 'light'
+  const foreground = resolveForeground(settings.glass.tone, settings.foreground);
+  const transparentTone = `${toneToHex(settings.glass.tone)}00`;
+  return foreground.mode === 'light'
     ? {
-        background: `${settings.glass.tint}00`,
-        foreground: '#ffffff',
-        cursor: '#ffffff',
+        background: transparentTone,
+        foreground: foreground.color,
+        cursor: foreground.color,
         selectionBackground: '#ffffff38',
       }
     : {
-        background: `${settings.glass.tint}00`,
-        foreground: '#000000',
-        cursor: '#000000',
+        background: transparentTone,
+        foreground: foreground.color,
+        cursor: foreground.color,
         selectionBackground: '#0000002f',
       };
 }
@@ -83,8 +84,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       cursorStyle: 'block',
       disableStdin: false,
       fontFamily: '"Cascadia Mono PL", monospace',
-      fontSize: 14,
-      lineHeight: 1.22,
+      fontSize: 15,
+      lineHeight: 1.28,
       minimumContrastRatio: 4.5,
       rightClickSelectsWord: false,
       screenReaderMode: capabilities.screenReader,
@@ -145,13 +146,21 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
+    terminal.options.theme = terminalTheme(settings, capabilities, host.current);
+  }, [capabilities, settings.foreground, settings.glass.tone]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
     terminal.options.cursorBlink =
       settings.animations && !capabilities.reducedMotion && !capabilities.screenReader;
     terminal.options.screenReaderMode = capabilities.screenReader;
-    terminal.options.theme = terminalTheme(settings, capabilities, host.current);
-    fitRef.current?.fit();
-    terminal.focus();
-  }, [capabilities, settings]);
+  }, [capabilities.reducedMotion, capabilities.screenReader, settings.animations]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => fitRef.current?.fit());
+    return () => cancelAnimationFrame(frame);
+  }, [settings.uiScale]);
 
   const preventWebClipboard = (event: ReactClipboardEvent) => {
     event.preventDefault();

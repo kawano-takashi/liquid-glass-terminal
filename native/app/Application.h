@@ -41,6 +41,7 @@ class Application final {
   void RecoverGraphics();
   void UpdateLayout();
   void UpdatePolicy();
+  void UpdateWindowState();
   void ApplySettings(const settings::Settings& settings);
   void SyncCompositionFailure(composition::AppearanceState previousState);
   void RegisterDropTarget();
@@ -59,6 +60,7 @@ class Application final {
   std::unique_ptr<webview::WebViewBridge> bridge_;
   Microsoft::WRL::ComPtr<platform::FileDropTarget> dropTarget_;
   platform::PolicySnapshot policy_{};
+  platform::SystemPolicyMonitor policyMonitor_;
   std::deque<std::chrono::steady_clock::time_point> webViewFailures_;
   bool dropRegistered_ = false;
   bool compositionMode_ = true;

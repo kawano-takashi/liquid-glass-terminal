@@ -1,7 +1,51 @@
 // Generated from contracts/protocol.idl.json. Do not edit.
 
-export const PROTOCOL_VERSION = 1 as const;
+export const PROTOCOL_VERSION = 2 as const;
 export const APP_ORIGIN = 'https://app.liquid-glass-terminal.invalid/' as const;
+export const UI_METRICS = {
+  titlebarHeightDip: 56,
+  captionButtonWidthDip: 46,
+} as const;
+export const SETTINGS_SCHEMA_VERSION = 2 as const;
+export const WINDOW_STATE_SCHEMA_VERSION = 2 as const;
+export const SETTINGS_CONSTRAINTS = {
+  frostThickness: {
+    minimum: 0,
+    maximum: 13,
+    step: 1,
+  },
+  opacity: {
+    minimum: 0,
+    maximum: 100,
+    step: 5,
+  },
+  tone: {
+    minimum: 0,
+    maximum: 100,
+    step: 1,
+  },
+  grain: {
+    minimum: 0,
+    maximum: 100,
+    step: 1,
+  },
+  uiScale: {
+    minimum: 80,
+    maximum: 200,
+    step: 10,
+  },
+} as const;
+export const SETTINGS_KEYS = ['locale', 'glass', 'foreground', 'animations', 'uiScale'] as const;
+export const GLASS_SETTING_KEYS = [
+  'enabled',
+  'frostThickness',
+  'opacity',
+  'tone',
+  'grain',
+] as const;
+export const GLASS_VALUE_KEYS = ['frostThickness', 'opacity', 'tone', 'grain'] as const;
+export const FROST_BLUR_DIPS = [0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74] as const;
+export const GRAIN_MAXIMUM_OPACITY = 0.03 as const;
 export const LIMITS = {
   maxGlassRegions: 32,
   maxTerminalChunkBytes: 65536,
@@ -11,7 +55,8 @@ export const LIMITS = {
 } as const;
 
 export const GLASS_ROLES = ['terminal', 'overlay', 'decorative'] as const;
-export const GLASS_PRESETS = ['clear', 'regular', 'dense'] as const;
+export const GLASS_PRESET_NAMES = ['clear', 'regular', 'dense'] as const;
+export const SETTINGS_OPERATIONS = ['preview', 'apply', 'cancel'] as const;
 export const FOREGROUNDS = ['auto', 'light', 'dark'] as const;
 export const LOCALES = ['system', 'en', 'ja'] as const;
 export const APPEARANCE_STATES = ['glass', 'solid', 'safe'] as const;
@@ -37,22 +82,33 @@ export const NATIVE_TO_WEB_TYPES = [
   'settings.snapshot',
   'settings.result',
   'appearance.changed',
+  'window.state.changed',
   'clipboard.result',
   'drop.path',
   'app.notice',
 ] as const;
 
 export type GlassRole = (typeof GLASS_ROLES)[number];
-export type GlassPreset = (typeof GLASS_PRESETS)[number];
+export type GlassPreset = (typeof GLASS_PRESET_NAMES)[number];
+export type SettingsOperation = (typeof SETTINGS_OPERATIONS)[number];
 export type Foreground = (typeof FOREGROUNDS)[number];
 export type Locale = (typeof LOCALES)[number];
 export type AppearanceState = (typeof APPEARANCE_STATES)[number];
 export type WebToNativeType = (typeof WEB_TO_NATIVE_TYPES)[number];
 export type NativeToWebType = (typeof NATIVE_TO_WEB_TYPES)[number];
 
+export interface GlassValues {
+  frostThickness: number;
+  opacity: number;
+  tone: number;
+  grain: number;
+}
+export interface GlassSettings extends GlassValues {
+  enabled: boolean;
+}
 export interface Settings {
   locale: Locale;
-  glass: { enabled: boolean; preset: GlassPreset; tint: string };
+  glass: GlassSettings;
   foreground: Foreground;
   animations: boolean;
   uiScale: number;
@@ -60,11 +116,66 @@ export interface Settings {
 
 export interface SettingsPatch {
   locale?: Locale;
-  glass?: Partial<Settings['glass']>;
+  glass?: Partial<GlassSettings>;
   foreground?: Foreground;
   animations?: boolean;
   uiScale?: number;
 }
+
+export interface WindowRuntimeState {
+  maximized: boolean;
+  fullscreen: boolean;
+  active: boolean;
+}
+
+export interface PersistedWindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+}
+export const DEFAULT_PERSISTED_WINDOW_STATE = {
+  x: 0,
+  y: 0,
+  width: 1120,
+  height: 840,
+  maximized: false,
+} as const satisfies PersistedWindowState;
+
+export const GLASS_PRESETS = {
+  clear: {
+    frostThickness: 5,
+    opacity: 20,
+    tone: 92,
+    grain: 0,
+  },
+  regular: {
+    frostThickness: 10,
+    opacity: 35,
+    tone: 92,
+    grain: 0,
+  },
+  dense: {
+    frostThickness: 12,
+    opacity: 50,
+    tone: 92,
+    grain: 0,
+  },
+} as const satisfies Record<GlassPreset, GlassValues>;
+export const DEFAULT_SETTINGS = {
+  locale: 'system',
+  glass: {
+    enabled: true,
+    frostThickness: 10,
+    opacity: 35,
+    tone: 92,
+    grain: 0,
+  },
+  foreground: 'auto',
+  animations: true,
+  uiScale: 100,
+} as const satisfies Settings;
 
 export interface GlassRegion {
   id: string;
@@ -105,7 +216,12 @@ export interface BufferCommit {
 export type NativeToWebMessage =
   | Envelope<
       'bridge.accepted',
-      { sessionId: string; settings: Settings; capabilities: Capabilities }
+      {
+        sessionId: string;
+        settings: Settings;
+        capabilities: Capabilities;
+        windowState: WindowRuntimeState;
+      }
     >
   | Envelope<'capabilities.changed', Capabilities>
   | Envelope<
@@ -116,8 +232,12 @@ export type NativeToWebMessage =
   | Envelope<'terminal.output.ready', BufferCommit>
   | Envelope<'terminal.recovered', { generation: number; droppedBytes: number }>
   | Envelope<'settings.snapshot', { transactionId: string; settings: Settings }>
-  | Envelope<'settings.result', { transactionId: string; ok: boolean; error?: string }>
+  | Envelope<
+      'settings.result',
+      { transactionId: string; operation: SettingsOperation; ok: boolean; error?: string }
+    >
   | Envelope<'appearance.changed', { state: AppearanceState; reason?: string }>
+  | Envelope<'window.state.changed', WindowRuntimeState>
   | Envelope<'clipboard.result', { requestId: string; ok: boolean; text?: string; error?: string }>
   | Envelope<'drop.path', { path: string }>
   | Envelope<'app.notice', { level: 'info' | 'warning' | 'error'; message: string }>;
@@ -132,7 +252,7 @@ export interface Capabilities {
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
-const exactKeys = (
+const exactObjectKeys = (
   value: Record<string, unknown>,
   required: readonly string[],
   optional: readonly string[] = [],
@@ -144,8 +264,14 @@ const exactKeys = (
 };
 const finite = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
-const integer = (value: unknown, min: number, max: number): value is number =>
+const integerInRange = (value: unknown, min: number, max: number): value is number =>
   Number.isInteger(value) && finite(value, min, max);
+const constrainedInteger = (
+  value: unknown,
+  constraint: { minimum: number; maximum: number; step: number },
+): value is number =>
+  integerInRange(value, constraint.minimum, constraint.maximum) &&
+  (value - constraint.minimum) % constraint.step === 0;
 const asciiId = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(value);
 const enumValue = <T extends string>(values: readonly T[], value: unknown): value is T =>
@@ -156,60 +282,105 @@ const boundedString = (value: unknown, max: number): value is string =>
 const utf8Within = (value: string, max: number): boolean =>
   new TextEncoder().encode(value).byteLength <= max;
 
+const validConstrainedField = (
+  name: keyof typeof SETTINGS_CONSTRAINTS,
+  value: unknown,
+): value is number => constrainedInteger(value, SETTINGS_CONSTRAINTS[name]);
+
+export function toneToChannel(tone: number): number {
+  return Math.floor((tone * 255 + 50) / 100);
+}
+export function toneToHex(tone: number): string {
+  const channel = toneToChannel(tone).toString(16).padStart(2, '0').toUpperCase();
+  return `#${channel}${channel}${channel}`;
+}
+export function frostBlurDip(frostThickness: number): number {
+  return FROST_BLUR_DIPS[frostThickness] ?? FROST_BLUR_DIPS[DEFAULT_SETTINGS.glass.frostThickness];
+}
+export function grainOpacity(grain: number): number {
+  return (grain / SETTINGS_CONSTRAINTS.grain.maximum) * GRAIN_MAXIMUM_OPACITY;
+}
+export function resolveGlassPreset(glass: GlassSettings): GlassPreset | 'custom' {
+  for (const name of GLASS_PRESET_NAMES) {
+    const value = GLASS_PRESETS[name];
+    if (GLASS_VALUE_KEYS.every((field) => value[field] === glass[field])) return name;
+  }
+  return 'custom';
+}
+
 export function isSettings(value: unknown): value is Settings {
   if (
     !record(value) ||
-    !exactKeys(value, ['locale', 'glass', 'foreground', 'animations', 'uiScale']) ||
-    !enumValue(LOCALES, value.locale) ||
-    !enumValue(FOREGROUNDS, value.foreground) ||
-    typeof value.animations !== 'boolean' ||
-    !integer(value.uiScale, 80, 200) ||
-    value.uiScale % 10 !== 0
+    !exactObjectKeys(value, SETTINGS_KEYS) ||
+    !(
+      enumValue(LOCALES, value.locale) &&
+      enumValue(FOREGROUNDS, value.foreground) &&
+      typeof value.animations === 'boolean' &&
+      validConstrainedField('uiScale', value.uiScale)
+    )
   )
     return false;
   return (
     record(value.glass) &&
-    exactKeys(value.glass, ['enabled', 'preset', 'tint']) &&
+    exactObjectKeys(value.glass, GLASS_SETTING_KEYS) &&
     typeof value.glass.enabled === 'boolean' &&
-    enumValue(GLASS_PRESETS, value.glass.preset) &&
-    typeof value.glass.tint === 'string' &&
-    /^#[0-9A-Fa-f]{6}$/.test(value.glass.tint)
+    validConstrainedField('frostThickness', value.glass.frostThickness) &&
+    validConstrainedField('opacity', value.glass.opacity) &&
+    validConstrainedField('tone', value.glass.tone) &&
+    validConstrainedField('grain', value.glass.grain)
   );
 }
 
 export function isSettingsPatch(value: unknown): value is SettingsPatch {
   if (
     !record(value) ||
-    !exactKeys(value, [], ['locale', 'glass', 'foreground', 'animations', 'uiScale']) ||
+    !exactObjectKeys(value, [], SETTINGS_KEYS) ||
     Object.keys(value).length === 0
   )
     return false;
   if (value.locale !== undefined && !enumValue(LOCALES, value.locale)) return false;
   if (value.foreground !== undefined && !enumValue(FOREGROUNDS, value.foreground)) return false;
-  if (value.animations !== undefined && typeof value.animations !== 'boolean') return false;
-  if (value.uiScale !== undefined && (!integer(value.uiScale, 80, 200) || value.uiScale % 10 !== 0))
-    return false;
+  if (value.animations !== undefined && !(typeof value.animations === 'boolean')) return false;
+  if (value.uiScale !== undefined && !validConstrainedField('uiScale', value.uiScale)) return false;
   if (value.glass !== undefined) {
     if (
       !record(value.glass) ||
-      !exactKeys(value.glass, [], ['enabled', 'preset', 'tint']) ||
+      !exactObjectKeys(value.glass, [], GLASS_SETTING_KEYS) ||
       Object.keys(value.glass).length === 0
     )
       return false;
-    if (value.glass.enabled !== undefined && typeof value.glass.enabled !== 'boolean') return false;
-    if (value.glass.preset !== undefined && !enumValue(GLASS_PRESETS, value.glass.preset))
+    if (value.glass.enabled !== undefined && !(typeof value.glass.enabled === 'boolean'))
       return false;
     if (
-      value.glass.tint !== undefined &&
-      (typeof value.glass.tint !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(value.glass.tint))
+      value.glass.frostThickness !== undefined &&
+      !validConstrainedField('frostThickness', value.glass.frostThickness)
     )
+      return false;
+    if (value.glass.opacity !== undefined && !validConstrainedField('opacity', value.glass.opacity))
+      return false;
+    if (value.glass.tone !== undefined && !validConstrainedField('tone', value.glass.tone))
+      return false;
+    if (value.glass.grain !== undefined && !validConstrainedField('grain', value.glass.grain))
       return false;
   }
   return true;
 }
 
+export function isWindowRuntimeState(value: unknown): value is WindowRuntimeState {
+  return (
+    record(value) &&
+    exactObjectKeys(value, ['maximized', 'fullscreen', 'active']) &&
+    typeof value.maximized === 'boolean' &&
+    typeof value.fullscreen === 'boolean' &&
+    typeof value.active === 'boolean'
+  );
+}
+
 export function isGlassRegion(value: unknown): value is GlassRegion {
-  if (!record(value) || !exactKeys(value, ['id', 'x', 'y', 'width', 'height', 'radii', 'role']))
+  if (
+    !record(value) ||
+    !exactObjectKeys(value, ['id', 'x', 'y', 'width', 'height', 'radii', 'role'])
+  )
     return false;
   if (
     !asciiId(value.id) ||
@@ -231,18 +402,18 @@ export function isGlassRegion(value: unknown): value is GlassRegion {
 function isCommit(value: unknown, buffers: number): value is BufferCommit {
   return (
     record(value) &&
-    exactKeys(value, ['buffer', 'generation', 'sequence', 'length']) &&
-    integer(value.buffer, 0, buffers - 1) &&
-    integer(value.generation, 0, 0xffffffff) &&
-    integer(value.sequence, 0, 0xffffffff) &&
-    integer(value.length, 0, LIMITS.maxTerminalChunkBytes)
+    exactObjectKeys(value, ['buffer', 'generation', 'sequence', 'length']) &&
+    integerInRange(value.buffer, 0, buffers - 1) &&
+    integerInRange(value.generation, 0, 0xffffffff) &&
+    integerInRange(value.sequence, 0, 0xffffffff) &&
+    integerInRange(value.length, 0, LIMITS.maxTerminalChunkBytes)
   );
 }
 
 export function isWebToNativeMessage(value: unknown): value is WebToNativeMessage {
   if (
     !record(value) ||
-    !exactKeys(value, ['v', 'type', 'payload'], ['id']) ||
+    !exactObjectKeys(value, ['v', 'type', 'payload'], ['id']) ||
     value.v !== PROTOCOL_VERSION ||
     !enumValue(WEB_TO_NATIVE_TYPES, value.type) ||
     (value.id !== undefined && !asciiId(value.id)) ||
@@ -253,16 +424,16 @@ export function isWebToNativeMessage(value: unknown): value is WebToNativeMessag
   switch (value.type) {
     case 'bridge.ready':
       return (
-        exactKeys(payload, ['locale', 'devicePixelRatio']) &&
+        exactObjectKeys(payload, ['locale', 'devicePixelRatio']) &&
         typeof payload.locale === 'string' &&
         payload.locale.length <= 32 &&
         finite(payload.devicePixelRatio, 0.5, 8)
       );
     case 'terminal.resize':
       return (
-        exactKeys(payload, ['cols', 'rows']) &&
-        integer(payload.cols, 2, 500) &&
-        integer(payload.rows, 1, 300)
+        exactObjectKeys(payload, ['cols', 'rows']) &&
+        integerInRange(payload.cols, 2, 500) &&
+        integerInRange(payload.rows, 1, 300)
       );
     case 'terminal.input.commit':
       return isCommit(payload, 2);
@@ -270,8 +441,8 @@ export function isWebToNativeMessage(value: unknown): value is WebToNativeMessag
       return isCommit(payload, 4);
     case 'glass.layout.set':
       return (
-        exactKeys(payload, ['revision', 'regions']) &&
-        integer(payload.revision, 0, 0xffffffff) &&
+        exactObjectKeys(payload, ['revision', 'regions']) &&
+        integerInRange(payload.revision, 0, 0xffffffff) &&
         Array.isArray(payload.regions) &&
         payload.regions.length <= LIMITS.maxGlassRegions &&
         payload.regions.every(isGlassRegion) &&
@@ -280,17 +451,17 @@ export function isWebToNativeMessage(value: unknown): value is WebToNativeMessag
     case 'settings.preview':
     case 'settings.apply':
       return (
-        exactKeys(payload, ['transactionId', 'patch']) &&
+        exactObjectKeys(payload, ['transactionId', 'patch']) &&
         asciiId(payload.transactionId) &&
         isSettingsPatch(payload.patch)
       );
     case 'settings.cancel':
-      return exactKeys(payload, ['transactionId']) && asciiId(payload.transactionId);
+      return exactObjectKeys(payload, ['transactionId']) && asciiId(payload.transactionId);
     case 'clipboard.read':
-      return exactKeys(payload, ['requestId']) && asciiId(payload.requestId);
+      return exactObjectKeys(payload, ['requestId']) && asciiId(payload.requestId);
     case 'clipboard.write':
       return (
-        exactKeys(payload, ['requestId', 'text']) &&
+        exactObjectKeys(payload, ['requestId', 'text']) &&
         asciiId(payload.requestId) &&
         typeof payload.text === 'string' &&
         utf8Within(payload.text, LIMITS.maxClipboardBytes)
@@ -301,7 +472,7 @@ export function isWebToNativeMessage(value: unknown): value is WebToNativeMessag
 export function isNativeToWebMessage(value: unknown): value is NativeToWebMessage {
   if (
     !record(value) ||
-    !exactKeys(value, ['v', 'type', 'payload'], ['id']) ||
+    !exactObjectKeys(value, ['v', 'type', 'payload'], ['id']) ||
     value.v !== PROTOCOL_VERSION ||
     !enumValue(NATIVE_TO_WEB_TYPES, value.type) ||
     (value.id !== undefined && !asciiId(value.id)) ||
@@ -312,11 +483,12 @@ export function isNativeToWebMessage(value: unknown): value is NativeToWebMessag
   switch (value.type) {
     case 'bridge.accepted':
       return (
-        exactKeys(payload, ['sessionId', 'settings', 'capabilities']) &&
+        exactObjectKeys(payload, ['sessionId', 'settings', 'capabilities', 'windowState']) &&
         asciiId(payload.sessionId) &&
         isSettings(payload.settings) &&
+        isWindowRuntimeState(payload.windowState) &&
         record(payload.capabilities) &&
-        exactKeys(payload.capabilities, [
+        exactObjectKeys(payload.capabilities, [
           'glass',
           'sharedBuffers',
           'reducedMotion',
@@ -331,7 +503,7 @@ export function isNativeToWebMessage(value: unknown): value is NativeToWebMessag
       );
     case 'capabilities.changed':
       return (
-        exactKeys(payload, [
+        exactObjectKeys(payload, [
           'glass',
           'sharedBuffers',
           'reducedMotion',
@@ -346,13 +518,13 @@ export function isNativeToWebMessage(value: unknown): value is NativeToWebMessag
       );
     case 'terminal.buffer.attach': {
       if (
-        !exactKeys(payload, ['direction', 'buffer', 'generation', 'capacity']) ||
+        !exactObjectKeys(payload, ['direction', 'buffer', 'generation', 'capacity']) ||
         (payload.direction !== 'input' && payload.direction !== 'output') ||
-        !integer(payload.generation, 0, 0xffffffff) ||
+        !integerInRange(payload.generation, 0, 0xffffffff) ||
         payload.capacity !== LIMITS.maxTerminalChunkBytes
       )
         return false;
-      return integer(payload.buffer, 0, payload.direction === 'input' ? 1 : 3);
+      return integerInRange(payload.buffer, 0, payload.direction === 'input' ? 1 : 3);
     }
     case 'terminal.input.ack':
       return isCommit(payload, 2);
@@ -360,32 +532,35 @@ export function isNativeToWebMessage(value: unknown): value is NativeToWebMessag
       return isCommit(payload, 4);
     case 'terminal.recovered':
       return (
-        exactKeys(payload, ['generation', 'droppedBytes']) &&
-        integer(payload.generation, 0, 0xffffffff) &&
-        integer(payload.droppedBytes, 0, Number.MAX_SAFE_INTEGER)
+        exactObjectKeys(payload, ['generation', 'droppedBytes']) &&
+        integerInRange(payload.generation, 0, 0xffffffff) &&
+        integerInRange(payload.droppedBytes, 0, Number.MAX_SAFE_INTEGER)
       );
     case 'settings.snapshot':
       return (
-        exactKeys(payload, ['transactionId', 'settings']) &&
+        exactObjectKeys(payload, ['transactionId', 'settings']) &&
         asciiId(payload.transactionId) &&
         isSettings(payload.settings)
       );
     case 'settings.result':
       return (
-        exactKeys(payload, ['transactionId', 'ok'], ['error']) &&
+        exactObjectKeys(payload, ['transactionId', 'operation', 'ok'], ['error']) &&
         asciiId(payload.transactionId) &&
+        enumValue(SETTINGS_OPERATIONS, payload.operation) &&
         typeof payload.ok === 'boolean' &&
         (payload.error === undefined || boundedString(payload.error, 256))
       );
     case 'appearance.changed':
       return (
-        exactKeys(payload, ['state'], ['reason']) &&
+        exactObjectKeys(payload, ['state'], ['reason']) &&
         enumValue(APPEARANCE_STATES, payload.state) &&
         (payload.reason === undefined || boundedString(payload.reason, 256))
       );
+    case 'window.state.changed':
+      return isWindowRuntimeState(payload);
     case 'clipboard.result':
       return (
-        exactKeys(payload, ['requestId', 'ok'], ['text', 'error']) &&
+        exactObjectKeys(payload, ['requestId', 'ok'], ['text', 'error']) &&
         asciiId(payload.requestId) &&
         typeof payload.ok === 'boolean' &&
         (payload.text === undefined ||
@@ -394,10 +569,10 @@ export function isNativeToWebMessage(value: unknown): value is NativeToWebMessag
         (payload.error === undefined || boundedString(payload.error, 256))
       );
     case 'drop.path':
-      return exactKeys(payload, ['path']) && boundedString(payload.path, 32768);
+      return exactObjectKeys(payload, ['path']) && boundedString(payload.path, 32768);
     case 'app.notice':
       return (
-        exactKeys(payload, ['level', 'message']) &&
+        exactObjectKeys(payload, ['level', 'message']) &&
         enumValue(['info', 'warning', 'error'] as const, payload.level) &&
         boundedString(payload.message, 1024)
       );

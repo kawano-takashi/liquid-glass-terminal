@@ -13,12 +13,6 @@ namespace {
 
 constexpr wchar_t kWindowClass[] = L"LiquidGlassTerminal.NativeWindow.0.3";
 constexpr wchar_t kWindowTitle[] = L"Liquid Glass Terminal";
-constexpr int kTitlebarDip = 44;
-constexpr int kControlWidthDip = 46;
-constexpr int kMinimumWidthDip = 480;
-constexpr int kMinimumHeightDip = 320;
-
-int Pixels(int dips, UINT dpi) { return MulDiv(dips, static_cast<int>(dpi), 96); }
 
 BOOL CALLBACK FindIntersectingMonitor(HMONITOR monitor, HDC, LPRECT candidate, LPARAM state) {
   MONITORINFO info{sizeof(info)};
@@ -59,6 +53,11 @@ bool NativeWindow::Create(const settings::WindowState& state, bool compositionMo
                             bounds.bottom - bounds.top, nullptr, nullptr, instance_, this);
   if (!window_) return false;
   dpi_ = GetDpiForWindow(window_);
+  if (compositionMode_) {
+    SetWindowPos(window_, nullptr, 0, 0, 0, 0,
+                 SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOOWNERZORDER | SWP_NOACTIVATE);
+  }
   if (state.maximized) ShowWindow(window_, SW_MAXIMIZE);
   return true;
 }
@@ -85,8 +84,8 @@ bool NativeWindow::Fullscreen() const noexcept { return fullscreen_; }
 
 RECT NativeWindow::InitialBounds(const settings::WindowState& state) const {
   const UINT dpi = GetDpiForSystem();
-  RECT result{state.x, state.y, state.x + Pixels(state.width, dpi),
-              state.y + Pixels(state.height, dpi)};
+  RECT result{state.x, state.y, state.x + DipPixels(state.width, dpi),
+              state.y + DipPixels(state.height, dpi)};
   bool intersects = state.x != 0 || state.y != 0;
   if (intersects) {
     intersects = false;
@@ -96,8 +95,8 @@ RECT NativeWindow::InitialBounds(const settings::WindowState& state) const {
   if (!intersects) {
     MONITORINFO monitor{sizeof(monitor)};
     GetMonitorInfoW(MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY), &monitor);
-    const int width = Pixels(state.width, dpi);
-    const int height = Pixels(state.height, dpi);
+    const int width = DipPixels(state.width, dpi);
+    const int height = DipPixels(state.height, dpi);
     result.left = monitor.rcWork.left + (monitor.rcWork.right - monitor.rcWork.left - width) / 2;
     result.top = monitor.rcWork.top + (monitor.rcWork.bottom - monitor.rcWork.top - height) / 2;
     result.right = result.left + width;
@@ -124,8 +123,21 @@ RECT NativeWindow::WebViewBounds() const {
   RECT bounds{};
   if (!window_) return bounds;
   GetClientRect(window_, &bounds);
-  bounds.top += Pixels(kTitlebarDip, dpi_);
   return bounds;
+}
+
+void NativeWindow::SetWebHitTestHandler(WebHitTestHandler handler) {
+  webHitTestHandler_ = std::move(handler);
+}
+
+bool NativeWindow::Active() const noexcept { return active_; }
+
+CaptionButton NativeWindow::HoveredCaptionButton() const noexcept {
+  return hoveredCaptionButton_;
+}
+
+CaptionButton NativeWindow::PressedCaptionButton() const noexcept {
+  return pressedCaptionButton_;
 }
 
 void NativeWindow::ToggleFullscreen() {
@@ -144,6 +156,9 @@ void NativeWindow::ToggleFullscreen() {
                monitor.rcMonitor.bottom - monitor.rcMonitor.top,
                SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
   fullscreen_ = true;
+  hoveredCaptionButton_ = CaptionButton::None;
+  pressedCaptionButton_ = CaptionButton::None;
+  PostMessageW(window_, kWindowStateChangedMessage, 0, 0);
 }
 
 void NativeWindow::ExitFullscreen() {
@@ -153,6 +168,7 @@ void NativeWindow::ExitFullscreen() {
   SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
   fullscreen_ = false;
+  PostMessageW(window_, kWindowStateChangedMessage, 0, 0);
 }
 
 void NativeWindow::ShowSystemMenu(POINT screenPoint) {
@@ -181,7 +197,7 @@ LRESULT CALLBACK NativeWindow::WindowProcedure(HWND window, UINT message, WPARAM
 LRESULT NativeWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
     case WM_NCCALCSIZE:
-      if (wParam != 0) {
+      if (compositionMode_ && wParam != 0) {
         if (IsZoomed(window_)) {
           auto* parameters = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
           MONITORINFO monitor{sizeof(monitor)};
@@ -192,21 +208,60 @@ LRESULT NativeWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
       }
       break;
     case WM_NCHITTEST: {
+      if (!compositionMode_) break;
       LRESULT dwmResult = 0;
       if (DwmDefWindowProc(window_, message, wParam, lParam, &dwmResult)) return dwmResult;
       return HitTest({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
     }
+    case WM_NCMOUSEMOVE: {
+      if (!compositionMode_) break;
+      const auto hovered = CaptionButtonFromHit(wParam);
+      if (hoveredCaptionButton_ != hovered) {
+        hoveredCaptionButton_ = hovered;
+        PostMessageW(window_, kWindowChromeChangedMessage, 0, 0);
+      }
+      TRACKMOUSEEVENT track{sizeof(track), TME_LEAVE | TME_NONCLIENT, window_, 0};
+      TrackMouseEvent(&track);
+      break;
+    }
+    case WM_NCMOUSELEAVE:
+      if (!compositionMode_) break;
+      if (hoveredCaptionButton_ != CaptionButton::None ||
+          pressedCaptionButton_ != CaptionButton::None) {
+        hoveredCaptionButton_ = CaptionButton::None;
+        pressedCaptionButton_ = CaptionButton::None;
+        PostMessageW(window_, kWindowChromeChangedMessage, 0, 0);
+      }
+      return 0;
+    case WM_NCLBUTTONDOWN:
+      if (!compositionMode_) break;
+      pressedCaptionButton_ = CaptionButtonFromHit(wParam);
+      if (pressedCaptionButton_ != CaptionButton::None) {
+        PostMessageW(window_, kWindowChromeChangedMessage, 0, 0);
+      }
+      break;
     case WM_NCLBUTTONUP:
-      HandleNonClientAction(wParam);
-      return 0;
+      if (!compositionMode_) break;
+      if (pressedCaptionButton_ != CaptionButton::None) {
+        const auto pressed = pressedCaptionButton_;
+        pressedCaptionButton_ = CaptionButton::None;
+        PostMessageW(window_, kWindowChromeChangedMessage, 0, 0);
+        if (CaptionButtonFromHit(wParam) == pressed) HandleNonClientAction(wParam);
+        return 0;
+      }
+      break;
     case WM_NCRBUTTONUP:
-      if (wParam == HTCAPTION) ShowSystemMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
-      return 0;
+      if (!compositionMode_) break;
+      if (wParam == HTCAPTION) {
+        ShowSystemMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+        return 0;
+      }
+      break;
     case WM_SYSKEYDOWN:
       if (wParam == VK_SPACE && (GetKeyState(VK_MENU) & 0x8000) != 0) {
         RECT bounds{};
         GetWindowRect(window_, &bounds);
-        ShowSystemMenu({bounds.left + 8, bounds.top + Pixels(kTitlebarDip, dpi_)});
+        ShowSystemMenu({bounds.left + 8, bounds.top + DipPixels(kTitlebarHeightDip, dpi_)});
         return 0;
       }
       break;
@@ -222,7 +277,8 @@ LRESULT NativeWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
       break;
     case WM_GETMINMAXINFO: {
       auto* info = reinterpret_cast<MINMAXINFO*>(lParam);
-      info->ptMinTrackSize = {Pixels(kMinimumWidthDip, dpi_), Pixels(kMinimumHeightDip, dpi_)};
+      info->ptMinTrackSize = {DipPixels(kMinimumWidthDip, dpi_),
+                              DipPixels(kMinimumHeightDip, dpi_)};
       return 0;
     }
     case WM_DPICHANGED: {
@@ -233,6 +289,9 @@ LRESULT NativeWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                    SWP_NOZORDER | SWP_NOACTIVATE);
       break;
     }
+    case WM_ACTIVATE:
+      active_ = LOWORD(wParam) != WA_INACTIVE;
+      break;
     case WM_DESTROY:
       if (!suppressQuit_) PostQuitMessage(0);
       return 0;
@@ -248,29 +307,13 @@ LRESULT NativeWindow::HitTest(POINT screenPoint) const {
   ScreenToClient(window_, &point);
   RECT client{};
   GetClientRect(window_, &client);
-  const int border = std::max(GetSystemMetricsForDpi(SM_CXFRAME, dpi_) +
-                                  GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi_),
-                              Pixels(6, dpi_));
-  if (!IsZoomed(window_) && !fullscreen_) {
-    const bool left = point.x < border;
-    const bool right = point.x >= client.right - border;
-    const bool top = point.y < border;
-    const bool bottom = point.y >= client.bottom - border;
-    if (top && left) return HTTOPLEFT;
-    if (top && right) return HTTOPRIGHT;
-    if (bottom && left) return HTBOTTOMLEFT;
-    if (bottom && right) return HTBOTTOMRIGHT;
-    if (left) return HTLEFT;
-    if (right) return HTRIGHT;
-    if (top) return HTTOP;
-    if (bottom) return HTBOTTOM;
+  if (const auto resize = ResizeHitTest(point, client, dpi_, !IsZoomed(window_) && !fullscreen_)) {
+    return *resize;
   }
-  if (point.y < Pixels(kTitlebarDip, dpi_)) {
-    const int control = Pixels(kControlWidthDip, dpi_);
-    if (point.x >= client.right - control) return HTCLOSE;
-    if (point.x >= client.right - control * 2) return HTMAXBUTTON;
-    if (point.x >= client.right - control * 3) return HTMINBUTTON;
-    return HTCAPTION;
+  const auto caption = CaptionButtonAtPoint(point, client, dpi_, fullscreen_);
+  if (caption != CaptionButton::None) return CaptionButtonHit(caption);
+  if (webHitTestHandler_) {
+    if (const auto web = webHitTestHandler_(point)) return *web;
   }
   return HTCLIENT;
 }

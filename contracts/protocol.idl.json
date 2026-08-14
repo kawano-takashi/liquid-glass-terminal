@@ -1,7 +1,46 @@
 {
   "name": "LiquidGlassTerminalProtocol",
-  "version": 1,
+  "version": 2,
   "origin": "https://app.liquid-glass-terminal.invalid/",
+  "uiMetrics": {
+    "titlebarHeightDip": 56,
+    "captionButtonWidthDip": 46
+  },
+  "settings": {
+    "schemaVersion": 2,
+    "defaults": {
+      "locale": "system",
+      "glass": {
+        "enabled": true,
+        "frostThickness": 10,
+        "opacity": 35,
+        "tone": 92,
+        "grain": 0
+      },
+      "foreground": "auto",
+      "animations": true,
+      "uiScale": 100
+    },
+    "constraints": {
+      "frostThickness": { "minimum": 0, "maximum": 13, "step": 1 },
+      "opacity": { "minimum": 0, "maximum": 100, "step": 5 },
+      "tone": { "minimum": 0, "maximum": 100, "step": 1 },
+      "grain": { "minimum": 0, "maximum": 100, "step": 1 },
+      "uiScale": { "minimum": 80, "maximum": 200, "step": 10 }
+    },
+    "grainMaximumOpacity": 0.03,
+    "frostBlurDips": [0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74],
+    "presets": {
+      "clear": { "frostThickness": 5, "opacity": 20, "tone": 92, "grain": 0 },
+      "regular": { "frostThickness": 10, "opacity": 35, "tone": 92, "grain": 0 },
+      "dense": { "frostThickness": 12, "opacity": 50, "tone": 92, "grain": 0 }
+    }
+  },
+  "windowState": {
+    "schemaVersion": 2,
+    "defaults": { "x": 0, "y": 0, "width": 1120, "height": 840, "maximized": false },
+    "constraints": { "minimumWidth": 480, "minimumHeight": 320, "maximumExtent": 16384 }
+  },
   "limits": {
     "maxGlassRegions": 32,
     "maxTerminalChunkBytes": 65536,
@@ -12,6 +51,7 @@
   "enums": {
     "glassRole": ["terminal", "overlay", "decorative"],
     "glassPreset": ["clear", "regular", "dense"],
+    "settingsOperation": ["preview", "apply", "cancel"],
     "foreground": ["auto", "light", "dark"],
     "locale": ["system", "en", "ja"],
     "appearanceState": ["glass", "solid", "safe"]
@@ -39,6 +79,7 @@
       "settings.snapshot",
       "settings.result",
       "appearance.changed",
+      "window.state.changed",
       "clipboard.result",
       "drop.path",
       "app.notice"

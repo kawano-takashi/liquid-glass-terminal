@@ -3,10 +3,12 @@
 #include <shlobj.h>
 
 #include <chrono>
+#include <cmath>
 #include <fstream>
-#include <iomanip>
+#include <limits>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Data.Json.h>
@@ -56,51 +58,33 @@ bool Boolean(const JsonObject& object, std::wstring_view name, bool& value) {
   return true;
 }
 
-std::optional<std::uint32_t> ParseTint(std::wstring_view text) {
-  if (text.size() != 7 || text.front() != L'#') return std::nullopt;
-  std::uint32_t value = 0;
-  for (const wchar_t character : text.substr(1)) {
-    value <<= 4;
-    if (character >= L'0' && character <= L'9') value |= character - L'0';
-    else if (character >= L'a' && character <= L'f') value |= character - L'a' + 10;
-    else if (character >= L'A' && character <= L'F') value |= character - L'A' + 10;
-    else return std::nullopt;
+bool ConstrainedInteger(const JsonObject& object, std::wstring_view name,
+                        protocol::NumericConstraint constraint, std::uint32_t& value) {
+  const auto key = winrt::hstring(name);
+  if (!object.HasKey(key) || object.GetNamedValue(key).ValueType() != JsonValueType::Number) {
+    return false;
   }
-  return value;
+  const double number = object.GetNamedNumber(key);
+  if (!std::isfinite(number) || number != std::floor(number) || number < constraint.minimum ||
+      number > constraint.maximum) {
+    return false;
+  }
+  value = static_cast<std::uint32_t>(number);
+  return protocol::IsValid(value, constraint);
 }
 
-std::wstring TintString(std::uint32_t tint) {
-  std::wostringstream stream;
-  stream << L'#' << std::uppercase << std::hex << std::setfill(L'0') << std::setw(6)
-         << (tint & 0xFFFFFFU);
-  return stream.str();
-}
-
-template <typename Enum>
-std::optional<Enum> ParseEnum(std::wstring_view) = delete;
-
-template <>
-std::optional<GlassPreset> ParseEnum(std::wstring_view value) {
-  if (value == L"clear") return GlassPreset::Clear;
-  if (value == L"regular") return GlassPreset::Regular;
-  if (value == L"dense") return GlassPreset::Dense;
-  return std::nullopt;
-}
-
-template <>
-std::optional<Foreground> ParseEnum(std::wstring_view value) {
-  if (value == L"auto") return Foreground::Auto;
-  if (value == L"light") return Foreground::Light;
-  if (value == L"dark") return Foreground::Dark;
-  return std::nullopt;
-}
-
-template <>
-std::optional<Locale> ParseEnum(std::wstring_view value) {
-  if (value == L"system") return Locale::System;
-  if (value == L"en") return Locale::English;
-  if (value == L"ja") return Locale::Japanese;
-  return std::nullopt;
+bool Integer(const JsonObject& object, std::wstring_view name, int& value) {
+  const auto key = winrt::hstring(name);
+  if (!object.HasKey(key) || object.GetNamedValue(key).ValueType() != JsonValueType::Number) {
+    return false;
+  }
+  const double number = object.GetNamedNumber(key);
+  if (!std::isfinite(number) || number != std::floor(number) ||
+      number < std::numeric_limits<int>::min() || number > std::numeric_limits<int>::max()) {
+    return false;
+  }
+  value = static_cast<int>(number);
+  return true;
 }
 
 std::wstring ReadText(const std::filesystem::path& path) {
@@ -114,30 +98,15 @@ std::wstring ReadText(const std::filesystem::path& path) {
 }  // namespace
 
 std::wstring_view ToString(GlassPreset value) noexcept {
-  switch (value) {
-    case GlassPreset::Clear: return L"clear";
-    case GlassPreset::Regular: return L"regular";
-    case GlassPreset::Dense: return L"dense";
-  }
-  return L"regular";
+  return protocol::ToString(value);
 }
 
 std::wstring_view ToString(Foreground value) noexcept {
-  switch (value) {
-    case Foreground::Auto: return L"auto";
-    case Foreground::Light: return L"light";
-    case Foreground::Dark: return L"dark";
-  }
-  return L"auto";
+  return protocol::ToString(value);
 }
 
 std::wstring_view ToString(Locale value) noexcept {
-  switch (value) {
-    case Locale::System: return L"system";
-    case Locale::English: return L"en";
-    case Locale::Japanese: return L"ja";
-  }
-  return L"system";
+  return protocol::ToString(value);
 }
 
 SettingsStore::SettingsStore() : SettingsStore(ResolveDataDirectory()) {}
@@ -156,7 +125,7 @@ const Settings& SettingsStore::Current() const noexcept { return current_; }
 Settings SettingsStore::Effective() const noexcept { return preview_.value_or(current_); }
 
 void SettingsStore::Load() {
-  const auto path = dataDirectory_ / L"settings-v1.json";
+  const auto path = dataDirectory_ / L"settings-v2.json";
   if (!std::filesystem::exists(path)) return;
   try {
     const auto parsed = Parse(ReadText(path));
@@ -169,7 +138,8 @@ void SettingsStore::Load() {
 }
 
 bool SettingsStore::Save(const Settings& value) {
-  if (!AtomicWrite(dataDirectory_ / L"settings-v1.json", Serialize(value))) return false;
+  if (!protocol::IsValid(value) ||
+      !AtomicWrite(dataDirectory_ / L"settings-v2.json", Serialize(value))) return false;
   current_ = value;
   preview_.reset();
   previewTransaction_.clear();
@@ -182,7 +152,7 @@ void SettingsStore::BeginPreview(std::wstring transactionId) {
 }
 
 bool SettingsStore::Preview(std::wstring_view transactionId, const Settings& value) {
-  if (transactionId != previewTransaction_) return false;
+  if (transactionId != previewTransaction_ || !protocol::IsValid(value)) return false;
   preview_ = value;
   return true;
 }
@@ -203,18 +173,26 @@ bool SettingsStore::Cancel(std::wstring_view transactionId) {
 }
 
 WindowState SettingsStore::LoadWindowState() const {
-  const auto path = dataDirectory_ / L"window-state-v1.json";
+  const auto path = dataDirectory_ / L"window-state-v2.json";
   if (!std::filesystem::exists(path)) return {};
   try {
     const auto object = JsonObject::Parse(ReadText(path));
-    if (!ExactKeys(object, {L"x", L"y", L"width", L"height", L"maximized"})) return {};
-    WindowState state{
-        static_cast<int>(object.GetNamedNumber(L"x")),
-        static_cast<int>(object.GetNamedNumber(L"y")),
-        static_cast<int>(object.GetNamedNumber(L"width")),
-        static_cast<int>(object.GetNamedNumber(L"height")),
-        object.GetNamedBoolean(L"maximized")};
-    if (state.width < 480 || state.height < 320 || state.width > 16384 || state.height > 16384) return {};
+    if (!ExactKeys(object, {L"schemaVersion", L"x", L"y", L"width", L"height", L"maximized"}) ||
+        object.GetNamedValue(L"schemaVersion").ValueType() != JsonValueType::Number ||
+        object.GetNamedNumber(L"schemaVersion") != protocol::kWindowStateSchemaVersion ||
+        object.GetNamedValue(L"maximized").ValueType() != JsonValueType::Boolean) {
+      throw std::runtime_error("invalid window state");
+    }
+    WindowState state;
+    if (!Integer(object, L"x", state.x) || !Integer(object, L"y", state.y) ||
+        !Integer(object, L"width", state.width) || !Integer(object, L"height", state.height) ||
+        state.width < protocol::kMinimumWindowWidth ||
+        state.height < protocol::kMinimumWindowHeight ||
+        state.width > protocol::kMaximumWindowExtent ||
+        state.height > protocol::kMaximumWindowExtent) {
+      throw std::runtime_error("invalid window state");
+    }
+    state.maximized = object.GetNamedBoolean(L"maximized");
     return state;
   } catch (...) {
     IsolateInvalid(path);
@@ -223,26 +201,39 @@ WindowState SettingsStore::LoadWindowState() const {
 }
 
 bool SettingsStore::SaveWindowState(const WindowState& state) const {
+  if (state.width < protocol::kMinimumWindowWidth ||
+      state.height < protocol::kMinimumWindowHeight ||
+      state.width > protocol::kMaximumWindowExtent ||
+      state.height > protocol::kMaximumWindowExtent) {
+    return false;
+  }
   JsonObject object;
+  object.Insert(L"schemaVersion", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(
+                                      protocol::kWindowStateSchemaVersion));
   object.Insert(L"x", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(state.x));
   object.Insert(L"y", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(state.y));
   object.Insert(L"width", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(state.width));
   object.Insert(L"height", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(state.height));
   object.Insert(L"maximized", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(state.maximized));
-  return AtomicWrite(dataDirectory_ / L"window-state-v1.json",
+  return AtomicWrite(dataDirectory_ / L"window-state-v2.json",
                      std::wstring(object.Stringify()));
 }
 
 std::wstring SettingsStore::Serialize(const Settings& value) {
   JsonObject glass;
-  glass.Insert(L"enabled", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.glassEnabled));
-  glass.Insert(L"preset", winrt::Windows::Data::Json::JsonValue::CreateStringValue(ToString(value.preset)));
-  glass.Insert(L"tint", winrt::Windows::Data::Json::JsonValue::CreateStringValue(TintString(value.tint)));
+  glass.Insert(L"enabled", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.glass.enabled));
+  glass.Insert(L"frostThickness", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.frostThickness));
+  glass.Insert(L"opacity", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.opacity));
+  glass.Insert(L"tone", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.tone));
+  glass.Insert(L"grain", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.grain));
   JsonObject root;
-  root.Insert(L"schemaVersion", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(1));
-  root.Insert(L"locale", winrt::Windows::Data::Json::JsonValue::CreateStringValue(ToString(value.locale)));
+  root.Insert(L"schemaVersion", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(
+                                    protocol::kSettingsSchemaVersion));
+  root.Insert(L"locale", winrt::Windows::Data::Json::JsonValue::CreateStringValue(
+                              protocol::ToString(value.locale)));
   root.Insert(L"glass", glass);
-  root.Insert(L"foreground", winrt::Windows::Data::Json::JsonValue::CreateStringValue(ToString(value.foreground)));
+  root.Insert(L"foreground", winrt::Windows::Data::Json::JsonValue::CreateStringValue(
+                                  protocol::ToString(value.foreground)));
   root.Insert(L"animations", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.animations));
   root.Insert(L"uiScale", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.uiScale));
   return std::wstring(root.Stringify());
@@ -252,25 +243,30 @@ std::optional<Settings> SettingsStore::Parse(std::wstring_view json) {
   try {
     const auto root = JsonObject::Parse(json);
     if (!ExactKeys(root, {L"schemaVersion", L"locale", L"glass", L"foreground", L"animations", L"uiScale"}) ||
-        root.GetNamedNumber(L"schemaVersion") != 1 ||
+        root.GetNamedValue(L"schemaVersion").ValueType() != JsonValueType::Number ||
+        root.GetNamedNumber(L"schemaVersion") != protocol::kSettingsSchemaVersion ||
         root.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) return std::nullopt;
     const auto glass = root.GetNamedObject(L"glass");
-    if (!ExactKeys(glass, {L"enabled", L"preset", L"tint"})) return std::nullopt;
+    if (!ExactKeys(glass, {L"enabled", L"frostThickness", L"opacity", L"tone", L"grain"})) {
+      return std::nullopt;
+    }
     Settings result;
-    const auto locale = ParseEnum<Locale>(root.GetNamedString(L"locale"));
-    const auto preset = ParseEnum<GlassPreset>(glass.GetNamedString(L"preset"));
-    const auto tint = ParseTint(glass.GetNamedString(L"tint"));
-    const auto foreground = ParseEnum<Foreground>(root.GetNamedString(L"foreground"));
-    if (!locale || !preset || !tint || !foreground || !Boolean(glass, L"enabled", result.glassEnabled) ||
+    const auto locale = protocol::ParseLocale(root.GetNamedString(L"locale"));
+    const auto foreground = protocol::ParseForeground(root.GetNamedString(L"foreground"));
+    if (!locale || !foreground || !Boolean(glass, L"enabled", result.glass.enabled) ||
         !Boolean(root, L"animations", result.animations)) return std::nullopt;
-    const double scale = root.GetNamedNumber(L"uiScale");
-    if (scale < 80 || scale > 200 || static_cast<int>(scale) % 10 != 0 || scale != static_cast<int>(scale)) return std::nullopt;
+    if (!ConstrainedInteger(glass, L"frostThickness", protocol::kFrostThicknessConstraint,
+                            result.glass.frostThickness) ||
+        !ConstrainedInteger(glass, L"opacity", protocol::kOpacityConstraint,
+                            result.glass.opacity) ||
+        !ConstrainedInteger(glass, L"tone", protocol::kToneConstraint, result.glass.tone) ||
+        !ConstrainedInteger(glass, L"grain", protocol::kGrainConstraint, result.glass.grain) ||
+        !ConstrainedInteger(root, L"uiScale", protocol::kUiScaleConstraint, result.uiScale)) {
+      return std::nullopt;
+    }
     result.locale = *locale;
-    result.preset = *preset;
-    result.tint = *tint;
     result.foreground = *foreground;
-    result.uiScale = static_cast<int>(scale);
-    return result;
+    return protocol::IsValid(result) ? std::optional<Settings>(result) : std::nullopt;
   } catch (...) {
     return std::nullopt;
   }

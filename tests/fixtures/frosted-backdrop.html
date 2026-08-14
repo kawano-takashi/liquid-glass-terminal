@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frosted Glass Backdrop Fixture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: 'Segoe UI', sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        background: #111;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .split::before,
+      .split::after {
+        content: '';
+      }
+
+      .split::before {
+        background: #000;
+      }
+
+      .split::after {
+        background: #fff;
+      }
+
+      .colors {
+        background:
+          linear-gradient(90deg, #df2935 0 25%, #ffcf00 25% 50%, #00a676 50% 75%, #4056f4 75%), #fff;
+      }
+
+      .fine-detail {
+        display: grid;
+        place-items: center;
+        color: #111;
+        font:
+          700 13px/1.25 Consolas,
+          monospace;
+        letter-spacing: 0.08em;
+        text-align: center;
+        background-color: #f6f6f6;
+        background-image:
+          linear-gradient(45deg, #111 25%, transparent 25%),
+          linear-gradient(-45deg, #111 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #111 75%),
+          linear-gradient(-45deg, transparent 75%, #111 75%);
+        background-position:
+          0 0,
+          0 4px,
+          4px -4px,
+          -4px 0;
+        background-size: 8px 8px;
+      }
+
+      .fine-detail span {
+        max-width: 72%;
+        padding: 18px;
+        background: rgb(255 255 255 / 88%);
+      }
+
+      .moving-gradient {
+        background: linear-gradient(115deg, #28104e, #6a2c91, #ff4e88, #ffd166, #36c5f0);
+        background-size: 300% 300%;
+        animation: drift 12s ease-in-out infinite alternate;
+      }
+
+      @keyframes drift {
+        from {
+          background-position: 0% 50%;
+        }
+
+        to {
+          background-position: 100% 50%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .moving-gradient {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="split" aria-label="Black and white split"></section>
+    <section class="colors" aria-label="Large color blocks"></section>
+    <section class="fine-detail" aria-label="Fine checker and text grid">
+      <span>FINE TEXT · 0123456789 · THE QUICK BROWN FOX · 細かな文字と格子</span>
+    </section>
+    <section class="moving-gradient" aria-label="Moving gradient"></section>
+  </body>
+</html>

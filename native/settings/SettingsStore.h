@@ -7,31 +7,17 @@
 #include <optional>
 #include <string>
 
+#include "contracts/generated/Protocol.generated.h"
+
 namespace lgt::settings {
 
-enum class GlassPreset { Clear, Regular, Dense };
-enum class Foreground { Auto, Light, Dark };
-enum class Locale { System, English, Japanese };
-
-struct Settings {
-  Locale locale = Locale::System;
-  bool glassEnabled = true;
-  GlassPreset preset = GlassPreset::Regular;
-  std::uint32_t tint = 0x181818;
-  Foreground foreground = Foreground::Auto;
-  bool animations = true;
-  int uiScale = 100;
-
-  auto operator<=>(const Settings&) const = default;
-};
-
-struct WindowState {
-  int x = 0;
-  int y = 0;
-  int width = 1100;
-  int height = 720;
-  bool maximized = false;
-};
+using Foreground = protocol::Foreground;
+using GlassPreset = protocol::GlassPreset;
+using GlassSettings = protocol::GlassSettings;
+using GlassValues = protocol::GlassValues;
+using Locale = protocol::Locale;
+using Settings = protocol::Settings;
+using WindowState = protocol::PersistedWindowState;
 
 class SettingsStore final {
  public:

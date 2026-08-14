@@ -6,12 +6,17 @@
 #include <optional>
 
 #include "settings/SettingsStore.h"
+#include "window/WindowMetrics.h"
 
 namespace lgt::window {
+
+inline constexpr UINT kWindowStateChangedMessage = WM_APP + 0x34;
+inline constexpr UINT kWindowChromeChangedMessage = WM_APP + 0x35;
 
 class NativeWindow final {
  public:
   using MessageHandler = std::function<std::optional<LRESULT>(UINT, WPARAM, LPARAM)>;
+  using WebHitTestHandler = std::function<std::optional<LRESULT>(POINT)>;
 
   NativeWindow(HINSTANCE instance, MessageHandler handler);
   ~NativeWindow();
@@ -25,11 +30,15 @@ class NativeWindow final {
   void ToggleFullscreen();
   void ExitFullscreen();
   void ShowSystemMenu(POINT screenPoint);
+  void SetWebHitTestHandler(WebHitTestHandler handler);
 
   [[nodiscard]] HWND Handle() const noexcept;
   [[nodiscard]] UINT Dpi() const noexcept;
   [[nodiscard]] bool CompositionMode() const noexcept;
   [[nodiscard]] bool Fullscreen() const noexcept;
+  [[nodiscard]] bool Active() const noexcept;
+  [[nodiscard]] CaptionButton HoveredCaptionButton() const noexcept;
+  [[nodiscard]] CaptionButton PressedCaptionButton() const noexcept;
   [[nodiscard]] settings::WindowState CaptureState() const;
   [[nodiscard]] RECT WebViewBounds() const;
 
@@ -45,10 +54,14 @@ class NativeWindow final {
   HINSTANCE instance_ = nullptr;
   HWND window_ = nullptr;
   MessageHandler handler_;
+  WebHitTestHandler webHitTestHandler_;
   UINT dpi_ = 96;
   bool compositionMode_ = true;
   bool suppressQuit_ = false;
   bool fullscreen_ = false;
+  bool active_ = true;
+  CaptionButton hoveredCaptionButton_ = CaptionButton::None;
+  CaptionButton pressedCaptionButton_ = CaptionButton::None;
   WINDOWPLACEMENT savedPlacement_{sizeof(savedPlacement_)};
   LONG_PTR savedStyle_ = 0;
 };

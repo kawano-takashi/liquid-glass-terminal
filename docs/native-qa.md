@@ -17,6 +17,7 @@ For each run record the application version, Windows build/edition, WebView2 Run
 - [ ] Move, all-edge/corner resize, minimize, maximize, restore, Alt+Space system menu, keyboard window commands, and taskbar activation work.
 - [ ] Hovering the maximize control exposes Snap Layout; snapped windows resize and restore correctly.
 - [ ] F11 enters fullscreen and Escape restores the previous placement.
+- [ ] F11 hides both the DOM header and native caption controls; restoring fullscreen returns both without shifting terminal content.
 - [ ] The 480×320-DIP minimum and saved normal/maximized placement are honored.
 - [ ] Reconnecting, removing, or rearranging monitors never restores the window entirely off-screen.
 - [ ] Moving between 100%, 125%, 150%, and 200% DPI monitors keeps visuals, clicks, cursors, IME, drag targets, and title-bar controls aligned.
@@ -25,15 +26,21 @@ For each run record the application version, Windows build/edition, WebView2 Run
 ## Glass material
 
 - [ ] Desktop wallpaper and another application behind the window are blurred live without a capture/recording prompt.
-- [ ] Fully transparent areas and masked Glass regions coexist in one window.
-- [ ] Terminal, settings drawer, and context menu create the expected rounded regions; opening/closing overlays leaves no stale mask.
+- [ ] The 56-DIP header and terminal form one continuous full-window Glass sheet without an inset terminal card or seam.
+- [ ] Settings, context menu, paste confirmation, notices, and toasts use overlay masks only; opening/closing them leaves no stale mask or second blur pass.
 - [ ] Nonuniform corner radii render without clipping gaps or crashes.
 - [ ] Clear, Regular, and Dense are visibly distinct and switch without restarting or losing terminal output.
-- [ ] Tint, saturation, local noise, border highlight, inner highlight, shadow, and active/inactive states are visible but do not distort terminal glyphs.
-- [ ] Multiple panels do not multiply blur cost linearly; GPU traces show the shared backdrop effect rather than one blur graph per panel.
-- [ ] White, black, saturated, text-heavy, moving-video, SDR, and HDR backgrounds remain readable.
-- [ ] Automatic and explicit light/dark foreground choices retain at least 4.5:1 terminal contrast; unsafe explicit choices are corrected.
+- [ ] Frost thickness 0–13, Glass opacity 0–100, grayscale tone 0–100, and grain 0–100 preview and persist at every boundary.
+- [ ] With `tests/fixtures/frosted-backdrop.html` behind the terminal, Glass opacity 0 leaves fine text, checker edges, and large colors crisp and unshifted through empty areas from the title bar to the terminal; no blur, tone, grain, panel density, or passive border remains.
+- [ ] Sweeping Glass opacity through 0, 5, 20, 35, 50, and 100 changes blur contribution, grain, panel density, and passive UI decoration without a discontinuity; the configured Frost radius does not change.
+- [ ] At Glass opacity 0, settings, menus, dialogs, and toasts lose passive fills, separators, shadows, and modal scrims while text, focus, hover, selected, checked, and error states remain visible.
+- [ ] Grain 0 is visually smooth and does not allocate the noise surface; grain 100 adds only fine high-frequency texture.
+- [ ] Saturation remains 1.0, so large backdrop colors do not shift when Glass is enabled.
+- [ ] Multiple panels do not multiply blur cost; GPU traces show exactly one backdrop/blur graph.
+- [ ] With `tests/fixtures/frosted-backdrop.html` behind the terminal, large colors and shapes remain identifiable while the checker and fine text are unreadable.
+- [ ] Automatic and explicit light/dark foreground choices retain at least 4.5:1 against the nominal Tone; extreme transparency/background combinations are inspected separately and are not corrected with a dynamic opacity floor.
 - [ ] Deactivating and reactivating the window transitions smoothly when motion is enabled and changes immediately when it is reduced.
+- [ ] DWM uses standard rounded corners and its external shadow normally, with square corners while maximized, snapped, or fullscreen.
 
 ## WebView2 and input
 
@@ -41,6 +48,7 @@ For each run record the application version, Windows build/edition, WebView2 Run
 - [ ] Mouse move/buttons/double-click, vertical/horizontal wheel, capture outside the window, cursor changes, and context menu work at every tested DPI.
 - [ ] Touch scrolling/tapping and pen input work without duplicated events or coordinate drift.
 - [ ] Keyboard focus traverses controls and returns to the terminal after dialogs/settings close.
+- [ ] The header drag region moves and double-click-maximizes the window, while the settings button remains interactive and the maximize button exposes Snap Layout.
 - [ ] Japanese IME input, conversion, reconversion, candidate selection, and candidate-window placement remain correct while moved, resized, maximized, snapped, fullscreen, and across DPI monitors.
 - [ ] Clipboard copy/paste works once per command; `Ctrl+C` without a selection reaches the shell.
 - [ ] Multiline paste is never sent before confirmation, and cancel sends nothing.
@@ -58,12 +66,13 @@ For each run record the application version, Windows build/edition, WebView2 Run
 ## Policy and accessibility
 
 - [ ] Turning Windows transparency off selects a solid surface and automatically restores Glass when re-enabled.
+- [ ] Disabling Advanced Effects selects Solid without creating the backdrop graph and restores Glass when re-enabled.
 - [ ] High contrast uses opaque Windows system window/text colors and retains keyboard/screen-reader operability.
 - [ ] Remote Desktop and energy saver select the solid fallback and restore Glass after the condition clears.
 - [ ] Disabling Glass in settings selects a solid surface without changing the information hierarchy.
 - [ ] Reduced client-area animations or an active screen reader suppresses decorative transitions and cursor blinking.
 - [ ] Narrator reads terminal content in xterm screen-reader mode and does not lose focus when settings or paste confirmation closes.
-- [ ] Windows light/dark preference does not silently override the user-selected Tint and foreground policy.
+- [ ] Windows light/dark preference does not silently override the user-selected Tone and foreground policy.
 
 ## Recovery
 

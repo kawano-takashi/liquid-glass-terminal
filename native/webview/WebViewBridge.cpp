@@ -2,6 +2,7 @@
 
 #include <wil/com.h>
 
+#include <array>
 #include <cmath>
 #include <set>
 
@@ -32,6 +33,13 @@ bool ExactKeys(const JsonObject& object, const std::set<std::wstring>& required,
     if (!required.contains(key) && !optional.contains(key)) return false;
   }
   return true;
+}
+
+template <std::size_t Size>
+std::set<std::wstring> KeySet(const std::array<std::wstring_view, Size>& keys) {
+  std::set<std::wstring> result;
+  for (const auto key : keys) result.emplace(key);
+  return result;
 }
 
 bool AsciiId(std::wstring_view value) {
@@ -69,11 +77,12 @@ bool Integer(const JsonObject& object, std::wstring_view name, std::uint32_t min
 
 JsonObject SettingsJson(const settings::Settings& settings) {
   JsonObject glass;
-  glass.Insert(L"enabled", JsonValue::CreateBooleanValue(settings.glassEnabled));
-  glass.Insert(L"preset", JsonValue::CreateStringValue(settings::ToString(settings.preset)));
-  wchar_t tint[8]{};
-  swprintf_s(tint, L"#%06X", settings.tint & 0xFFFFFFU);
-  glass.Insert(L"tint", JsonValue::CreateStringValue(tint));
+  glass.Insert(L"enabled", JsonValue::CreateBooleanValue(settings.glass.enabled));
+  glass.Insert(L"frostThickness",
+               JsonValue::CreateNumberValue(settings.glass.frostThickness));
+  glass.Insert(L"opacity", JsonValue::CreateNumberValue(settings.glass.opacity));
+  glass.Insert(L"tone", JsonValue::CreateNumberValue(settings.glass.tone));
+  glass.Insert(L"grain", JsonValue::CreateNumberValue(settings.glass.grain));
   JsonObject result;
   result.Insert(L"locale", JsonValue::CreateStringValue(settings::ToString(settings.locale)));
   result.Insert(L"glass", glass);
@@ -81,19 +90,6 @@ JsonObject SettingsJson(const settings::Settings& settings) {
                 JsonValue::CreateStringValue(settings::ToString(settings.foreground)));
   result.Insert(L"animations", JsonValue::CreateBooleanValue(settings.animations));
   result.Insert(L"uiScale", JsonValue::CreateNumberValue(settings.uiScale));
-  return result;
-}
-
-std::optional<std::uint32_t> Tint(std::wstring_view text) {
-  if (text.size() != 7 || text[0] != L'#') return std::nullopt;
-  std::uint32_t result = 0;
-  for (const wchar_t character : text.substr(1)) {
-    result <<= 4;
-    if (character >= L'0' && character <= L'9') result |= character - L'0';
-    else if (character >= L'a' && character <= L'f') result |= character - L'a' + 10;
-    else if (character >= L'A' && character <= L'F') result |= character - L'A' + 10;
-    else return std::nullopt;
-  }
   return result;
 }
 
@@ -314,46 +310,48 @@ bool WebViewBridge::HandleGlassLayout(const JsonObject& payload) {
 
 bool WebViewBridge::ParseSettingsPatch(const JsonObject& object,
                                        settings::Settings& value) const {
-  if (!ExactKeys(object, {}, {L"locale", L"glass", L"foreground", L"animations", L"uiScale"}) ||
+  if (!ExactKeys(object, {}, KeySet(protocol::kSettingsKeys)) ||
       object.Size() == 0) return false;
   if (object.HasKey(L"locale")) {
     if (object.GetNamedValue(L"locale").ValueType() != JsonValueType::String) return false;
-    const std::wstring locale(object.GetNamedString(L"locale"));
-    if (locale == L"system") value.locale = settings::Locale::System;
-    else if (locale == L"en") value.locale = settings::Locale::English;
-    else if (locale == L"ja") value.locale = settings::Locale::Japanese;
-    else return false;
+    const auto locale = protocol::ParseLocale(object.GetNamedString(L"locale"));
+    if (!locale) return false;
+    value.locale = *locale;
   }
   if (object.HasKey(L"glass")) {
     if (object.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) return false;
     const auto glass = object.GetNamedObject(L"glass");
-    if (!ExactKeys(glass, {}, {L"enabled", L"preset", L"tint"}) || glass.Size() == 0) return false;
+    if (!ExactKeys(glass, {}, KeySet(protocol::kGlassSettingKeys)) ||
+        glass.Size() == 0) return false;
     if (glass.HasKey(L"enabled")) {
       if (glass.GetNamedValue(L"enabled").ValueType() != JsonValueType::Boolean) return false;
-      value.glassEnabled = glass.GetNamedBoolean(L"enabled");
+      value.glass.enabled = glass.GetNamedBoolean(L"enabled");
     }
-    if (glass.HasKey(L"preset")) {
-      if (glass.GetNamedValue(L"preset").ValueType() != JsonValueType::String) return false;
-      const std::wstring preset(glass.GetNamedString(L"preset"));
-      if (preset == L"clear") value.preset = settings::GlassPreset::Clear;
-      else if (preset == L"regular") value.preset = settings::GlassPreset::Regular;
-      else if (preset == L"dense") value.preset = settings::GlassPreset::Dense;
-      else return false;
-    }
-    if (glass.HasKey(L"tint")) {
-      if (glass.GetNamedValue(L"tint").ValueType() != JsonValueType::String) return false;
-      const auto tint = Tint(glass.GetNamedString(L"tint"));
-      if (!tint) return false;
-      value.tint = *tint;
+    auto parseGlassNumber = [&](std::wstring_view name, protocol::NumericConstraint constraint,
+                                std::uint32_t& target) {
+      const auto key = winrt::hstring(name);
+      if (!glass.HasKey(key)) return true;
+      std::uint32_t parsed = 0;
+      if (!Integer(glass, name, constraint.minimum, constraint.maximum, parsed) ||
+          !protocol::IsValid(parsed, constraint)) {
+        return false;
+      }
+      target = parsed;
+      return true;
+    };
+    if (!parseGlassNumber(L"frostThickness", protocol::kFrostThicknessConstraint,
+                          value.glass.frostThickness) ||
+        !parseGlassNumber(L"opacity", protocol::kOpacityConstraint, value.glass.opacity) ||
+        !parseGlassNumber(L"tone", protocol::kToneConstraint, value.glass.tone) ||
+        !parseGlassNumber(L"grain", protocol::kGrainConstraint, value.glass.grain)) {
+      return false;
     }
   }
   if (object.HasKey(L"foreground")) {
     if (object.GetNamedValue(L"foreground").ValueType() != JsonValueType::String) return false;
-    const std::wstring foreground(object.GetNamedString(L"foreground"));
-    if (foreground == L"auto") value.foreground = settings::Foreground::Auto;
-    else if (foreground == L"light") value.foreground = settings::Foreground::Light;
-    else if (foreground == L"dark") value.foreground = settings::Foreground::Dark;
-    else return false;
+    const auto foreground = protocol::ParseForeground(object.GetNamedString(L"foreground"));
+    if (!foreground) return false;
+    value.foreground = *foreground;
   }
   if (object.HasKey(L"animations")) {
     if (object.GetNamedValue(L"animations").ValueType() != JsonValueType::Boolean) return false;
@@ -361,30 +359,42 @@ bool WebViewBridge::ParseSettingsPatch(const JsonObject& object,
   }
   if (object.HasKey(L"uiScale")) {
     std::uint32_t scale = 0;
-    if (!Integer(object, L"uiScale", 80, 200, scale) || scale % 10 != 0) return false;
-    value.uiScale = static_cast<int>(scale);
+    if (!Integer(object, L"uiScale", protocol::kUiScaleConstraint.minimum,
+                 protocol::kUiScaleConstraint.maximum, scale) ||
+        !protocol::IsValid(scale, protocol::kUiScaleConstraint)) return false;
+    value.uiScale = scale;
   }
   return true;
 }
 
 bool WebViewBridge::HandleSettings(std::wstring_view type, const JsonObject& payload) {
   const bool cancel = type == L"settings.cancel";
+  const auto operation = cancel ? protocol::SettingsOperation::Cancel
+                         : type == L"settings.preview" ? protocol::SettingsOperation::Preview
+                                                       : protocol::SettingsOperation::Apply;
   if (!ExactKeys(payload, cancel ? std::set<std::wstring>{L"transactionId"}
                                  : std::set<std::wstring>{L"transactionId", L"patch"}) ||
-      payload.GetNamedValue(L"transactionId").ValueType() != JsonValueType::String) return false;
+      payload.GetNamedValue(L"transactionId").ValueType() != JsonValueType::String) {
+    if (operation == protocol::SettingsOperation::Apply) RollbackSettingsTransaction();
+    return false;
+  }
   const std::wstring transaction(payload.GetNamedString(L"transactionId"));
-  if (!AsciiId(transaction)) return false;
+  if (!AsciiId(transaction)) {
+    if (operation == protocol::SettingsOperation::Apply) RollbackSettingsTransaction();
+    return false;
+  }
   if (cancel) {
     if (transaction != settingsTransaction_) {
-      PostSettingsResult(transaction, false, L"settings.transaction.invalid");
+      PostSettingsResult(transaction, operation, false, L"settings.transaction.invalid");
       return true;
     }
     const bool result = settingsStore_.Cancel(transaction);
     if (result) {
       settingsTransaction_.clear();
-      settingsChanged_(settingsStore_.Effective());
+      settingsChanged_(settingsStore_.Current());
     }
-    PostSettingsResult(transaction, result, result ? L"" : L"settings.transaction.invalid");
+    PostSettingsResult(transaction, operation, result,
+                       result ? L"" : L"settings.transaction.invalid");
     return true;
   }
   if (settingsTransaction_.empty()) {
@@ -392,19 +402,25 @@ bool WebViewBridge::HandleSettings(std::wstring_view type, const JsonObject& pay
     settingsTransaction_ = transaction;
     PostSettingsSnapshot(transaction);
   } else if (transaction != settingsTransaction_) {
-    PostSettingsResult(transaction, false, L"settings.transaction.invalid");
+    if (operation == protocol::SettingsOperation::Apply) RollbackSettingsTransaction();
+    PostSettingsResult(transaction, operation, false, L"settings.transaction.invalid");
     return true;
   }
-  if (payload.GetNamedValue(L"patch").ValueType() != JsonValueType::Object) return false;
+  if (payload.GetNamedValue(L"patch").ValueType() != JsonValueType::Object) {
+    if (operation == protocol::SettingsOperation::Apply) RollbackSettingsTransaction();
+    PostSettingsResult(transaction, operation, false, L"settings.patch.invalid");
+    return true;
+  }
   settings::Settings value = settingsStore_.Effective();
   if (!ParseSettingsPatch(payload.GetNamedObject(L"patch"), value)) {
-    PostSettingsResult(transaction, false, L"settings.patch.invalid");
+    if (operation == protocol::SettingsOperation::Apply) RollbackSettingsTransaction();
+    PostSettingsResult(transaction, operation, false, L"settings.patch.invalid");
     return true;
   }
   if (type == L"settings.preview") {
     const bool result = settingsStore_.Preview(transaction, value);
     if (result) settingsChanged_(value);
-    PostSettingsResult(transaction, result,
+    PostSettingsResult(transaction, operation, result,
                        result ? L"" : L"settings.transaction.invalid");
     return true;
   }
@@ -413,10 +429,9 @@ bool WebViewBridge::HandleSettings(std::wstring_view type, const JsonObject& pay
     settingsTransaction_.clear();
     settingsChanged_(value);
   } else {
-    settingsTransaction_.clear();
-    settingsChanged_(settingsStore_.Effective());
+    RollbackSettingsTransaction();
   }
-  PostSettingsResult(transaction, result, result ? L"" : L"settings.save.failed");
+  PostSettingsResult(transaction, operation, result, result ? L"" : L"settings.save.failed");
   return true;
 }
 
@@ -461,6 +476,11 @@ void WebViewBridge::PostAccepted(bool sharedBuffers) {
   payload.Insert(L"sessionId", JsonValue::CreateStringValue(L"terminal-1"));
   payload.Insert(L"settings", SettingsJson(settingsStore_.Effective()));
   payload.Insert(L"capabilities", capabilities);
+  JsonObject windowState;
+  windowState.Insert(L"maximized", JsonValue::CreateBooleanValue(windowMaximized_));
+  windowState.Insert(L"fullscreen", JsonValue::CreateBooleanValue(windowFullscreen_));
+  windowState.Insert(L"active", JsonValue::CreateBooleanValue(windowActive_));
+  payload.Insert(L"windowState", windowState);
   Post(L"bridge.accepted", payload);
 }
 
@@ -482,10 +502,20 @@ void WebViewBridge::PostSettingsSnapshot(std::wstring_view transactionId) {
   Post(L"settings.snapshot", payload);
 }
 
-void WebViewBridge::PostSettingsResult(std::wstring_view transactionId, bool success,
+void WebViewBridge::RollbackSettingsTransaction() {
+  if (settingsTransaction_.empty()) return;
+  const auto transaction = settingsTransaction_;
+  settingsStore_.Cancel(transaction);
+  settingsTransaction_.clear();
+  settingsChanged_(settingsStore_.Current());
+}
+
+void WebViewBridge::PostSettingsResult(std::wstring_view transactionId,
+                                       protocol::SettingsOperation operation, bool success,
                                        std::wstring_view error) {
   JsonObject payload;
   payload.Insert(L"transactionId", JsonValue::CreateStringValue(transactionId));
+  payload.Insert(L"operation", JsonValue::CreateStringValue(protocol::ToString(operation)));
   payload.Insert(L"ok", JsonValue::CreateBooleanValue(success));
   if (!error.empty()) payload.Insert(L"error", JsonValue::CreateStringValue(error));
   Post(L"settings.result", payload);
@@ -507,14 +537,39 @@ void WebViewBridge::UpdatePolicy(const platform::PolicySnapshot& policy) {
   PostAppearance();
 }
 
+void WebViewBridge::UpdateWindowState(bool maximized, bool fullscreen, bool active) {
+  const bool changed = windowMaximized_ != maximized || windowFullscreen_ != fullscreen ||
+                       windowActive_ != active;
+  windowMaximized_ = maximized;
+  windowFullscreen_ = fullscreen;
+  windowActive_ = active;
+  if (changed) PostWindowState();
+}
+
+void WebViewBridge::PostWindowState() {
+  if (!host_ || !handshake_) return;
+  JsonObject payload;
+  payload.Insert(L"maximized", JsonValue::CreateBooleanValue(windowMaximized_));
+  payload.Insert(L"fullscreen", JsonValue::CreateBooleanValue(windowFullscreen_));
+  payload.Insert(L"active", JsonValue::CreateBooleanValue(windowActive_));
+  Post(L"window.state.changed", payload);
+}
+
 void WebViewBridge::PostAppearance() {
   if (!host_ || !handshake_) return;
   JsonObject payload;
   std::wstring_view state = L"safe";
-  if (compositionHost_.State() == composition::AppearanceState::Glass) state = L"glass";
-  else if (compositionHost_.State() == composition::AppearanceState::Solid) state = L"solid";
+  std::wstring reason;
+  if (!host_->CompositionMode()) {
+    state = L"safe";
+    reason = L"non-composition-fallback";
+  } else if (compositionHost_.State() == composition::AppearanceState::Glass) {
+    state = L"glass";
+  } else if (compositionHost_.State() == composition::AppearanceState::Solid) {
+    state = L"solid";
+  }
   payload.Insert(L"state", JsonValue::CreateStringValue(state));
-  const auto reason = compositionHost_.StateReason();
+  if (reason.empty()) reason = compositionHost_.StateReason();
   if (!reason.empty()) payload.Insert(L"reason", JsonValue::CreateStringValue(reason));
   Post(L"appearance.changed", payload);
 }

@@ -1,21 +1,24 @@
-import { Settings as SettingsIcon } from 'lucide-react';
 import {
   lazy,
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from 'react';
 import {
+  DEFAULT_SETTINGS,
   LIMITS,
+  UI_METRICS,
   type AppearanceState,
   type Capabilities,
   type GlassRegion,
   type Settings,
   type SettingsPatch,
+  type WindowRuntimeState,
 } from '../../contracts/generated/protocol';
 import { cssAppearance } from './appearance';
 import { NativeBridge } from './bridge/NativeBridge';
@@ -24,19 +27,16 @@ import { ContextMenu } from './components/ContextMenu';
 import { PasteDialog } from './components/PasteDialog';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import type { TerminalViewHandle } from './components/TerminalView';
+import { WindowChrome } from './components/WindowChrome';
 import { messages, resolveLocale } from './i18n';
 
 const TerminalView = lazy(() =>
   import('./components/TerminalView').then((module) => ({ default: module.TerminalView })),
 );
 
-const TITLEBAR_DIP = 44;
-const DEFAULT_SETTINGS: Settings = {
-  locale: 'system',
-  glass: { enabled: true, preset: 'regular', tint: '#181818' },
-  foreground: 'auto',
-  animations: true,
-  uiScale: 100,
+const INITIAL_SETTINGS: Settings = {
+  ...DEFAULT_SETTINGS,
+  glass: { ...DEFAULT_SETTINGS.glass },
 };
 const DEFAULT_CAPABILITIES: Capabilities = {
   glass: false,
@@ -44,6 +44,11 @@ const DEFAULT_CAPABILITIES: Capabilities = {
   reducedMotion: false,
   screenReader: false,
   highContrast: false,
+};
+const DEFAULT_WINDOW_STATE: WindowRuntimeState = {
+  maximized: false,
+  fullscreen: false,
+  active: true,
 };
 
 interface ContextState {
@@ -77,32 +82,39 @@ function isMultiline(value: string): boolean {
 
 export function App() {
   const bridge = useMemo(() => new NativeBridge(), []);
+  const appRoot = useRef<HTMLElement>(null);
   const terminal = useRef<TerminalViewHandle>(null);
-  const terminalSurface = useRef<HTMLDivElement>(null);
-  const drawerSurface = useRef<HTMLElement>(null);
-  const contextSurface = useRef<HTMLDivElement>(null);
   const settingsTransactionRef = useRef<string | undefined>(undefined);
   const pendingApplyRef = useRef<string | undefined>(undefined);
   const pendingCancelRef = useRef<string | undefined>(undefined);
-  const draftRef = useRef(DEFAULT_SETTINGS);
-  const settingsRef = useRef(DEFAULT_SETTINGS);
+  const settingsDraftDirtyRef = useRef(false);
+  const previewFrameRef = useRef<number | undefined>(undefined);
+  const previewValueRef = useRef<Settings>(INITIAL_SETTINGS);
+  const draftRef = useRef<Settings>(INITIAL_SETTINGS);
+  const settingsRef = useRef<Settings>(INITIAL_SETTINGS);
   const clipboardRequests = useRef(new Map<string, (text?: string) => void>());
   const layoutRevision = useRef(0);
   const noticeSequence = useRef(1);
   const [accepted, setAccepted] = useState(false);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [draft, setDraft] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings>(INITIAL_SETTINGS);
+  const [draft, setDraft] = useState<Settings>(INITIAL_SETTINGS);
   const [capabilities, setCapabilities] = useState(DEFAULT_CAPABILITIES);
+  const [windowState, setWindowState] = useState(DEFAULT_WINDOW_STATE);
   const [appearance, setAppearance] = useState<AppearanceState>('solid');
   const [appearanceReason, setAppearanceReason] = useState<string>();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTransaction, setSettingsTransaction] = useState<string>();
   const [applyingSettings, setApplyingSettings] = useState(false);
   const [context, setContext] = useState<ContextState>();
   const [pasteCandidate, setPasteCandidate] = useState<string>();
   const [notices, setNotices] = useState<Notice[]>([]);
   const locale = resolveLocale(draft.locale);
   const labels = messages[locale];
+  const labelsRef = useRef(labels);
+  labelsRef.current = labels;
+
+  const focusTerminal = useCallback(() => {
+    requestAnimationFrame(() => terminal.current?.focus());
+  }, []);
 
   const addNotice = useCallback((level: Notice['level'], message: string) => {
     const id = noticeSequence.current++;
@@ -110,36 +122,69 @@ export function App() {
     window.setTimeout(() => setNotices((items) => items.filter((item) => item.id !== id)), 6_000);
   }, []);
 
+  const nativeNotice = useCallback((message: string): string => {
+    if (message === 'composition.update.failed') return labelsRef.current.compositionUpdateFailed;
+    if (message === 'bridge.invalid-message') return labelsRef.current.invalidBridgeMessage;
+    if (message === 'terminal.transport.failed') return labelsRef.current.terminalTransportFailed;
+    if (message === 'terminal.start.failed') return labelsRef.current.terminalStartFailed;
+    if (message.startsWith('settings.')) return labelsRef.current.settingsFailed;
+    if (message.startsWith('clipboard.')) return labelsRef.current.clipboardFailed;
+    return message;
+  }, []);
+
+  const cancelScheduledPreview = useCallback(() => {
+    if (previewFrameRef.current === undefined) return;
+    cancelAnimationFrame(previewFrameRef.current);
+    previewFrameRef.current = undefined;
+  }, []);
+
+  const schedulePreview = useCallback(
+    (value: Settings) => {
+      previewValueRef.current = value;
+      if (previewFrameRef.current !== undefined) return;
+      previewFrameRef.current = requestAnimationFrame(() => {
+        previewFrameRef.current = undefined;
+        const transaction = settingsTransactionRef.current;
+        if (transaction)
+          bridge.previewSettings(transaction, settingsPatch(previewValueRef.current));
+      });
+    },
+    [bridge],
+  );
+
   const sendLayout = useCallback(() => {
-    const makeRegion = (
-      element: Element,
-      id: string,
-      role: GlassRegion['role'],
-      radius: number,
-    ): GlassRegion => {
-      const rect = element.getBoundingClientRect();
-      return {
-        id,
-        x: rect.x,
-        y: rect.y + TITLEBAR_DIP,
-        width: rect.width,
-        height: rect.height,
-        radii: [radius, radius, radius, radius],
-        role,
-      };
-    };
+    if (!accepted || !appRoot.current) return;
     const regions: GlassRegion[] = [];
-    if (terminalSurface.current) {
-      regions.push(makeRegion(terminalSurface.current, 'terminal', 'terminal', 16));
+    if (capabilities.glass) {
+      const surfaces = appRoot.current.querySelectorAll<HTMLElement>('[data-glass-id]');
+      for (const surface of surfaces) {
+        const id = surface.dataset.glassId;
+        if (!id || regions.length >= LIMITS.maxGlassRegions) break;
+        const rect = surface.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        const style = getComputedStyle(surface);
+        const radius = (value: string) => {
+          const parsed = Number.parseFloat(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        regions.push({
+          id,
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          radii: [
+            radius(style.borderTopLeftRadius),
+            radius(style.borderTopRightRadius),
+            radius(style.borderBottomRightRadius),
+            radius(style.borderBottomLeftRadius),
+          ],
+          role: 'overlay',
+        });
+      }
     }
-    if (settingsOpen && drawerSurface.current) {
-      regions.push(makeRegion(drawerSurface.current, 'settings', 'overlay', 20));
-    }
-    if (context && contextSurface.current) {
-      regions.push(makeRegion(contextSurface.current, 'context', 'overlay', 12));
-    }
-    bridge.setGlassLayout(++layoutRevision.current, regions.slice(0, LIMITS.maxGlassRegions));
-  }, [bridge, context, settingsOpen]);
+    bridge.setGlassLayout(++layoutRevision.current, regions);
+  }, [accepted, bridge, capabilities.glass]);
 
   useEffect(() => {
     bridge.connect();
@@ -149,36 +194,56 @@ export function App() {
           setSettings(message.payload.settings);
           settingsRef.current = message.payload.settings;
           setDraft(message.payload.settings);
+          draftRef.current = message.payload.settings;
+          previewValueRef.current = message.payload.settings;
+          settingsDraftDirtyRef.current = false;
           setCapabilities(message.payload.capabilities);
+          setWindowState(message.payload.windowState);
           setAccepted(true);
           break;
         case 'capabilities.changed':
           setCapabilities(message.payload);
           break;
+        case 'window.state.changed':
+          setWindowState(message.payload);
+          break;
         case 'settings.snapshot':
-          if (message.payload.transactionId === settingsTransactionRef.current) {
+          if (
+            message.payload.transactionId === settingsTransactionRef.current &&
+            !settingsDraftDirtyRef.current
+          ) {
             setDraft(message.payload.settings);
             draftRef.current = message.payload.settings;
+            previewValueRef.current = message.payload.settings;
           }
           break;
-        case 'settings.result':
+        case 'settings.result': {
+          const pendingApply =
+            message.payload.operation === 'apply' &&
+            message.payload.transactionId === pendingApplyRef.current;
+          const pendingCancel =
+            message.payload.operation === 'cancel' &&
+            message.payload.transactionId === pendingCancelRef.current;
           if (!message.payload.ok) {
-            if (
-              message.payload.transactionId === pendingApplyRef.current ||
-              message.payload.transactionId === pendingCancelRef.current
-            ) {
+            if (pendingApply || pendingCancel) {
               pendingApplyRef.current = undefined;
               pendingCancelRef.current = undefined;
               settingsTransactionRef.current = undefined;
               setApplyingSettings(false);
               setDraft(settingsRef.current);
               draftRef.current = settingsRef.current;
+              previewValueRef.current = settingsRef.current;
+              settingsDraftDirtyRef.current = false;
               setSettingsOpen(false);
-              setSettingsTransaction(undefined);
-              requestAnimationFrame(() => terminal.current?.focus());
+              focusTerminal();
             }
-            addNotice('error', message.payload.error ?? 'Settings failed.');
-          } else if (message.payload.transactionId === pendingApplyRef.current) {
+            addNotice(
+              'error',
+              message.payload.error
+                ? nativeNotice(message.payload.error)
+                : labelsRef.current.settingsFailed,
+            );
+          } else if (pendingApply) {
             const committed = draftRef.current;
             pendingApplyRef.current = undefined;
             settingsTransactionRef.current = undefined;
@@ -186,20 +251,23 @@ export function App() {
             setSettings(committed);
             settingsRef.current = committed;
             setDraft(committed);
+            previewValueRef.current = committed;
+            settingsDraftDirtyRef.current = false;
             setSettingsOpen(false);
-            setSettingsTransaction(undefined);
-            requestAnimationFrame(() => terminal.current?.focus());
-          } else if (message.payload.transactionId === pendingCancelRef.current) {
+            focusTerminal();
+          } else if (pendingCancel) {
             pendingCancelRef.current = undefined;
             settingsTransactionRef.current = undefined;
             setApplyingSettings(false);
             setDraft(settingsRef.current);
             draftRef.current = settingsRef.current;
+            previewValueRef.current = settingsRef.current;
+            settingsDraftDirtyRef.current = false;
             setSettingsOpen(false);
-            setSettingsTransaction(undefined);
-            requestAnimationFrame(() => terminal.current?.focus());
+            focusTerminal();
           }
           break;
+        }
         case 'appearance.changed':
           setAppearance(message.payload.state);
           setAppearanceReason(message.payload.reason);
@@ -208,31 +276,39 @@ export function App() {
           const callback = clipboardRequests.current.get(message.payload.requestId);
           clipboardRequests.current.delete(message.payload.requestId);
           if (message.payload.ok) callback?.(message.payload.text);
-          else addNotice('error', message.payload.error ?? 'Clipboard operation failed.');
+          else
+            addNotice(
+              'error',
+              message.payload.error
+                ? nativeNotice(message.payload.error)
+                : labelsRef.current.clipboardFailed,
+            );
           break;
         }
         case 'drop.path':
           terminal.current?.paste(message.payload.path);
+          focusTerminal();
           break;
         case 'terminal.recovered':
           terminal.current?.clear();
           addNotice(
             'warning',
             message.payload.droppedBytes > 0
-              ? `WebView recovered; ${message.payload.droppedBytes} buffered bytes were dropped.`
-              : 'WebView recovered.',
+              ? labelsRef.current.terminalRecoveredDropped(message.payload.droppedBytes)
+              : labelsRef.current.terminalRecovered,
           );
           break;
         case 'app.notice':
-          addNotice(message.payload.level, message.payload.message);
+          addNotice(message.payload.level, nativeNotice(message.payload.message));
           break;
       }
     });
     return () => {
+      cancelScheduledPreview();
       off();
       bridge.dispose();
     };
-  }, [addNotice, bridge]);
+  }, [addNotice, bridge, cancelScheduledPreview, focusTerminal, nativeNotice]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -245,7 +321,8 @@ export function App() {
     return () => window.clearInterval(retry);
   }, [accepted, bridge]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!accepted || !appRoot.current) return;
     let frame = 0;
     const schedule = () => {
       cancelAnimationFrame(frame);
@@ -253,45 +330,63 @@ export function App() {
     };
     const observer = new ResizeObserver(schedule);
     observer.observe(document.documentElement);
+    for (const surface of appRoot.current.querySelectorAll<HTMLElement>('[data-glass-id]')) {
+      observer.observe(surface);
+    }
+    window.addEventListener('resize', schedule);
     schedule();
     return () => {
       observer.disconnect();
+      window.removeEventListener('resize', schedule);
       cancelAnimationFrame(frame);
     };
-  }, [sendLayout]);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(sendLayout);
-    return () => cancelAnimationFrame(frame);
-  }, [context, draft.uiScale, sendLayout, settingsOpen]);
+  }, [
+    accepted,
+    appearance,
+    capabilities.glass,
+    context,
+    draft.uiScale,
+    notices,
+    pasteCandidate,
+    sendLayout,
+    settingsOpen,
+    windowState.fullscreen,
+  ]);
 
   const copy = useCallback(() => {
     const selection = terminal.current?.getSelection() ?? '';
     if (!selection) return;
     const id = requestId('copy');
-    clipboardRequests.current.set(id, () => undefined);
+    clipboardRequests.current.set(id, () => focusTerminal());
     bridge.writeClipboard(id, selection);
     setContext(undefined);
-  }, [bridge]);
+  }, [bridge, focusTerminal]);
 
   const requestPaste = useCallback(() => {
     const id = requestId('paste');
     clipboardRequests.current.set(id, (text) => {
-      if (!text) return;
+      if (!text) {
+        focusTerminal();
+        return;
+      }
       if (isMultiline(text)) setPasteCandidate(text);
-      else terminal.current?.paste(text);
+      else {
+        terminal.current?.paste(text);
+        focusTerminal();
+      }
     });
     bridge.readClipboard(id);
     setContext(undefined);
-  }, [bridge]);
+  }, [bridge, focusTerminal]);
 
   const openSettings = useCallback(() => {
     if (settingsOpen) return;
     const transaction = requestId('settings');
     settingsTransactionRef.current = transaction;
-    setSettingsTransaction(transaction);
+    settingsDraftDirtyRef.current = false;
     setDraft(settings);
     draftRef.current = settings;
+    previewValueRef.current = settings;
     bridge.previewSettings(transaction, settingsPatch(settings));
     setSettingsOpen(true);
     setContext(undefined);
@@ -299,39 +394,54 @@ export function App() {
 
   const preview = useCallback(
     (value: Settings) => {
+      settingsDraftDirtyRef.current = true;
       setDraft(value);
       draftRef.current = value;
-      if (settingsTransaction) bridge.previewSettings(settingsTransaction, settingsPatch(value));
+      schedulePreview(value);
     },
-    [bridge, settingsTransaction],
+    [schedulePreview],
   );
 
   const apply = useCallback(() => {
-    if (!settingsTransaction || applyingSettings) return;
-    pendingApplyRef.current = settingsTransaction;
+    const transaction = settingsTransactionRef.current;
+    if (!transaction || applyingSettings) return;
+    cancelScheduledPreview();
+    pendingApplyRef.current = transaction;
     setApplyingSettings(true);
-    bridge.applySettings(settingsTransaction, settingsPatch(draft));
-  }, [applyingSettings, bridge, draft, settingsTransaction]);
+    bridge.applySettings(transaction, settingsPatch(draftRef.current));
+  }, [applyingSettings, bridge, cancelScheduledPreview]);
 
   const cancel = useCallback(() => {
     if (applyingSettings) return;
-    if (settingsTransaction) {
-      pendingCancelRef.current = settingsTransaction;
+    cancelScheduledPreview();
+    const transaction = settingsTransactionRef.current;
+    if (transaction) {
+      pendingCancelRef.current = transaction;
       setApplyingSettings(true);
-      bridge.cancelSettings(settingsTransaction);
+      bridge.cancelSettings(transaction);
       return;
     }
     setSettingsOpen(false);
-    terminal.current?.focus();
-  }, [applyingSettings, bridge, settings, settingsTransaction]);
+    focusTerminal();
+  }, [applyingSettings, bridge, cancelScheduledPreview, focusTerminal]);
+
+  useEffect(() => {
+    if (!windowState.fullscreen) return;
+    setContext(undefined);
+    if (settingsOpen) cancel();
+  }, [cancel, settingsOpen, windowState.fullscreen]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
       if (event.key === 'Escape') {
-        if (pasteCandidate !== undefined) setPasteCandidate(undefined);
-        else if (context) setContext(undefined);
-        else if (settingsOpen) cancel();
+        if (pasteCandidate !== undefined) {
+          setPasteCandidate(undefined);
+          focusTerminal();
+        } else if (context) {
+          setContext(undefined);
+          focusTerminal();
+        } else if (settingsOpen) cancel();
         return;
       }
       if (settingsOpen || pasteCandidate !== undefined) return;
@@ -354,87 +464,110 @@ export function App() {
     };
     window.addEventListener('keydown', keydown, true);
     return () => window.removeEventListener('keydown', keydown, true);
-  }, [cancel, context, copy, openSettings, pasteCandidate, requestPaste, settingsOpen]);
+  }, [
+    cancel,
+    context,
+    copy,
+    focusTerminal,
+    openSettings,
+    pasteCandidate,
+    requestPaste,
+    settingsOpen,
+  ]);
 
-  const appearanceStyle = cssAppearance(draft) as CSSProperties;
-  const appearanceNotice =
-    appearance === 'safe'
-      ? labels.safeMode
-      : appearanceReason === 'user-disabled'
-        ? labels.glassDisabled
-        : labels.policyFallback;
+  const zoom = draft.uiScale / 100;
+  const motionEnabled =
+    draft.animations && !capabilities.reducedMotion && !capabilities.screenReader;
+  const appearanceStyle = {
+    ...cssAppearance(draft),
+    '--chrome-height': `${UI_METRICS.titlebarHeightDip / zoom}px`,
+    '--caption-reserve': capabilities.glass
+      ? `${(UI_METRICS.captionButtonWidthDip * 3) / zoom}px`
+      : '0px',
+    '--chrome-control-size': `${32 / zoom}px`,
+    '--chrome-icon-size': `${17 / zoom}px`,
+    '--chrome-font-size': `${12 / zoom}px`,
+    '--chrome-inline-gap': `${8 / zoom}px`,
+    '--surface-inset': `${12 / zoom}px`,
+    '--motion-duration': motionEnabled ? '140ms' : '0ms',
+  } as CSSProperties;
+
   return (
     <BridgeContext.Provider value={bridge}>
       <main
+        ref={appRoot}
         className="app"
         data-appearance={appearance}
-        data-animations={draft.animations && !capabilities.reducedMotion}
+        data-active={windowState.active}
+        data-animations={motionEnabled}
+        data-composition={capabilities.glass}
+        data-fullscreen={windowState.fullscreen}
         style={appearanceStyle}
-        onPointerDown={() => setContext(undefined)}
+        onPointerDown={(event) => {
+          if (!(event.target instanceof Element) || !event.target.closest('.context-menu')) {
+            setContext(undefined);
+          }
+        }}
       >
-        <div
-          ref={terminalSurface}
-          className="terminal-surface"
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setContext({ x: event.clientX, y: event.clientY });
-          }}
-        >
-          {accepted ? (
-            <Suspense fallback={<div className="loading">Liquid Glass Terminal</div>}>
-              <TerminalView ref={terminal} settings={draft} capabilities={capabilities} />
-            </Suspense>
-          ) : (
-            <div className="loading">Liquid Glass Terminal</div>
-          )}
-        </div>
+        <div className="application-content" inert={pasteCandidate !== undefined}>
+          {!windowState.fullscreen ? (
+            <WindowChrome
+              accepted={accepted}
+              active={windowState.active}
+              appearance={appearance}
+              appearanceReason={appearanceReason}
+              compositionMode={capabilities.glass}
+              labels={labels}
+              onOpenSettings={openSettings}
+            />
+          ) : null}
 
-        <button
-          className="settings-trigger"
-          type="button"
-          aria-label={labels.settings}
-          onClick={openSettings}
-          disabled={!accepted}
-        >
-          <SettingsIcon size={17} />
-        </button>
-
-        {appearance !== 'glass' && (
-          <div className="appearance-notice" role="status">
-            {appearanceNotice}
-            {appearanceReason ? <code>{appearanceReason}</code> : null}
+          <div
+            className="terminal-surface"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setContext({ x: event.clientX, y: event.clientY });
+            }}
+          >
+            {accepted ? (
+              <Suspense fallback={<div className="loading">{labels.appName}</div>}>
+                <TerminalView ref={terminal} settings={draft} capabilities={capabilities} />
+              </Suspense>
+            ) : (
+              <div className="loading">{labels.appName}</div>
+            )}
           </div>
-        )}
 
-        {context ? (
-          <ContextMenu
-            ref={contextSurface}
-            {...context}
+          {context ? (
+            <ContextMenu
+              {...context}
+              labels={labels}
+              canCopy={terminal.current?.hasSelection() ?? false}
+              onCopy={copy}
+              onPaste={requestPaste}
+              onSelectAll={() => {
+                terminal.current?.selectAll();
+                setContext(undefined);
+                focusTerminal();
+              }}
+              onClear={() => {
+                terminal.current?.clear();
+                setContext(undefined);
+                focusTerminal();
+              }}
+            />
+          ) : null}
+
+          <SettingsDrawer
+            open={settingsOpen}
+            value={draft}
             labels={labels}
-            canCopy={terminal.current?.hasSelection() ?? false}
-            onCopy={copy}
-            onPaste={requestPaste}
-            onSelectAll={() => {
-              terminal.current?.selectAll();
-              setContext(undefined);
-            }}
-            onClear={() => {
-              terminal.current?.clear();
-              setContext(undefined);
-            }}
+            onChange={preview}
+            onApply={apply}
+            onCancel={cancel}
+            pending={applyingSettings}
           />
-        ) : null}
-
-        <SettingsDrawer
-          ref={drawerSurface}
-          open={settingsOpen}
-          value={draft}
-          labels={labels}
-          onChange={preview}
-          onApply={apply}
-          onCancel={cancel}
-          pending={applyingSettings}
-        />
+        </div>
 
         {pasteCandidate !== undefined ? (
           <PasteDialog
@@ -442,18 +575,25 @@ export function App() {
             labels={labels}
             onCancel={() => {
               setPasteCandidate(undefined);
-              terminal.current?.focus();
+              focusTerminal();
             }}
             onAccept={() => {
               terminal.current?.paste(pasteCandidate);
               setPasteCandidate(undefined);
+              focusTerminal();
             }}
           />
         ) : null}
 
         <div className="toast-region" aria-live="polite">
           {notices.map((notice) => (
-            <div className="toast" data-level={notice.level} key={notice.id}>
+            <div
+              className="toast"
+              data-level={notice.level}
+              data-glass-id={`toast-${notice.id}`}
+              data-glass-radius="10"
+              key={notice.id}
+            >
               {notice.message}
             </div>
           ))}

@@ -1,6 +1,9 @@
 #include "platform/SystemPolicy.h"
 
 #include <windows.h>
+#include <wtsapi32.h>
+
+#include <winrt/base.h>
 
 namespace {
 
@@ -20,7 +23,7 @@ bool AutomationClientsAreListening() noexcept {
 namespace lgt::platform {
 
 bool PolicySnapshot::AllowsGlass() const noexcept {
-  return transparency && !highContrast && !remoteSession && !energySaver;
+  return transparency && advancedEffects && !highContrast && !remoteSession && !energySaver;
 }
 
 bool PolicySnapshot::ReducedMotion() const noexcept { return !animations || screenReader; }
@@ -28,6 +31,7 @@ bool PolicySnapshot::ReducedMotion() const noexcept { return !animations || scre
 std::wstring PolicySnapshot::Reason() const {
   if (highContrast) return L"high-contrast";
   if (!transparency) return L"transparency-disabled";
+  if (!advancedEffects) return L"advanced-effects-disabled";
   if (remoteSession) return L"remote-session";
   if (energySaver) return L"energy-saver";
   return {};
@@ -51,6 +55,12 @@ PolicySnapshot QuerySystemPolicy() noexcept {
   BOOL disableOverlappedContent = FALSE;
   SystemParametersInfoW(SPI_GETDISABLEOVERLAPPEDCONTENT, 0, &disableOverlappedContent, 0);
   result.transparency = transparency != 0 && disableOverlappedContent == FALSE;
+  try {
+    result.advancedEffects =
+        winrt::Windows::UI::ViewManagement::UISettings().AdvancedEffectsEnabled();
+  } catch (...) {
+    result.advancedEffects = false;
+  }
   result.remoteSession = GetSystemMetrics(SM_REMOTESESSION) != 0;
   SYSTEM_POWER_STATUS power{};
   result.energySaver = GetSystemPowerStatus(&power) && power.SystemStatusFlag != 0;
@@ -58,6 +68,41 @@ PolicySnapshot QuerySystemPolicy() noexcept {
   SystemParametersInfoW(SPI_GETSCREENREADER, 0, &screenReader, 0);
   result.screenReader = screenReader != FALSE || AutomationClientsAreListening();
   return result;
+}
+
+SystemPolicyMonitor::~SystemPolicyMonitor() { Reset(); }
+
+void SystemPolicyMonitor::Start(HWND window) noexcept {
+  Reset();
+  window_ = window;
+  sessionNotificationRegistered_ =
+      WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
+  try {
+    settings_ = winrt::Windows::UI::ViewManagement::UISettings();
+    advancedEffectsToken_ = settings_.AdvancedEffectsEnabledChanged(
+        [window](const auto&, const auto&) {
+          if (window && IsWindow(window)) PostMessageW(window, kSystemPolicyChangedMessage, 0, 0);
+        });
+  } catch (...) {
+    settings_ = nullptr;
+    advancedEffectsToken_ = {};
+  }
+}
+
+void SystemPolicyMonitor::Reset() noexcept {
+  try {
+    if (settings_ && advancedEffectsToken_.value != 0) {
+      settings_.AdvancedEffectsEnabledChanged(advancedEffectsToken_);
+    }
+  } catch (...) {
+  }
+  advancedEffectsToken_ = {};
+  settings_ = nullptr;
+  if (sessionNotificationRegistered_ && window_) {
+    WTSUnRegisterSessionNotification(window_);
+  }
+  sessionNotificationRegistered_ = false;
+  window_ = nullptr;
 }
 
 }  // namespace lgt::platform

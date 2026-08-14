@@ -19,6 +19,7 @@
 
 #include "platform/SystemPolicy.h"
 #include "settings/SettingsStore.h"
+#include "window/WindowMetrics.h"
 
 namespace lgt::composition {
 
@@ -53,6 +54,9 @@ class CompositionHost final {
   void SetAppearance(const settings::Settings& settings,
                      const platform::PolicySnapshot& policy);
   void SetActive(bool active);
+  void SetFullscreen(bool fullscreen);
+  void SetCaptionState(window::CaptionButton hovered, window::CaptionButton pressed,
+                       bool maximized);
 
   [[nodiscard]] winrt::Windows::UI::Composition::ContainerVisual WebRoot() const noexcept;
   [[nodiscard]] AppearanceState State() const noexcept;
@@ -62,8 +66,12 @@ class CompositionHost final {
   void EnsureDispatcherQueue();
   void ConfigureDwm();
   void CreateVisualTree();
-  void CreateEffectBrush();
+  void RefreshCapabilities();
+  void EnsureBackdropBrush();
+  void EnsureEffectBrush();
+  void ReleaseBackdropResources() noexcept;
   void CreateNoiseBrush();
+  void ReleaseNoiseBrush() noexcept;
   void RebuildShapes() noexcept;
   void RebuildShapesCore();
   void RebuildTitleBar();
@@ -83,6 +91,12 @@ class CompositionHost final {
   UINT dpi_ = 96;
   double webZoom_ = 1.0;
   bool active_ = true;
+  bool fullscreen_ = false;
+  bool effectsSupported_ = true;
+  bool effectsFast_ = true;
+  bool maximized_ = false;
+  window::CaptionButton hoveredCaptionButton_ = window::CaptionButton::None;
+  window::CaptionButton pressedCaptionButton_ = window::CaptionButton::None;
   AppearanceState state_ = AppearanceState::Safe;
   std::wstring stateReason_ = L"not-initialized";
   std::wstring_view shapeStage_ = L"idle";
@@ -93,16 +107,18 @@ class CompositionHost final {
   winrt::Windows::System::DispatcherQueueController dispatcher_{nullptr};
   winrt::Windows::UI::Composition::Compositor compositor_{nullptr};
   winrt::Windows::UI::Composition::Desktop::DesktopWindowTarget target_{nullptr};
+  winrt::Windows::UI::Composition::CompositionCapabilities capabilities_{nullptr};
+  winrt::event_token capabilitiesChangedToken_{};
   winrt::Windows::UI::Composition::ContainerVisual root_{nullptr};
   winrt::Windows::UI::Composition::SpriteVisual solidLayer_{nullptr};
-  winrt::Windows::UI::Composition::ShapeVisual shadowLayer_{nullptr};
-  winrt::Windows::UI::Composition::ContainerVisual glassLayer_{nullptr};
+  winrt::Windows::UI::Composition::SpriteVisual glassLayer_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual tintLayer_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual noiseLayer_{nullptr};
   winrt::Windows::UI::Composition::ShapeVisual borderLayer_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual webRoot_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual overlayRoot_{nullptr};
   winrt::Windows::UI::Composition::ShapeVisual titlebarLayer_{nullptr};
+  winrt::Windows::UI::Composition::CompositionBackdropBrush backdropBrush_{nullptr};
   winrt::Windows::UI::Composition::CompositionEffectBrush glassBrush_{nullptr};
   winrt::Windows::UI::Composition::CompositionColorBrush tintBrush_{nullptr};
   winrt::Windows::UI::Composition::CompositionColorBrush solidBrush_{nullptr};

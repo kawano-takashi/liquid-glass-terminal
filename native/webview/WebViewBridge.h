@@ -37,6 +37,7 @@ class WebViewBridge final {
   bool Attach(WebViewHost& host, const platform::PolicySnapshot& policy);
   void Detach() noexcept;
   void UpdatePolicy(const platform::PolicySnapshot& policy);
+  void UpdateWindowState(bool maximized, bool fullscreen, bool active);
   void PostAppearance();
   void PostDroppedPath(std::wstring_view quotedPath);
   void PostNotice(std::wstring_view level, std::wstring_view message);
@@ -58,8 +59,11 @@ class WebViewBridge final {
   void EnsureTerminalStarted();
   void PostAccepted(bool sharedBuffers);
   void PostCapabilities();
+  void PostWindowState();
   void PostSettingsSnapshot(std::wstring_view transactionId);
-  void PostSettingsResult(std::wstring_view transactionId, bool success,
+  void RollbackSettingsTransaction();
+  void PostSettingsResult(std::wstring_view transactionId,
+                          protocol::SettingsOperation operation, bool success,
                           std::wstring_view error = {});
   void PostClipboardResult(std::wstring_view requestId, bool success,
                            std::wstring_view text = {}, std::wstring_view error = {});
@@ -78,6 +82,9 @@ class WebViewBridge final {
   bool tokenRegistered_ = false;
   bool handshake_ = false;
   bool sharedBuffers_ = false;
+  bool windowMaximized_ = false;
+  bool windowFullscreen_ = false;
+  bool windowActive_ = true;
   short columns_ = 0;
   short rows_ = 0;
   std::uint32_t layoutRevision_ = 0;

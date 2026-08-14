@@ -1,5 +1,7 @@
 #include "app/Application.h"
 
+#include "composition/GlassMaterial.h"
+
 #include <shellapi.h>
 #include <winternl.h>
 
@@ -35,12 +37,22 @@ std::uint32_t RgbFromColorRef(COLORREF value) {
          static_cast<std::uint32_t>(GetBValue(value));
 }
 
+#if defined(LGT_E2E_BUILD)
+bool ForceCompositionFailureForE2E() noexcept {
+  wchar_t value[2]{};
+  return GetEnvironmentVariableW(L"LGT_E2E_FORCE_COMPOSITION_FAILURE", value,
+                                 ARRAYSIZE(value)) == 1 &&
+         value[0] == L'1';
+}
+#endif
+
 }  // namespace
 
 Application::Application(HINSTANCE instance)
     : instance_(instance), logger_(settingsStore_.DataDirectory()) {}
 
 Application::~Application() {
+  policyMonitor_.Reset();
   RevokeDropTarget();
   if (terminal_) terminal_->Close();
   if (transport_) transport_->Close();
@@ -89,12 +101,23 @@ bool Application::CreateWindowAndGraphics() {
   const auto state = settingsStore_.LoadWindowState();
   if (!window_->Create(state, true)) return false;
   compositionMode_ = false;
-  for (int attempt = 0; attempt < 2; ++attempt) {
-    if (composition_.Initialize(window_->Handle())) {
-      compositionMode_ = true;
-      break;
+#if defined(LGT_E2E_BUILD)
+  const bool forceCompositionFailure = ForceCompositionFailureForE2E();
+#else
+  constexpr bool forceCompositionFailure = false;
+#endif
+  if (!forceCompositionFailure) {
+    for (int attempt = 0; attempt < 2; ++attempt) {
+      if (composition_.Initialize(window_->Handle())) {
+        compositionMode_ = true;
+        break;
+      }
+      logger_.Write(diagnostics::Level::Warning, L"composition.initialize.retry", attempt + 1);
     }
-    logger_.Write(diagnostics::Level::Warning, L"composition.initialize.retry", attempt + 1);
+#if defined(LGT_E2E_BUILD)
+  } else {
+    logger_.Write(diagnostics::Level::Warning, L"composition.initialize.forced-failure");
+#endif
   }
   if (!compositionMode_) {
     const auto fallbackState = window_->CaptureState();
@@ -109,6 +132,9 @@ bool Application::CreateWindowAndGraphics() {
 
 void Application::InitializeWindowServices() {
   const HWND handle = window_->Handle();
+  policyMonitor_.Start(handle);
+  window_->SetWebHitTestHandler(
+      [this](POINT point) { return webView_.NonClientHitTest(point); });
   clipboard_ = std::make_unique<platform::ClipboardService>(handle);
   if (terminal_) terminal_->SetNotificationWindow(handle);
   else terminal_ = std::make_unique<terminal::ConPtySession>(handle);
@@ -117,6 +143,7 @@ void Application::InitializeWindowServices() {
   bridge_ = std::make_unique<webview::WebViewBridge>(
       settingsStore_, composition_, *terminal_, *transport_, *clipboard_,
       [this](const settings::Settings& value) { ApplySettings(value); });
+  UpdateWindowState();
 }
 
 HRESULT Application::InitializeWebView() {
@@ -124,6 +151,17 @@ HRESULT Application::InitializeWebView() {
   initializingWebView_ = true;
   ++webViewInitializationAttempts_;
   UpdateLayout();
+  const auto& settings = settingsStore_.Effective();
+  const bool opaque = !compositionMode_ ||
+                      composition_.State() != composition::AppearanceState::Glass;
+  if (opaque) {
+    const std::uint32_t background = policy_.highContrast
+                                         ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
+                                         : composition::ToneRgb(settings.glass.tone);
+    webView_.SetOpaqueBackground(background);
+  } else {
+    webView_.SetTransparentBackground();
+  }
   return webView_.Initialize(
       window_->Handle(), compositionMode_, composition_.WebRoot(),
       settingsStore_.WebViewDataDirectory(),
@@ -267,12 +305,24 @@ void Application::UpdatePolicy() {
   if (bridge_) bridge_->UpdatePolicy(policy_);
 }
 
+void Application::UpdateWindowState() {
+  if (!window_) return;
+  const bool maximized = IsZoomed(window_->Handle()) != FALSE;
+  composition_.SetFullscreen(window_->Fullscreen());
+  composition_.SetCaptionState(window_->HoveredCaptionButton(),
+                               window_->PressedCaptionButton(), maximized);
+  if (bridge_) {
+    bridge_->UpdateWindowState(maximized, window_->Fullscreen(), window_->Active());
+  }
+}
+
 void Application::ApplySettings(const settings::Settings& settings) {
   if (compositionMode_) composition_.SetAppearance(settings, policy_);
   const bool opaque = !compositionMode_ || composition_.State() != composition::AppearanceState::Glass;
   if (opaque) {
     const std::uint32_t background =
-        policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW)) : settings.tint;
+        policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
+                             : composition::ToneRgb(settings.glass.tone);
     webView_.SetOpaqueBackground(background);
   }
   else webView_.SetTransparentBackground();
@@ -288,7 +338,8 @@ void Application::SyncCompositionFailure(composition::AppearanceState previousSt
   }
   const auto& settings = settingsStore_.Effective();
   const std::uint32_t background =
-      policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW)) : settings.tint;
+      policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
+                           : composition::ToneRgb(settings.glass.tone);
   webView_.SetOpaqueBackground(background);
   logger_.Write(diagnostics::Level::Error, L"composition.update.safe-mode");
   if (bridge_) {
@@ -321,6 +372,7 @@ std::optional<LRESULT> Application::OnWindowMessage(UINT message, WPARAM wParam,
     case WM_SIZE:
       webView_.SetVisible(wParam != SIZE_MINIMIZED);
       UpdateLayout();
+      UpdateWindowState();
       break;
     case WM_MOVE:
       webView_.NotifyParentPositionChanged();
@@ -331,13 +383,23 @@ std::optional<LRESULT> Application::OnWindowMessage(UINT message, WPARAM wParam,
         composition_.SetActive(LOWORD(wParam) != WA_INACTIVE);
         SyncCompositionFailure(previous);
       }
+      UpdateWindowState();
       break;
     case WM_SETTINGCHANGE:
     case WM_THEMECHANGED:
     case WM_DWMCOMPOSITIONCHANGED:
     case WM_POWERBROADCAST:
+    case WM_WTSSESSION_CHANGE:
       UpdatePolicy();
       break;
+    case platform::kSystemPolicyChangedMessage:
+      UpdatePolicy();
+      return 0;
+    case window::kWindowStateChangedMessage:
+    case window::kWindowChromeChangedMessage:
+      UpdateLayout();
+      UpdateWindowState();
+      return 0;
     case terminal::kOutputAvailableMessage:
       if (transport_) transport_->DrainOutput();
       return 0;
