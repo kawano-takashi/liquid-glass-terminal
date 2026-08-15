@@ -1,13 +1,16 @@
 // Generated from contracts/protocol.idl.json. Do not edit.
 
-export const PROTOCOL_VERSION = 6 as const;
+export const PROTOCOL_VERSION = 7 as const;
 export const APP_ORIGIN = 'https://app.liquid-glass-terminal.invalid/' as const;
 export const UI_METRICS = {
   titlebarHeightDip: 56,
   captionButtonWidthDip: 46,
 } as const;
-export const SETTINGS_SCHEMA_VERSION = 6 as const;
+export const SETTINGS_SCHEMA_VERSION = 7 as const;
 export const WINDOW_STATE_SCHEMA_VERSION = 2 as const;
+export const STRING_FORMATS = {
+  backgroundColor: 'empty-or-hex-rgb',
+} as const;
 export const SETTINGS_CONSTRAINTS = {
   blurDips: {
     minimum: 0,
@@ -20,7 +23,14 @@ export const SETTINGS_CONSTRAINTS = {
     step: 10,
   },
 } as const;
-export const SETTINGS_KEYS = ['locale', 'glass', 'foreground', 'animations', 'uiScale'] as const;
+export const SETTINGS_KEYS = [
+  'locale',
+  'backgroundColor',
+  'glass',
+  'foreground',
+  'animations',
+  'uiScale',
+] as const;
 export const GLASS_SETTING_KEYS = ['enabled', 'blurDips'] as const;
 export const GLASS_VALUE_KEYS = ['blurDips'] as const;
 export const LIMITS = {
@@ -78,6 +88,7 @@ export interface GlassSettings extends GlassValues {
 }
 export interface Settings {
   locale: Locale;
+  backgroundColor: string;
   glass: GlassSettings;
   foreground: Foreground;
   animations: boolean;
@@ -86,6 +97,7 @@ export interface Settings {
 
 export interface SettingsPatch {
   locale?: Locale;
+  backgroundColor?: string;
   glass?: Partial<GlassSettings>;
   foreground?: Foreground;
   animations?: boolean;
@@ -126,6 +138,7 @@ export const GLASS_PRESETS = {
 } as const satisfies Record<GlassPreset, GlassValues>;
 export const DEFAULT_SETTINGS = {
   locale: 'system',
+  backgroundColor: '',
   glass: {
     enabled: true,
     blurDips: 30,
@@ -219,6 +232,9 @@ const constrainedInteger = (
 ): value is number =>
   integerInRange(value, constraint.minimum, constraint.maximum) &&
   (value - constraint.minimum) % constraint.step === 0;
+const validStringField = (name: keyof typeof STRING_FORMATS, value: unknown): value is string =>
+  typeof value === 'string' &&
+  (name === 'backgroundColor' ? value === '' || /^#[0-9a-fA-F]{6}$/u.test(value) : false);
 const asciiId = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(value);
 const enumValue = <T extends string>(values: readonly T[], value: unknown): value is T =>
@@ -248,6 +264,7 @@ export function isSettings(value: unknown): value is Settings {
     !exactObjectKeys(value, SETTINGS_KEYS) ||
     !(
       enumValue(LOCALES, value.locale) &&
+      validStringField('backgroundColor', value.backgroundColor) &&
       enumValue(FOREGROUNDS, value.foreground) &&
       typeof value.animations === 'boolean' &&
       validConstrainedField('uiScale', value.uiScale)
@@ -270,6 +287,11 @@ export function isSettingsPatch(value: unknown): value is SettingsPatch {
   )
     return false;
   if (value.locale !== undefined && !enumValue(LOCALES, value.locale)) return false;
+  if (
+    value.backgroundColor !== undefined &&
+    !validStringField('backgroundColor', value.backgroundColor)
+  )
+    return false;
   if (value.foreground !== undefined && !enumValue(FOREGROUNDS, value.foreground)) return false;
   if (value.animations !== undefined && !(typeof value.animations === 'boolean')) return false;
   if (value.uiScale !== undefined && !validConstrainedField('uiScale', value.uiScale)) return false;

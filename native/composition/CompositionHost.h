@@ -52,6 +52,7 @@ class CompositionHost final {
   void RefreshCapabilities();
   void EnsureGlassBlurBrush(std::uint32_t blurDips);
   void ReleaseGlassBlurBrush() noexcept;
+  [[nodiscard]] std::uint32_t SurfaceColor() const noexcept;
   void RebuildShapes() noexcept;
   void RebuildShapesCore();
   void RebuildTitleBar();
@@ -84,11 +85,13 @@ class CompositionHost final {
   winrt::Windows::UI::Composition::ContainerVisual root_{nullptr};
   winrt::Windows::UI::Composition::SpriteVisual solidLayer_{nullptr};
   winrt::Windows::UI::Composition::SpriteVisual blurLayer_{nullptr};
+  winrt::Windows::UI::Composition::SpriteVisual tintLayer_{nullptr};
   winrt::Windows::UI::Composition::ShapeVisual borderLayer_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual webRoot_{nullptr};
   winrt::Windows::UI::Composition::ContainerVisual overlayRoot_{nullptr};
   winrt::Windows::UI::Composition::ShapeVisual titlebarLayer_{nullptr};
   winrt::Windows::UI::Composition::CompositionColorBrush solidBrush_{nullptr};
+  winrt::Windows::UI::Composition::CompositionColorBrush tintBrush_{nullptr};
   winrt::Windows::UI::Composition::CompositionBackdropBrush backdropBrush_{nullptr};
   winrt::Windows::UI::Composition::CompositionEffectBrush blurBrush_{nullptr};
   std::uint32_t blurDips_ = 0;

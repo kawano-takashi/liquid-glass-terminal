@@ -17,6 +17,12 @@ export interface ResolvedForeground {
   mode: 'light' | 'dark';
 }
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/u;
+
+export function normalizeBackgroundColor(value: string): string | undefined {
+  return HEX_COLOR.test(value) ? value.toUpperCase() : undefined;
+}
+
 function systemForeground(): ResolvedForeground {
   const prefersDark =
     typeof window !== 'undefined' &&

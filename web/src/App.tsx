@@ -62,6 +62,7 @@ interface Notice {
 function settingsPatch(settings: Settings): SettingsPatch {
   return {
     locale: settings.locale,
+    backgroundColor: settings.backgroundColor,
     glass: { ...settings.glass },
     foreground: settings.foreground,
     animations: settings.animations,

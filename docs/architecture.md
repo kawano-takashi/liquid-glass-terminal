@@ -42,11 +42,13 @@ HostBackdropBrush (one shared source; no raw output branch)
 GaussianBlurEffect (shared graph; Blur.BlurAmount = glass.blurDips)
       ↓
 full-client blur SpriteVisual (opacity 1)
+      ↓
+optional full-client color tint SpriteVisual (opacity 1; brush alpha follows blurDips)
       ├── native borders and title-bar glyphs
       └── transparent WebView2 content visual
 ```
 
-The Gaussian effect samples the DWM-composited colors behind the window before this window is drawn. The application cannot read the source pixels, and the raw HostBackdrop is never an effect output or assigned to a visual. The shared graph is created once and its `Blur.BlurAmount` property is updated for previews. HostBackdrop is enabled with `DWMWA_USE_HOSTBACKDROPBRUSH` only while Glass is active, and disabled for Solid/Safe. The HostBackdrop source can be translucent by platform design; no extra opaque backing is inserted in Glass. If effects are unsupported, reported slow, or fail to initialize, the renderer uses an opaque system-color Solid surface and never exposes Tone-only or raw HostBackdrop output.
+The Gaussian effect samples the DWM-composited colors behind the window before this window is drawn. The application cannot read the source pixels, and the raw HostBackdrop is never an effect output or assigned to a visual. The shared graph is created once and its `Blur.BlurAmount` property is updated for previews. An optional `#RRGGBB` tint uses a separate color brush whose alpha is linearly mapped from 0% at 0 DIP to 45% at 74 DIP; the tint visual itself remains at opacity 1. HostBackdrop is enabled with `DWMWA_USE_HOSTBACKDROPBRUSH` only while Glass is active, and disabled for Solid/Safe. The HostBackdrop source can be translucent by platform design; no extra opaque backing is inserted in Glass. If effects are unsupported, reported slow, or fail to initialize, the renderer uses the selected color as an opaque Safe/Solid surface unless a Windows policy requires the system-color fallback.
 
 Presets are exact tuples and become `Custom` in the UI when the blur value differs.
 
@@ -119,11 +121,11 @@ Dropped paths are accepted only from the native OLE drop target and are quoted f
 Settings and window state live under `%LOCALAPPDATA%\Liquid Glass Terminal`. The settings drawer starts a native transaction:
 
 1. preview applies an in-memory candidate;
-2. apply writes a temporary file and atomically replaces `settings-v6.json`;
+2. apply writes a temporary file and atomically replaces `settings-v7.json`;
 3. cancel restores the committed value;
 4. invalid persisted JSON is isolated with an `.invalid-*` suffix.
 
-The incompatible `settings-v5.json` shape is neither imported nor deleted. Window placement uses `window-state-v2.json`; v1 files are also ignored. The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
+Valid `settings-v6.json` files are migrated to v7 with an empty background color and retained as legacy backups. The incompatible `settings-v5.json` shape is neither imported nor deleted. Window placement uses `window-state-v2.json`; v1 files are also ignored. The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
 
 ## Policy and fallback
 
@@ -136,7 +138,7 @@ The incompatible `settings-v5.json` shape is neither imported nor deleted. Windo
 - Remote Desktop;
 - energy saver.
 
-Disabled transparency, high contrast, Remote Desktop, energy saver, user opt-out, unsupported/slow effects, or effect initialization failure selects an opaque Solid surface without changing saved Glass preferences. High contrast and Auto foreground use Windows system colors; explicit Light/Dark use fixed application colors. `UISettings.ColorValuesChanged` and policy changes are observed while running and sent to React through `capabilities.changed`.
+Disabled transparency, high contrast, Remote Desktop, energy saver, user opt-out, unsupported/slow effects, or effect initialization failure selects an opaque Solid surface without changing saved Glass preferences. An optional background color is used for user opt-out and composition Safe fallback; policy fallbacks use the system color. High contrast and Auto foreground use Windows system colors; explicit Light/Dark use fixed application colors. `UISettings.ColorValuesChanged` and policy changes are observed while running and sent to React through `capabilities.changed`.
 
 Three runtime appearance states are exposed:
 

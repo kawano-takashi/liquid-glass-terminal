@@ -75,7 +75,7 @@ select:focus-visible {
 
 .app[data-appearance='solid'],
 .app[data-appearance='safe'] {
-  background: var(--surface-solid);
+  background: transparent;
 }
 
 .application-content {
@@ -412,6 +412,59 @@ select:focus-visible {
   grid-column: 1 / -1;
   width: 100%;
   accent-color: var(--text);
+}
+
+.background-color-field {
+  display: grid;
+  gap: 9px;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.background-color-field legend {
+  margin: 0 0 9px;
+  padding: 0;
+}
+
+.color-inputs {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 9px;
+  align-items: center;
+}
+
+.color-inputs input[type='color'] {
+  width: 42px;
+  height: 35px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--control);
+}
+
+.hex-color-input {
+  min-width: 0;
+  height: 35px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--control);
+  color: var(--text);
+  font-family: 'Cascadia Mono PL', monospace;
+  letter-spacing: 0.04em;
+}
+
+.hex-color-input[aria-invalid='true'] {
+  outline: 2px solid rgb(188 43 43 / 0.72);
+  outline-offset: 1px;
+}
+
+.field-error {
+  color: color-mix(in srgb, var(--text) 82%, #c52f3b);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .reset-button {

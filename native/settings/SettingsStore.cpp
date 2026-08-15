@@ -14,6 +14,8 @@
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/base.h>
 
+#include "settings/BackgroundColor.h"
+
 namespace lgt::settings {
 namespace {
 
@@ -95,6 +97,54 @@ std::wstring ReadText(const std::filesystem::path& path) {
   return buffer.str();
 }
 
+std::optional<Settings> ParseSettingsJson(std::wstring_view json,
+                                          std::uint32_t schemaVersion,
+                                          bool includesBackgroundColor) {
+  try {
+    const auto root = JsonObject::Parse(json);
+    const auto expectedKeys = includesBackgroundColor
+                                  ? std::set<std::wstring>{L"schemaVersion", L"locale",
+                                                           L"backgroundColor", L"glass",
+                                                           L"foreground", L"animations", L"uiScale"}
+                                  : std::set<std::wstring>{L"schemaVersion", L"locale", L"glass",
+                                                           L"foreground", L"animations", L"uiScale"};
+    if (!ExactKeys(root, expectedKeys) ||
+        root.GetNamedValue(L"schemaVersion").ValueType() != JsonValueType::Number ||
+        root.GetNamedNumber(L"schemaVersion") != schemaVersion ||
+        root.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) {
+      return std::nullopt;
+    }
+    const auto glass = root.GetNamedObject(L"glass");
+    if (!ExactKeys(glass, {L"enabled", L"blurDips"})) return std::nullopt;
+
+    Settings result;
+    const auto locale = protocol::ParseLocale(root.GetNamedString(L"locale"));
+    const auto foreground = protocol::ParseForeground(root.GetNamedString(L"foreground"));
+    if (!locale || !foreground || !Boolean(glass, L"enabled", result.glass.enabled) ||
+        !Boolean(root, L"animations", result.animations)) {
+      return std::nullopt;
+    }
+    if (includesBackgroundColor) {
+      if (root.GetNamedValue(L"backgroundColor").ValueType() != JsonValueType::String) {
+        return std::nullopt;
+      }
+      const std::wstring color(root.GetNamedString(L"backgroundColor"));
+      if (!IsValidBackgroundColor(color)) return std::nullopt;
+      result.backgroundColor = NormalizeBackgroundColor(color);
+    }
+    if (!ConstrainedInteger(glass, L"blurDips", protocol::kBlurDipsConstraint,
+                            result.glass.blurDips) ||
+        !ConstrainedInteger(root, L"uiScale", protocol::kUiScaleConstraint, result.uiScale)) {
+      return std::nullopt;
+    }
+    result.locale = *locale;
+    result.foreground = *foreground;
+    return protocol::IsValid(result) ? std::optional<Settings>(result) : std::nullopt;
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
 }  // namespace
 
 std::wstring_view ToString(GlassPreset value) noexcept {
@@ -125,22 +175,37 @@ const Settings& SettingsStore::Current() const noexcept { return current_; }
 Settings SettingsStore::Effective() const noexcept { return preview_.value_or(current_); }
 
 void SettingsStore::Load() {
-  const auto path = dataDirectory_ / L"settings-v6.json";
-  if (!std::filesystem::exists(path)) return;
-  try {
+  const auto path = dataDirectory_ / L"settings-v7.json";
+  if (std::filesystem::exists(path)) {
     const auto parsed = Parse(ReadText(path));
+    if (parsed) {
+      current_ = *parsed;
+    } else {
+      IsolateInvalid(path);
+      current_ = {};
+    }
+    return;
+  }
+
+  const auto legacyPath = dataDirectory_ / L"settings-v6.json";
+  if (!std::filesystem::exists(legacyPath)) return;
+  try {
+    const auto parsed = ParseSettingsJson(ReadText(legacyPath), 6, false);
     if (!parsed) throw std::runtime_error("invalid settings");
+    if (!AtomicWrite(path, Serialize(*parsed))) throw std::runtime_error("migration failed");
     current_ = *parsed;
   } catch (...) {
-    IsolateInvalid(path);
+    IsolateInvalid(legacyPath);
     current_ = {};
   }
 }
 
 bool SettingsStore::Save(const Settings& value) {
-  if (!protocol::IsValid(value) ||
-      !AtomicWrite(dataDirectory_ / L"settings-v6.json", Serialize(value))) return false;
-  current_ = value;
+  if (!protocol::IsValid(value)) return false;
+  Settings normalized = value;
+  normalized.backgroundColor = NormalizeBackgroundColor(value.backgroundColor);
+  if (!AtomicWrite(dataDirectory_ / L"settings-v7.json", Serialize(normalized))) return false;
+  current_ = normalized;
   preview_.reset();
   previewTransaction_.clear();
   return true;
@@ -154,6 +219,7 @@ void SettingsStore::BeginPreview(std::wstring transactionId) {
 bool SettingsStore::Preview(std::wstring_view transactionId, const Settings& value) {
   if (transactionId != previewTransaction_ || !protocol::IsValid(value)) return false;
   preview_ = value;
+  preview_->backgroundColor = NormalizeBackgroundColor(value.backgroundColor);
   return true;
 }
 
@@ -220,49 +286,28 @@ bool SettingsStore::SaveWindowState(const WindowState& state) const {
 }
 
 std::wstring SettingsStore::Serialize(const Settings& value) {
+  Settings normalized = value;
+  normalized.backgroundColor = NormalizeBackgroundColor(value.backgroundColor);
   JsonObject glass;
-  glass.Insert(L"enabled", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.glass.enabled));
-  glass.Insert(L"blurDips", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.blurDips));
+  glass.Insert(L"enabled", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(normalized.glass.enabled));
+  glass.Insert(L"blurDips", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(normalized.glass.blurDips));
   JsonObject root;
   root.Insert(L"schemaVersion", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(
-                                    protocol::kSettingsSchemaVersion));
+                                     protocol::kSettingsSchemaVersion));
   root.Insert(L"locale", winrt::Windows::Data::Json::JsonValue::CreateStringValue(
-                              protocol::ToString(value.locale)));
+                               protocol::ToString(normalized.locale)));
+  root.Insert(L"backgroundColor", winrt::Windows::Data::Json::JsonValue::CreateStringValue(
+                                      normalized.backgroundColor));
   root.Insert(L"glass", glass);
   root.Insert(L"foreground", winrt::Windows::Data::Json::JsonValue::CreateStringValue(
-                                  protocol::ToString(value.foreground)));
-  root.Insert(L"animations", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.animations));
-  root.Insert(L"uiScale", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.uiScale));
+                                   protocol::ToString(normalized.foreground)));
+  root.Insert(L"animations", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(normalized.animations));
+  root.Insert(L"uiScale", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(normalized.uiScale));
   return std::wstring(root.Stringify());
 }
 
 std::optional<Settings> SettingsStore::Parse(std::wstring_view json) {
-  try {
-    const auto root = JsonObject::Parse(json);
-    if (!ExactKeys(root, {L"schemaVersion", L"locale", L"glass", L"foreground", L"animations", L"uiScale"}) ||
-        root.GetNamedValue(L"schemaVersion").ValueType() != JsonValueType::Number ||
-        root.GetNamedNumber(L"schemaVersion") != protocol::kSettingsSchemaVersion ||
-        root.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) return std::nullopt;
-    const auto glass = root.GetNamedObject(L"glass");
-    if (!ExactKeys(glass, {L"enabled", L"blurDips"})) {
-      return std::nullopt;
-    }
-    Settings result;
-    const auto locale = protocol::ParseLocale(root.GetNamedString(L"locale"));
-    const auto foreground = protocol::ParseForeground(root.GetNamedString(L"foreground"));
-    if (!locale || !foreground || !Boolean(glass, L"enabled", result.glass.enabled) ||
-        !Boolean(root, L"animations", result.animations)) return std::nullopt;
-    if (!ConstrainedInteger(glass, L"blurDips", protocol::kBlurDipsConstraint,
-                            result.glass.blurDips) ||
-        !ConstrainedInteger(root, L"uiScale", protocol::kUiScaleConstraint, result.uiScale)) {
-      return std::nullopt;
-    }
-    result.locale = *locale;
-    result.foreground = *foreground;
-    return protocol::IsValid(result) ? std::optional<Settings>(result) : std::nullopt;
-  } catch (...) {
-    return std::nullopt;
-  }
+  return ParseSettingsJson(json, protocol::kSettingsSchemaVersion, true);
 }
 
 void SettingsStore::IsolateInvalid(const std::filesystem::path& path) const {

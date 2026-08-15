@@ -5,11 +5,12 @@
 #include <compare>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace lgt::protocol {
-inline constexpr std::uint32_t kVersion = 6;
-inline constexpr std::uint32_t kSettingsSchemaVersion = 6;
+inline constexpr std::uint32_t kVersion = 7;
+inline constexpr std::uint32_t kSettingsSchemaVersion = 7;
 inline constexpr std::uint32_t kWindowStateSchemaVersion = 2;
 inline constexpr std::wstring_view kAppOrigin = L"https://app.liquid-glass-terminal.invalid/";
 inline constexpr std::uint32_t kTitlebarHeightDip = 56;
@@ -91,7 +92,7 @@ struct NumericConstraint { std::uint32_t minimum; std::uint32_t maximum; std::ui
 inline constexpr NumericConstraint kBlurDipsConstraint{0, 74, 1};
 inline constexpr NumericConstraint kUiScaleConstraint{80, 200, 10};
 
-inline constexpr std::array<std::wstring_view, 5> kSettingsKeys{L"locale", L"glass", L"foreground", L"animations", L"uiScale"};
+inline constexpr std::array<std::wstring_view, 6> kSettingsKeys{L"locale", L"backgroundColor", L"glass", L"foreground", L"animations", L"uiScale"};
 inline constexpr std::array<std::wstring_view, 2> kGlassSettingKeys{L"enabled", L"blurDips"};
 inline constexpr std::array<std::wstring_view, 1> kGlassValueKeys{L"blurDips"};
 struct GlassValues {
@@ -118,6 +119,7 @@ inline constexpr std::array<GlassPresetDefinition, 3> kGlassPresets{{
 
 struct Settings {
   Locale locale = Locale::System;
+  std::wstring backgroundColor = L"";
   GlassSettings glass{};
   Foreground foreground = Foreground::Auto;
   bool animations = true;
@@ -152,7 +154,17 @@ constexpr bool IsValid(const GlassValues& value) noexcept { return IsValid(value
 constexpr bool IsValid(const GlassSettings& value) noexcept { return IsValid(GlassValues{value.blurDips}); }
 constexpr bool IsValid(Locale value) noexcept { return !ToString(value).empty(); }
 constexpr bool IsValid(Foreground value) noexcept { return !ToString(value).empty(); }
-constexpr bool IsValid(const Settings& value) noexcept { return IsValid(value.locale) && IsValid(value.glass) && IsValid(value.foreground) && IsValid(value.uiScale, kUiScaleConstraint); }
+constexpr bool IsValidStringField(std::wstring_view name, std::wstring_view value) noexcept {
+  if (name != L"backgroundColor") return false;
+  if (value.empty()) return true;
+  if (value.size() != 7 || value.front() != L'#') return false;
+  for (std::size_t index = 1; index < value.size(); ++index) {
+    const wchar_t character = value[index];
+    if (!((character >= L'0' && character <= L'9') || (character >= L'A' && character <= L'F') || (character >= L'a' && character <= L'f'))) return false;
+  }
+  return true;
+}
+inline bool IsValid(const Settings& value) noexcept { return IsValid(value.locale) && IsValidStringField(L"backgroundColor", value.backgroundColor) && IsValid(value.glass) && IsValid(value.foreground) && IsValid(value.uiScale, kUiScaleConstraint); }
 
 inline constexpr std::array<std::wstring_view, 9> kWebToNativeTypes{L"bridge.ready", L"terminal.resize", L"terminal.input.commit", L"terminal.output.ack", L"settings.preview", L"settings.apply", L"settings.cancel", L"clipboard.read", L"clipboard.write"};
 inline constexpr std::array<std::wstring_view, 13> kNativeToWebTypes{L"bridge.accepted", L"capabilities.changed", L"terminal.buffer.attach", L"terminal.input.ack", L"terminal.output.ready", L"terminal.recovered", L"settings.snapshot", L"settings.result", L"appearance.changed", L"window.state.changed", L"clipboard.result", L"drop.path", L"app.notice"};

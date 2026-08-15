@@ -8,6 +8,7 @@ import {
   SETTINGS_CONSTRAINTS,
   SETTINGS_KEYS,
   SETTINGS_OPERATIONS,
+  STRING_FORMATS,
   UI_METRICS,
   isNativeToWebMessage,
   isSettings,
@@ -21,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 const settings: Settings = {
   locale: 'ja',
+  backgroundColor: '',
   glass: { ...DEFAULT_SETTINGS.glass },
   foreground: 'auto',
   animations: true,
@@ -28,19 +30,21 @@ const settings: Settings = {
 };
 
 describe('generated protocol validators', () => {
-  it('generates the v6 blur metadata from the IDL', () => {
-    expect(PROTOCOL_VERSION).toBe(6);
+  it('generates the v7 background color and blur metadata from the IDL', () => {
+    expect(PROTOCOL_VERSION).toBe(7);
     expect(SETTINGS_OPERATIONS).toEqual(['preview', 'apply', 'cancel']);
     expect(UI_METRICS).toEqual({ titlebarHeightDip: 56, captionButtonWidthDip: 46 });
     expect(SETTINGS_CONSTRAINTS).toEqual({
       blurDips: { minimum: 0, maximum: 74, step: 1 },
       uiScale: { minimum: 80, maximum: 200, step: 10 },
     });
+    expect(STRING_FORMATS).toEqual({ backgroundColor: 'empty-or-hex-rgb' });
     expect(GLASS_PRESETS).toEqual({
       clear: { blurDips: 0 },
       regular: { blurDips: 30 },
       dense: { blurDips: 55 },
     });
+    expect(DEFAULT_SETTINGS.backgroundColor).toBe('');
     expect(DEFAULT_SETTINGS.glass).toEqual({ enabled: true, blurDips: 30 });
     expect(resolveGlassPreset({ ...DEFAULT_SETTINGS.glass })).toBe('regular');
     expect(resolveGlassPreset({ ...DEFAULT_SETTINGS.glass, blurDips: 29 })).toBe('custom');
@@ -54,8 +58,13 @@ describe('generated protocol validators', () => {
     for (const blurDips of [0, 30, 74]) {
       expect(isSettings(withGlass({ blurDips }))).toBe(true);
     }
+    expect(isSettings({ ...settings, backgroundColor: '#aBcD12' })).toBe(true);
     for (const blurDips of [-1, 75, 2.5]) {
       expect(isSettings(withGlass({ blurDips }))).toBe(false);
+    }
+    for (const backgroundColor of ['#12345', '#12345678', 'red', '123456', '']) {
+      if (backgroundColor === '') continue;
+      expect(isSettings({ ...settings, backgroundColor })).toBe(false);
     }
     expect(isSettings(withGlass({ intensity: 35 } as never))).toBe(false);
     expect(isSettings(withGlass({ tone: 92 } as never))).toBe(false);
@@ -83,6 +92,8 @@ describe('generated protocol validators', () => {
     expect(isSettingsPatch({ glass: { blurDips: 74 } })).toBe(true);
     expect(isSettingsPatch({ glass: { blurDips: -1 } })).toBe(false);
     expect(isSettingsPatch({ glass: { blurDips: 2.5 } })).toBe(false);
+    expect(isSettingsPatch({ backgroundColor: '#abcdef' })).toBe(true);
+    expect(isSettingsPatch({ backgroundColor: '#abc' })).toBe(false);
     expect(isSettingsPatch({ glass: { intensity: 35 } })).toBe(false);
     expect(isSettingsPatch({ glass: { tone: 0 } })).toBe(false);
     expect(isSettingsPatch({ glass: { opacity: 35 } })).toBe(false);

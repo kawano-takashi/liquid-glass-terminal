@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <string>
 
+#include "settings/BackgroundColor.h"
+
 namespace lgt::app {
 namespace {
 
@@ -34,6 +36,13 @@ std::uint32_t RgbFromColorRef(COLORREF value) {
   return (static_cast<std::uint32_t>(GetRValue(value)) << 16) |
          (static_cast<std::uint32_t>(GetGValue(value)) << 8) |
          static_cast<std::uint32_t>(GetBValue(value));
+}
+
+std::uint32_t SurfaceColor(const settings::Settings& settings,
+                           const platform::PolicySnapshot& policy) {
+  if (!policy.AllowsGlass()) return RgbFromColorRef(GetSysColor(COLOR_WINDOW));
+  return settings::BackgroundColorRgb(settings.backgroundColor)
+      .value_or(RgbFromColorRef(GetSysColor(COLOR_WINDOW)));
 }
 
 #if defined(LGT_E2E_BUILD)
@@ -153,7 +162,7 @@ HRESULT Application::InitializeWebView() {
   const bool opaque = !compositionMode_ ||
                       composition_.State() != composition::AppearanceState::Glass;
   if (opaque) {
-    const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
+    const std::uint32_t background = SurfaceColor(settingsStore_.Effective(), policy_);
     webView_.SetOpaqueBackground(background);
   } else {
     webView_.SetTransparentBackground();
@@ -316,7 +325,7 @@ void Application::ApplySettings(const settings::Settings& settings) {
   if (compositionMode_) composition_.SetAppearance(settings, policy_);
   const bool opaque = !compositionMode_ || composition_.State() != composition::AppearanceState::Glass;
   if (opaque) {
-    const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
+    const std::uint32_t background = SurfaceColor(settings, policy_);
     webView_.SetOpaqueBackground(background);
   }
   else webView_.SetTransparentBackground();
@@ -330,7 +339,7 @@ void Application::SyncCompositionFailure(composition::AppearanceState previousSt
       composition_.State() != composition::AppearanceState::Safe) {
     return;
   }
-  const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
+  const std::uint32_t background = SurfaceColor(settingsStore_.Effective(), policy_);
   webView_.SetOpaqueBackground(background);
   logger_.Write(diagnostics::Level::Error, L"composition.update.safe-mode");
   if (bridge_) {

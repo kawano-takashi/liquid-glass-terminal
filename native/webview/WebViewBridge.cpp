@@ -9,6 +9,7 @@
 #include <winrt/Windows.Data.Json.h>
 
 #include "contracts/generated/Protocol.generated.h"
+#include "settings/BackgroundColor.h"
 
 namespace lgt::webview {
 namespace {
@@ -81,6 +82,7 @@ JsonObject SettingsJson(const settings::Settings& settings) {
   glass.Insert(L"blurDips", JsonValue::CreateNumberValue(settings.glass.blurDips));
   JsonObject result;
   result.Insert(L"locale", JsonValue::CreateStringValue(settings::ToString(settings.locale)));
+  result.Insert(L"backgroundColor", JsonValue::CreateStringValue(settings.backgroundColor));
   result.Insert(L"glass", glass);
   result.Insert(L"foreground",
                 JsonValue::CreateStringValue(settings::ToString(settings.foreground)));
@@ -256,6 +258,14 @@ bool WebViewBridge::ParseSettingsPatch(const JsonObject& object,
     const auto locale = protocol::ParseLocale(object.GetNamedString(L"locale"));
     if (!locale) return false;
     value.locale = *locale;
+  }
+  if (object.HasKey(L"backgroundColor")) {
+    if (object.GetNamedValue(L"backgroundColor").ValueType() != JsonValueType::String) {
+      return false;
+    }
+    const std::wstring color(object.GetNamedString(L"backgroundColor"));
+    if (!settings::IsValidBackgroundColor(color)) return false;
+    value.backgroundColor = settings::NormalizeBackgroundColor(color);
   }
   if (object.HasKey(L"glass")) {
     if (object.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) return false;

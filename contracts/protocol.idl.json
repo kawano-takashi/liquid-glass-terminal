@@ -1,15 +1,16 @@
 {
   "name": "LiquidGlassTerminalProtocol",
-  "version": 6,
+  "version": 7,
   "origin": "https://app.liquid-glass-terminal.invalid/",
   "uiMetrics": {
     "titlebarHeightDip": 56,
     "captionButtonWidthDip": 46
   },
   "settings": {
-    "schemaVersion": 6,
+    "schemaVersion": 7,
     "defaults": {
       "locale": "system",
+      "backgroundColor": "",
       "glass": {
         "enabled": true,
         "blurDips": 30
@@ -21,6 +22,9 @@
     "constraints": {
       "blurDips": { "minimum": 0, "maximum": 74, "step": 1 },
       "uiScale": { "minimum": 80, "maximum": 200, "step": 10 }
+    },
+    "stringFormats": {
+      "backgroundColor": "empty-or-hex-rgb"
     },
     "presets": {
       "clear": { "blurDips": 0 },

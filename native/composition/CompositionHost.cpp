@@ -2,6 +2,7 @@
 
 #include "composition/Effects.h"
 #include "composition/GlassMaterial.h"
+#include "settings/BackgroundColor.h"
 
 #include <DispatcherQueue.h>
 #include <Windows.UI.Composition.Interop.h>
@@ -93,11 +94,13 @@ void CompositionHost::Reset() noexcept {
   capabilities_ = nullptr;
   ReleaseGlassBlurBrush();
   solidBrush_ = nullptr;
+  tintBrush_ = nullptr;
   titlebarLayer_ = nullptr;
   overlayRoot_ = nullptr;
   webRoot_ = nullptr;
   borderLayer_ = nullptr;
   blurLayer_ = nullptr;
+  tintLayer_ = nullptr;
   solidLayer_ = nullptr;
   root_ = nullptr;
   target_ = nullptr;
@@ -194,17 +197,19 @@ void CompositionHost::CreateVisualTree() {
   root_.RelativeSizeAdjustment({1.0F, 1.0F});
   solidLayer_ = compositor_.CreateSpriteVisual();
   blurLayer_ = compositor_.CreateSpriteVisual();
+  tintLayer_ = compositor_.CreateSpriteVisual();
   borderLayer_ = compositor_.CreateShapeVisual();
   webRoot_ = compositor_.CreateContainerVisual();
   overlayRoot_ = compositor_.CreateContainerVisual();
   titlebarLayer_ = compositor_.CreateShapeVisual();
-  for (const auto& layer : {solidLayer_, blurLayer_}) {
+  for (const auto& layer : {solidLayer_, blurLayer_, tintLayer_}) {
     layer.RelativeSizeAdjustment({1.0F, 1.0F});
   }
   webRoot_.RelativeSizeAdjustment({1.0F, 1.0F});
   overlayRoot_.RelativeSizeAdjustment({1.0F, 1.0F});
   root_.Children().InsertAtTop(solidLayer_);
   root_.Children().InsertAtTop(blurLayer_);
+  root_.Children().InsertAtTop(tintLayer_);
   root_.Children().InsertAtTop(borderLayer_);
   root_.Children().InsertAtTop(webRoot_);
   overlayRoot_.Children().InsertAtTop(titlebarLayer_);
@@ -213,6 +218,10 @@ void CompositionHost::CreateVisualTree() {
   solidLayer_.Brush(solidBrush_);
   blurLayer_.Opacity(1.0F);
   blurLayer_.IsVisible(false);
+  tintBrush_ = compositor_.CreateColorBrush();
+  tintLayer_.Brush(tintBrush_);
+  tintLayer_.Opacity(1.0F);
+  tintLayer_.IsVisible(false);
   borderLayer_.Opacity(0.0F);
 }
 
@@ -298,7 +307,9 @@ void CompositionHost::MarkFailure(std::wstring_view stage, HRESULT error) noexce
   try {
     if (solidLayer_) solidLayer_.IsVisible(true);
     if (blurLayer_) blurLayer_.IsVisible(false);
+    if (tintLayer_) tintLayer_.IsVisible(false);
     if (borderLayer_) borderLayer_.IsVisible(false);
+    if (solidBrush_) solidBrush_.Color(Color(SurfaceColor(), 1.0F));
   } catch (...) {
   }
   ReleaseGlassBlurBrush();
@@ -308,15 +319,25 @@ void CompositionHost::MarkFailure(std::wstring_view stage, HRESULT error) noexce
   }
 }
 
+std::uint32_t CompositionHost::SurfaceColor() const noexcept {
+  if (!policy_.AllowsGlass()) return RgbFromColorRef(GetSysColor(COLOR_WINDOW));
+  return settings::BackgroundColorRgb(settings_.backgroundColor)
+             .value_or(RgbFromColorRef(GetSysColor(COLOR_WINDOW)));
+}
+
 void CompositionHost::RebuildShapesCore() {
   shapeStage_ = L"clear";
   ClearShapes(borderLayer_.Shapes());
   const bool glass = state_ == AppearanceState::Glass;
-  const std::uint32_t fallbackColor = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
-  solidBrush_.Color(Color(fallbackColor, 1.0F));
+  solidBrush_.Color(Color(SurfaceColor(), 1.0F));
   solidLayer_.IsVisible(!glass);
   blurLayer_.Opacity(1.0F);
   blurLayer_.IsVisible(glass && blurBrush_ != nullptr);
+  const auto tintColor = settings::BackgroundColorRgb(settings_.backgroundColor);
+  const auto tintAlpha = GlassTintAlpha(blurDips_);
+  tintBrush_.Color(Color(tintColor.value_or(0), static_cast<float>(tintAlpha) / 255.0F));
+  tintLayer_.Opacity(1.0F);
+  tintLayer_.IsVisible(glass && tintColor.has_value() && tintAlpha != 0);
   borderLayer_.IsVisible(!policy_.highContrast && glass);
 
   const float scale = static_cast<float>(dpi_) / 96.0F;

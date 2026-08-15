@@ -38,6 +38,7 @@ const tsTypeForSetting = (name, value) => {
   if (name === 'glass') return 'GlassSettings';
   if (typeof value === 'boolean') return 'boolean';
   if (typeof value === 'number') return 'number';
+  if (typeof value === 'string') return 'string';
   throw new Error(`Invalid protocol IDL: unsupported settings field ${name}`);
 };
 
@@ -69,18 +70,37 @@ invariant(
 const settingsRootNames = Object.keys(settingsIdl.defaults);
 const glassSettingNames = Object.keys(settingsIdl.defaults.glass);
 const settingNames = Object.keys(settingsIdl.constraints);
+const stringFormats = settingsIdl.stringFormats ?? {};
+const stringSettingNames = settingsRootNames.filter(
+  (name) =>
+    typeof settingsIdl.defaults[name] === 'string' && name !== 'locale' && name !== 'foreground',
+);
 const glassValueNames = glassSettingNames.filter((name) => name in settingsIdl.constraints);
 const rootConstrainedNames = settingsRootNames.filter((name) => name in settingsIdl.constraints);
 const unconstrainedGlassNames = glassSettingNames.filter(
   (name) => !(name in settingsIdl.constraints),
 );
 invariant(
-  exactKeys(settingsIdl.defaults, ['locale', 'glass', 'foreground', 'animations', 'uiScale']),
+  exactKeys(settingsIdl.defaults, [
+    'locale',
+    'backgroundColor',
+    'glass',
+    'foreground',
+    'animations',
+    'uiScale',
+  ]),
   'settings defaults have unexpected keys',
 );
 invariant(
   exactKeys(settingsIdl.defaults.glass, ['enabled', 'blurDips']),
   'glass defaults have unexpected keys',
+);
+invariant(
+  exactKeys(stringFormats, stringSettingNames) &&
+    stringSettingNames.every(
+      (name) => stringFormats[name] === 'empty-or-hex-rgb' && settingsIdl.defaults[name] === '',
+    ),
+  'stringFormats must define every unconstrained string setting as empty-or-hex-rgb',
 );
 invariant(
   unconstrainedGlassNames.length === 1 &&
@@ -200,6 +220,7 @@ const tsSettingValidator = (owner, name, value) => {
   if (name === 'foreground') return `enumValue(FOREGROUNDS, ${owner}.${name})`;
   if (typeof value === 'boolean') return `typeof ${owner}.${name} === 'boolean'`;
   if (typeof value === 'number') return `validConstrainedField('${name}', ${owner}.${name})`;
+  if (typeof value === 'string') return `validStringField('${name}', ${owner}.${name})`;
   throw new Error(`Invalid protocol IDL: unsupported validator for ${name}`);
 };
 const tsSettingsValidators = settingsRootNames
@@ -230,6 +251,7 @@ const ts =
   `export const UI_METRICS = ${JSON.stringify(idl.uiMetrics, null, 2)} as const;\n` +
   `export const SETTINGS_SCHEMA_VERSION = ${settingsIdl.schemaVersion} as const;\n` +
   `export const WINDOW_STATE_SCHEMA_VERSION = ${windowStateIdl.schemaVersion} as const;\n` +
+  `export const STRING_FORMATS = ${JSON.stringify(stringFormats, null, 2)} as const;\n` +
   `export const SETTINGS_CONSTRAINTS = ${JSON.stringify(settingsIdl.constraints, null, 2)} as const;\n` +
   `export const SETTINGS_KEYS = [${quoted(settingsRootNames)}] as const;\n` +
   `export const GLASS_SETTING_KEYS = [${quoted(glassSettingNames)}] as const;\n` +
@@ -292,6 +314,7 @@ const ts =
   `const finite = (value: unknown, min: number, max: number): value is number => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;\n` +
   `const integerInRange = (value: unknown, min: number, max: number): value is number => Number.isInteger(value) && finite(value, min, max);\n` +
   `const constrainedInteger = (value: unknown, constraint: { minimum: number; maximum: number; step: number }): value is number => integerInRange(value, constraint.minimum, constraint.maximum) && (value - constraint.minimum) % constraint.step === 0;\n` +
+  `const validStringField = (name: keyof typeof STRING_FORMATS, value: unknown): value is string => typeof value === 'string' && (name === 'backgroundColor' ? value === '' || /^#[0-9a-fA-F]{6}$/u.test(value) : false);\n` +
   `const asciiId = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(value);\n` +
   `const enumValue = <T extends string>(values: readonly T[], value: unknown): value is T => typeof value === 'string' && values.includes(value as T);\n\n` +
   `const boundedString = (value: unknown, max: number): value is string => typeof value === 'string' && value.length <= max;\n` +
@@ -382,6 +405,7 @@ const cppSettingsFields = settingsRootNames
     if (name === 'glass') return '  GlassSettings glass{};';
     if (typeof value === 'boolean') return `  bool ${name} = ${cppBoolean(value)};`;
     if (typeof value === 'number') return `  std::uint32_t ${name} = ${value};`;
+    if (typeof value === 'string') return `  std::wstring ${name} = L"${value}";`;
     throw new Error(`Invalid protocol IDL: unsupported C++ settings field ${name}`);
   })
   .join('\n');
@@ -393,6 +417,9 @@ const cppSettingsValidation = settingsRootNames
   .map((name) => {
     if (name === 'locale' || name === 'foreground' || name === 'glass') {
       return `IsValid(value.${name})`;
+    }
+    if (typeof cppDefault[name] === 'string') {
+      return `IsValidStringField(L"${name}", value.${name})`;
     }
     return `IsValid(value.${name}, k${pascal(name)}Constraint)`;
   })
@@ -410,7 +437,7 @@ const cppPresetArray = presetNames
 const allTypes = [...idl.messages.webToNative, ...idl.messages.nativeToWeb];
 const cpp =
   `// Generated from contracts/protocol.idl.json. Do not edit.\n#pragma once\n\n` +
-  `#include <array>\n#include <compare>\n#include <cstdint>\n#include <optional>\n#include <string_view>\n\nnamespace lgt::protocol {\n` +
+  `#include <array>\n#include <compare>\n#include <cstdint>\n#include <optional>\n#include <string>\n#include <string_view>\n\nnamespace lgt::protocol {\n` +
   `inline constexpr std::uint32_t kVersion = ${idl.version};\n` +
   `inline constexpr std::uint32_t kSettingsSchemaVersion = ${settingsIdl.schemaVersion};\n` +
   `inline constexpr std::uint32_t kWindowStateSchemaVersion = ${windowStateIdl.schemaVersion};\n` +
@@ -464,7 +491,17 @@ const cpp =
   `constexpr bool IsValid(const GlassSettings& value) noexcept { return IsValid(GlassValues{${glassValueNames.map((name) => `value.${name}`).join(', ')}}); }\n` +
   `constexpr bool IsValid(Locale value) noexcept { return !ToString(value).empty(); }\n` +
   `constexpr bool IsValid(Foreground value) noexcept { return !ToString(value).empty(); }\n` +
-  `constexpr bool IsValid(const Settings& value) noexcept { return ${cppSettingsValidation}; }\n` +
+  `constexpr bool IsValidStringField(std::wstring_view name, std::wstring_view value) noexcept {\n` +
+  `  if (name != L"backgroundColor") return false;\n` +
+  `  if (value.empty()) return true;\n` +
+  `  if (value.size() != 7 || value.front() != L'#') return false;\n` +
+  `  for (std::size_t index = 1; index < value.size(); ++index) {\n` +
+  `    const wchar_t character = value[index];\n` +
+  `    if (!((character >= L'0' && character <= L'9') || (character >= L'A' && character <= L'F') || (character >= L'a' && character <= L'f'))) return false;\n` +
+  `  }\n` +
+  `  return true;\n` +
+  `}\n` +
+  `inline bool IsValid(const Settings& value) noexcept { return ${cppSettingsValidation}; }\n` +
   `\n` +
   `inline constexpr std::array<std::wstring_view, ${idl.messages.webToNative.length}> kWebToNativeTypes{${cppQuoted(idl.messages.webToNative)}};\n` +
   `inline constexpr std::array<std::wstring_view, ${idl.messages.nativeToWeb.length}> kNativeToWebTypes{${cppQuoted(idl.messages.nativeToWeb)}};\n` +

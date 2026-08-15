@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../../contracts/generated/proto
 import {
   cssAppearance,
   matchingGlassPreset,
+  normalizeBackgroundColor,
   resolveForeground,
   withGlassPreset,
 } from '../../web/src/appearance';
@@ -18,6 +19,12 @@ describe('appearance and locale', () => {
     expect(resolveForeground('light')).toEqual({ color: '#F5F5F5', mode: 'light' });
     expect(resolveForeground('dark')).toEqual({ color: '#202124', mode: 'dark' });
     expect(resolveForeground('auto').color).toBe('CanvasText');
+  });
+
+  it('normalizes six-digit background colors and rejects other color syntax', () => {
+    expect(normalizeBackgroundColor('#aBcD12')).toBe('#ABCD12');
+    expect(normalizeBackgroundColor('#abc')).toBeUndefined();
+    expect(normalizeBackgroundColor('rgb(1, 2, 3)')).toBeUndefined();
   });
 
   it('does not expose removed tone or opacity CSS variables', () => {

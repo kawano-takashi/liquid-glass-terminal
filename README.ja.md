@@ -10,6 +10,7 @@
 
 - Win32の`HWND`と`WS_EX_NOREDIRECTIONBITMAP`がトップレベルウィンドウを所有し、リサイズ、最大化／復元、Snap Layout、システムメニュー、DPI、フルスクリーンを維持します。
 - Windows.UI.Compositionが、ウィンドウ描画前のDesktop合成結果を常にGaussian Effectへ入力し、`glass.blurDips`で0〜74 DIPのぼかし量を選べます。0 DIPではGaussian Effectのぼかしを無効化しますが、共有された処理済みGlass経路は維持します。処理済みの全画面Glass LayerのOpacityは常に1です。未加工のHostBackdrop出力は描画せず、アプリからPixelを読み取りまたは保存することもできません。
+- Settingsから任意のsRGB `#RRGGBB`背景色をウィンドウ全体へ適用できます。Glassでは0 DIPの0%から74 DIPの45%まで色を重ね、SolidとSafeでは同じ色を不透明に使用します。WindowsのAccessibility／Power Policyが有効な場合はSystem ColorのFallbackを優先します。
 - `CoreWebView2CompositionController`により、透明なReact UIをネイティブVisualツリーへ直接配置します。マウス、ホイール、Pointer、Touch／Pen、Cursor、Focus、DPI、Drag & Drop、IMEに関係する入力はネイティブ側で転送します。
 - C++20のConPTYホストが、kill-on-close Job Object内でローカルシェルを起動します。ターミナルデータは、上限付きQueue、Sequence検証、ACK、Recovery Generationを備えたWebView2 Shared Bufferで転送します。
 - xterm.jsの表示経路では、Codexを含むTUIが出力するANSIのセル背景と反転表示を除去します。前景色、Cursor、Selectionは維持し、透明なGlass Surface上に描画します。
@@ -86,7 +87,7 @@ Release用Stageは`build/package/LiquidGlassTerminal/`、`npm run make`で生成
 
 56 DIPのCustom Headerは操作ボタン以外をDragできます。最大化ボタンではWindows 11のSnap Layoutを維持し、FullscreenではHeader全体を非表示にします。
 
-Settings v6、Window State v2、WebView2 Profile、Rotation付きDiagnostic Logは`%LOCALAPPDATA%\Liquid Glass Terminal`の下だけに保存します。以前のSettingsとVersion 1の配置ファイルは変更せず、移行にも使用しません。Telemetry、Analytics、Update Check、Runtime Content Downloadは行いません。
+Settings v7、Window State v2、WebView2 Profile、Rotation付きDiagnostic Logは`%LOCALAPPDATA%\Liquid Glass Terminal`の下だけに保存します。有効なsettings-v6.jsonはv7へ移行しますが、v6ファイルは残します。それ以前のSettingsとVersion 1の配置ファイルは変更せず、移行にも使用しません。Telemetry、Analytics、Update Check、Runtime Content Downloadは行いません。
 
 ## Release状況
 

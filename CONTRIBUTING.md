@@ -50,6 +50,7 @@ Set `LGT_CLIPBOARD_E2E=1` only intentionally. That test temporarily replaces and
 ## User interface
 
 - Keep terminal glyphs outside decorative effects and preserve a minimum xterm contrast ratio of 4.5 for auto, light, and dark foreground modes.
+- Background color is an optional six-digit sRGB HEX setting; keep its tint in Windows Composition, preserve the 0–45% blur mapping, and keep policy fallbacks on system colors.
 - Verify Clear, Regular, and Dense against white, black, saturated, text-heavy, and moving backgrounds.
 - Preserve resize, maximize/restore, Snap Layout, system-menu, fullscreen, high-DPI, multi-monitor, high-refresh, mouse, pointer, touch/pen, keyboard, and Japanese IME behavior.
 - Honor disabled transparency, high contrast, reduced motion, screen readers, Remote Desktop, and energy saver without overwriting saved preferences.

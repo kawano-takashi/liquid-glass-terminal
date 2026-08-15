@@ -10,6 +10,7 @@ A local-first terminal for Windows 11 whose window, Glass material, input routin
 
 - A Win32 `HWND` with `WS_EX_NOREDIRECTIONBITMAP` owns the top-level window and preserves resize, maximize/restore, Snap Layout, system-menu, DPI, and fullscreen behavior.
 - Windows.UI.Composition always feeds one shared pre-window desktop composite through a Gaussian effect, with `glass.blurDips` selectable from 0–74 DIP. At 0 DIP the Gaussian effect is disabled while the shared processed Glass path remains active. The full-window Glass layer stays at opacity 1; no raw HostBackdrop output is drawn, and the app cannot read or store its pixels.
+- Settings can apply an optional sRGB `#RRGGBB` background color to the full window. Glass blends it from 0% at 0 DIP to 45% at 74 DIP; Solid and Safe use the same color opaquely. Windows accessibility and power policies retain the system-color fallback.
 - `CoreWebView2CompositionController` places the transparent React UI directly in the native visual tree. Native code routes mouse, wheel, pointer, touch/pen, cursor, focus, DPI, drag/drop, and IME-sensitive input.
 - A C++20 ConPTY host starts the local shell in a kill-on-close Job Object. WebView2 shared buffers carry terminal data with bounded queues, sequence validation, acknowledgements, and recovery generations.
 - The xterm.js display path removes ANSI cell backgrounds and reverse-video attributes, including TUI fills emitted by Codex, while preserving foreground colors, cursor, and selection visuals over the transparent Glass surface.
@@ -86,7 +87,7 @@ The staged release package is written to `build/package/LiquidGlassTerminal/`. `
 
 The custom 56-DIP header is draggable except for its controls. The maximize control retains Windows 11 Snap Layout, and fullscreen hides the entire header.
 
-Settings v6, window state v2, the WebView2 profile, and rotating diagnostic logs stay under `%LOCALAPPDATA%\Liquid Glass Terminal`. Earlier settings files and version 1 placement files are left untouched and are not imported. No telemetry, analytics, update checks, or runtime content downloads are performed.
+Settings v7, window state v2, the WebView2 profile, and rotating diagnostic logs stay under `%LOCALAPPDATA%\Liquid Glass Terminal`. Valid settings-v6.json files are migrated to v7 while the v6 file is retained; earlier settings files and version 1 placement files are left untouched and are not imported. No telemetry, analytics, update checks, or runtime content downloads are performed.
 
 ## Release status
 

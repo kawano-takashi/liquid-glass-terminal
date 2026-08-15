@@ -103,4 +103,38 @@ describe('SettingsDrawer', () => {
       glass: { enabled: true, blurDips: 30 },
     });
   });
+
+  it('normalizes picker and HEX colors, rejects invalid HEX, and clears the color', () => {
+    const onChange = vi.fn();
+    const value = settings();
+    value.backgroundColor = '#123456';
+    render(
+      <SettingsDrawer
+        open
+        value={value}
+        labels={messages.en}
+        onChange={onChange}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        pending={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Background color HEX' }), {
+      target: { value: '#aBcD12' },
+    });
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Background color HEX' }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...value, backgroundColor: '#ABCD12' });
+
+    onChange.mockClear();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Background color HEX' }), {
+      target: { value: '#abc' },
+    });
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Background color HEX' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('six-digit HEX');
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'No background color' }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...value, backgroundColor: '' });
+  });
 });

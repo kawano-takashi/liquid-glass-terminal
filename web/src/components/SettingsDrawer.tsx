@@ -1,11 +1,16 @@
 import { RotateCcw, X } from 'lucide-react';
-import { forwardRef, useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import {
   GLASS_PRESETS,
   SETTINGS_CONSTRAINTS,
   type Settings,
 } from '../../../contracts/generated/protocol';
-import { matchingGlassPreset, withGlassPreset, type NamedGlassPreset } from '../appearance';
+import {
+  matchingGlassPreset,
+  normalizeBackgroundColor,
+  withGlassPreset,
+  type NamedGlassPreset,
+} from '../appearance';
 import type { messages } from '../i18n';
 
 type Labels = (typeof messages)[keyof typeof messages];
@@ -66,6 +71,13 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
 ) {
   const closeButton = useRef<HTMLButtonElement>(null);
   const selectedPreset = matchingGlassPreset(value.glass);
+  const [hexDraft, setHexDraft] = useState(value.backgroundColor || '#000000');
+  const [hexError, setHexError] = useState(false);
+
+  useEffect(() => {
+    setHexDraft(value.backgroundColor || '#000000');
+    setHexError(false);
+  }, [value.backgroundColor]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +87,18 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
 
   const updateGlass = (patch: Partial<Settings['glass']>) => {
     onChange({ ...value, glass: { ...value.glass, ...patch } });
+  };
+
+  const commitHex = (): boolean => {
+    const normalized = normalizeBackgroundColor(hexDraft);
+    if (!normalized) {
+      setHexError(true);
+      return false;
+    }
+    setHexError(false);
+    setHexDraft(normalized);
+    if (normalized !== value.backgroundColor) onChange({ ...value, backgroundColor: normalized });
+    return true;
   };
 
   return (
@@ -153,6 +177,53 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
               disabled={pending}
               onChange={(blurDips) => updateGlass({ blurDips })}
             />
+            <fieldset className="background-color-field">
+              <legend>{labels.backgroundColor}</legend>
+              <div className="color-inputs">
+                <input
+                  type="color"
+                  value={value.backgroundColor || '#000000'}
+                  disabled={pending}
+                  aria-label={labels.colorPicker}
+                  onChange={(event) =>
+                    onChange({ ...value, backgroundColor: event.target.value.toUpperCase() })
+                  }
+                />
+                <input
+                  className="hex-color-input"
+                  type="text"
+                  value={hexDraft}
+                  maxLength={7}
+                  inputMode="text"
+                  spellCheck={false}
+                  disabled={pending}
+                  aria-label={labels.hexColor}
+                  aria-invalid={hexError}
+                  onChange={(event) => {
+                    setHexDraft(event.target.value);
+                    setHexError(false);
+                  }}
+                  onBlur={commitHex}
+                />
+              </div>
+              {hexError ? (
+                <span className="field-error" role="alert">
+                  {labels.invalidHexColor}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="button reset-button"
+                disabled={pending || value.backgroundColor === ''}
+                onClick={() => {
+                  setHexDraft('#000000');
+                  setHexError(false);
+                  onChange({ ...value, backgroundColor: '' });
+                }}
+              >
+                {labels.noBackgroundColor}
+              </button>
+            </fieldset>
             <button
               type="button"
               className="button reset-button"
@@ -233,7 +304,14 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
           <button type="button" className="button ghost" onClick={onCancel} disabled={pending}>
             {labels.cancel}
           </button>
-          <button type="button" className="button primary" onClick={onApply} disabled={pending}>
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => {
+              if (commitHex()) onApply();
+            }}
+            disabled={pending}
+          >
             {labels.apply}
           </button>
         </footer>

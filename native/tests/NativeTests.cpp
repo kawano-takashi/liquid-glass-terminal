@@ -16,6 +16,7 @@
 #include "composition/GlassMaterial.h"
 #include "platform/ClipboardService.h"
 #include "platform/FileDropTarget.h"
+#include "settings/BackgroundColor.h"
 #include "settings/SettingsStore.h"
 #include "terminal/ConPtySession.h"
 #include "window/WindowMetrics.h"
@@ -48,6 +49,7 @@ void TestSettings() {
   using namespace lgt::settings;
   Settings source;
   source.locale = Locale::Japanese;
+  source.backgroundColor = L"#A1B2C3";
   source.glass.enabled = false;
   source.glass.blurDips = 48;
   source.foreground = Foreground::Dark;
@@ -56,17 +58,19 @@ void TestSettings() {
   const auto parsed = SettingsStore::Parse(SettingsStore::Serialize(source));
   Expect(parsed == source, "settings must round-trip exactly");
   Expect(!SettingsStore::Parse(
-             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":105})"),
+             LR"({"schemaVersion":7,"locale":"en","backgroundColor":"","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":105})"),
          "settings must reject a scale outside the ten-percent step");
   const auto zeroBlur = SettingsStore::Parse(
-      LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":0},"foreground":"auto","animations":true,"uiScale":100})");
+      LR"({"schemaVersion":7,"locale":"en","backgroundColor":"#aBcD12","glass":{"enabled":true,"blurDips":0},"foreground":"auto","animations":true,"uiScale":100})");
   Expect(zeroBlur && zeroBlur->glass.blurDips == 0,
          "settings must accept zero DIP blur");
+  Expect(zeroBlur && zeroBlur->backgroundColor == L"#ABCD12",
+         "settings must normalize background colors");
   Expect(!SettingsStore::Parse(
-             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":-1},"foreground":"auto","animations":true,"uiScale":100})"),
+             LR"({"schemaVersion":7,"locale":"en","backgroundColor":"","glass":{"enabled":true,"blurDips":-1},"foreground":"auto","animations":true,"uiScale":100})"),
          "settings must reject negative blur");
   Expect(!SettingsStore::Parse(
-             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":100,"extra":true})"),
+             LR"({"schemaVersion":7,"locale":"en","backgroundColor":"","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":100,"extra":true})"),
          "settings must reject unknown fields");
   Expect(!SettingsStore::Parse(LR"({"schemaVersion":1})"),
          "settings must reject unknown schemas");
@@ -95,6 +99,19 @@ void TestSettings() {
     Expect(std::filesystem::exists(legacyDirectory / L"settings-v5.json") &&
                std::filesystem::exists(legacyDirectory / L"window-state-v1.json"),
            "ignored persistence files must remain untouched");
+
+    const auto migrationDirectory = testDirectory / L"migration";
+    std::filesystem::create_directories(migrationDirectory, error);
+    WriteText(migrationDirectory / L"settings-v6.json",
+              R"({"schemaVersion":6,"locale":"ja","glass":{"enabled":false,"blurDips":48},"foreground":"dark","animations":false,"uiScale":140})");
+    SettingsStore migrated(migrationDirectory);
+    migrated.Load();
+    Expect(migrated.Current().locale == Locale::Japanese &&
+               migrated.Current().backgroundColor.empty() && !migrated.Current().glass.enabled &&
+               migrated.Current().glass.blurDips == 48 &&
+               std::filesystem::exists(migrationDirectory / L"settings-v6.json") &&
+               std::filesystem::exists(migrationDirectory / L"settings-v7.json"),
+           "v6 settings must migrate to v7 without deleting the legacy file");
 
     const auto persistedDirectory = testDirectory / L"persisted";
     std::filesystem::create_directories(persistedDirectory, error);
@@ -148,7 +165,10 @@ void TestSettings() {
            "valid settings preview must be accepted");
     Settings invalidPreview = preview;
     invalidPreview.glass.blurDips = 75;
+    Settings invalidColorPreview = preview;
+    invalidColorPreview.backgroundColor = L"#12345";
     Expect(!transactions.Preview(L"transaction-preview", invalidPreview) &&
+               !transactions.Preview(L"transaction-preview", invalidColorPreview) &&
                transactions.Effective() == preview &&
                transactions.Cancel(L"transaction-preview") &&
                transactions.Effective() == transactions.Current(),
@@ -161,6 +181,14 @@ void TestSettings() {
                transactions.Effective() == transactions.Current() &&
                !transactions.Cancel(L"transaction-apply"),
            "invalid apply must roll back and clear its settings transaction");
+
+    transactions.BeginPreview(L"transaction-color-apply");
+    Expect(transactions.Preview(L"transaction-color-apply", preview),
+           "background color apply regression preview must be accepted");
+    Expect(!transactions.Apply(L"transaction-color-apply", invalidColorPreview) &&
+               transactions.Effective() == transactions.Current() &&
+               !transactions.Cancel(L"transaction-color-apply"),
+           "invalid background color apply must roll back and clear its settings transaction");
 
     const auto blocker = testDirectory / L"not-a-directory";
     std::ofstream(blocker).put('x');
@@ -178,6 +206,7 @@ void TestSettings() {
 
 void TestMaterials() {
   using namespace lgt::composition;
+  using namespace lgt::settings;
   for (const std::uint32_t blurDips : {0U, 30U, 74U}) {
     Expect(GlassBlurDips(blurDips) == blurDips,
            "Glass blur must accept every public boundary value");
@@ -187,6 +216,14 @@ void TestMaterials() {
   Expect(!CanRenderGlassBlur(false, true) && !CanRenderGlassBlur(true, false) &&
              CanRenderGlassBlur(true, true),
          "Glass blur eligibility must depend only on effect capability and speed");
+  Expect(GlassTintAlpha(0) == 0 && GlassTintAlpha(74) == kGlassTintMaximumAlpha &&
+             GlassTintAlpha(30) < GlassTintAlpha(55),
+         "Glass tint alpha must scale monotonically from 0 to 45 percent with blur");
+  Expect(lgt::settings::IsValidBackgroundColor(L"#aBcD12") &&
+             lgt::settings::NormalizeBackgroundColor(L"#aBcD12") == L"#ABCD12" &&
+             lgt::settings::BackgroundColorRgb(L"#010203") == std::optional<std::uint32_t>{0x010203U} &&
+             !lgt::settings::IsValidBackgroundColor(L"#1234"),
+         "background colors must validate, normalize, and parse as RGB");
 }
 
 void TestWindowMetrics() {

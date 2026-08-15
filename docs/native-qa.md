@@ -29,12 +29,14 @@ For each run record the application version, Windows build/edition, WebView2 Run
 - [ ] The 56-DIP header and terminal form one continuous full-window Glass sheet without an inset terminal card or seam.
 - [ ] Settings, context menu, paste confirmation, notices, and toasts remain usable as ordinary WebView content above the shared full-window blur; no native overlay-mask messages or stale geometry remain.
 - [ ] Clear, Regular, and Dense select 0, 30, and 55 DIP and switch without restarting or losing terminal output.
+- [ ] The Settings drawer accepts a six-digit `#RRGGBB` color, normalizes it to uppercase, previews it immediately, and provides a colorless reset.
 - [ ] `blurDips` accepts 0–74 DIP in one-DIP steps, previews immediately, persists after Apply/restart, and has no Opacity, Intensity, Tone, Frost, or Grain control.
 - [ ] With `tests/fixtures/glass-transparency-background.html` behind the terminal, 0 DIP visibly preserves more fine detail than 74 DIP while the full Glass layer remains at opacity 1.
 - [ ] Sweeping blur through 0, 6, 30, 55, and 74 DIP changes only the Gaussian blur amount; CSS decoration, shadows, and control styling do not change with the blur value.
 - [ ] Saturated backdrop colors remain identifiable and no white or neutral DWM surface appears at 0, 30, or 74 DIP, including after rapid changes and restart.
+- [ ] Test `#000000`, `#FFFFFF`, and a saturated color at 0, 30, and 74 DIP; tint increases with blur, Solid/Safe use the selected color opaquely, and colorless restores the existing appearance.
 - [ ] Rapid 0 ↔ 30 ↔ 74 changes retain the same Composition HostBackdrop/Gaussian graph and show no raw HostBackdrop output or mode-switch flash.
-- [ ] When Composition effects are unavailable, reported slow, or fail to initialize, the app switches to an opaque system-color Solid surface; no Tone-only or raw HostBackdrop fallback is visible.
+- [ ] When Composition effects are unavailable, reported slow, or fail to initialize, the app switches to an opaque selected-color Solid/Safe surface unless a Windows policy requires system color; no Tone-only or raw HostBackdrop fallback is visible.
 - [ ] GPU traces show one shared HostBackdrop feeding only one Gaussian graph whose `Blur.BlurAmount` changes from 0 to 74 DIP; no sharp output branch or ArithmeticComposite exists.
 - [ ] Auto foreground follows the Windows system text color after a live theme change; explicit Light/Dark use their fixed colors, and xterm keeps its 4.5:1 minimum contrast setting.
 - [ ] Deactivating and reactivating the window keeps the material stable; settings changes take effect immediately regardless of the motion preference.
@@ -66,6 +68,7 @@ For each run record the application version, Windows build/edition, WebView2 Run
 - [ ] Turning Windows transparency off selects an opaque solid surface and automatically restores Glass when re-enabled.
 - [ ] Disabling Advanced Effects selects opaque Solid without creating blur resources and restores Glass when re-enabled.
 - [ ] High contrast uses opaque Windows system window/text colors and retains keyboard/screen-reader operability.
+- [ ] High contrast, disabled transparency, Remote Desktop, and energy saver ignore the selected color for the policy fallback and restore it when the policy clears.
 - [ ] Remote Desktop and energy saver select the solid fallback and restore Glass after the condition clears.
 - [ ] Disabling Glass in settings selects a solid surface without changing the information hierarchy.
 - [ ] Reduced client-area animations or an active screen reader suppresses decorative transitions and cursor blinking.
