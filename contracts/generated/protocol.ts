@@ -1,32 +1,17 @@
 // Generated from contracts/protocol.idl.json. Do not edit.
 
-export const PROTOCOL_VERSION = 2 as const;
+export const PROTOCOL_VERSION = 6 as const;
 export const APP_ORIGIN = 'https://app.liquid-glass-terminal.invalid/' as const;
 export const UI_METRICS = {
   titlebarHeightDip: 56,
   captionButtonWidthDip: 46,
 } as const;
-export const SETTINGS_SCHEMA_VERSION = 2 as const;
+export const SETTINGS_SCHEMA_VERSION = 6 as const;
 export const WINDOW_STATE_SCHEMA_VERSION = 2 as const;
 export const SETTINGS_CONSTRAINTS = {
-  frostThickness: {
-    minimum: 0,
-    maximum: 13,
-    step: 1,
-  },
-  opacity: {
-    minimum: 0,
-    maximum: 100,
-    step: 5,
-  },
-  tone: {
-    minimum: 0,
-    maximum: 100,
-    step: 1,
-  },
-  grain: {
-    minimum: 0,
-    maximum: 100,
+  blurDips: {
+    minimum: 2,
+    maximum: 74,
     step: 1,
   },
   uiScale: {
@@ -36,25 +21,15 @@ export const SETTINGS_CONSTRAINTS = {
   },
 } as const;
 export const SETTINGS_KEYS = ['locale', 'glass', 'foreground', 'animations', 'uiScale'] as const;
-export const GLASS_SETTING_KEYS = [
-  'enabled',
-  'frostThickness',
-  'opacity',
-  'tone',
-  'grain',
-] as const;
-export const GLASS_VALUE_KEYS = ['frostThickness', 'opacity', 'tone', 'grain'] as const;
-export const FROST_BLUR_DIPS = [0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74] as const;
-export const GRAIN_MAXIMUM_OPACITY = 0.03 as const;
+export const GLASS_SETTING_KEYS = ['enabled', 'blurDips'] as const;
+export const GLASS_VALUE_KEYS = ['blurDips'] as const;
 export const LIMITS = {
-  maxGlassRegions: 32,
   maxTerminalChunkBytes: 65536,
   maxTerminalOutstandingBytes: 262144,
   resumeTerminalBelowBytes: 65536,
   maxClipboardBytes: 1048576,
 } as const;
 
-export const GLASS_ROLES = ['terminal', 'overlay', 'decorative'] as const;
 export const GLASS_PRESET_NAMES = ['clear', 'regular', 'dense'] as const;
 export const SETTINGS_OPERATIONS = ['preview', 'apply', 'cancel'] as const;
 export const FOREGROUNDS = ['auto', 'light', 'dark'] as const;
@@ -65,7 +40,6 @@ export const WEB_TO_NATIVE_TYPES = [
   'terminal.resize',
   'terminal.input.commit',
   'terminal.output.ack',
-  'glass.layout.set',
   'settings.preview',
   'settings.apply',
   'settings.cancel',
@@ -88,7 +62,6 @@ export const NATIVE_TO_WEB_TYPES = [
   'app.notice',
 ] as const;
 
-export type GlassRole = (typeof GLASS_ROLES)[number];
 export type GlassPreset = (typeof GLASS_PRESET_NAMES)[number];
 export type SettingsOperation = (typeof SETTINGS_OPERATIONS)[number];
 export type Foreground = (typeof FOREGROUNDS)[number];
@@ -98,10 +71,7 @@ export type WebToNativeType = (typeof WEB_TO_NATIVE_TYPES)[number];
 export type NativeToWebType = (typeof NATIVE_TO_WEB_TYPES)[number];
 
 export interface GlassValues {
-  frostThickness: number;
-  opacity: number;
-  tone: number;
-  grain: number;
+  blurDips: number;
 }
 export interface GlassSettings extends GlassValues {
   enabled: boolean;
@@ -145,47 +115,25 @@ export const DEFAULT_PERSISTED_WINDOW_STATE = {
 
 export const GLASS_PRESETS = {
   clear: {
-    frostThickness: 5,
-    opacity: 20,
-    tone: 92,
-    grain: 0,
+    blurDips: 6,
   },
   regular: {
-    frostThickness: 10,
-    opacity: 35,
-    tone: 92,
-    grain: 0,
+    blurDips: 30,
   },
   dense: {
-    frostThickness: 12,
-    opacity: 50,
-    tone: 92,
-    grain: 0,
+    blurDips: 55,
   },
 } as const satisfies Record<GlassPreset, GlassValues>;
 export const DEFAULT_SETTINGS = {
   locale: 'system',
   glass: {
     enabled: true,
-    frostThickness: 10,
-    opacity: 35,
-    tone: 92,
-    grain: 0,
+    blurDips: 30,
   },
   foreground: 'auto',
   animations: true,
   uiScale: 100,
 } as const satisfies Settings;
-
-export interface GlassRegion {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  radii: readonly [number, number, number, number];
-  role: GlassRole;
-}
 
 export interface Envelope<TType extends string = string, TPayload = unknown> {
   v: typeof PROTOCOL_VERSION;
@@ -199,7 +147,6 @@ export type WebToNativeMessage =
   | Envelope<'terminal.resize', { cols: number; rows: number }>
   | Envelope<'terminal.input.commit', BufferCommit>
   | Envelope<'terminal.output.ack', BufferCommit>
-  | Envelope<'glass.layout.set', { revision: number; regions: GlassRegion[] }>
   | Envelope<'settings.preview', { transactionId: string; patch: SettingsPatch }>
   | Envelope<'settings.apply', { transactionId: string; patch: SettingsPatch }>
   | Envelope<'settings.cancel', { transactionId: string }>
@@ -287,19 +234,6 @@ const validConstrainedField = (
   value: unknown,
 ): value is number => constrainedInteger(value, SETTINGS_CONSTRAINTS[name]);
 
-export function toneToChannel(tone: number): number {
-  return Math.floor((tone * 255 + 50) / 100);
-}
-export function toneToHex(tone: number): string {
-  const channel = toneToChannel(tone).toString(16).padStart(2, '0').toUpperCase();
-  return `#${channel}${channel}${channel}`;
-}
-export function frostBlurDip(frostThickness: number): number {
-  return FROST_BLUR_DIPS[frostThickness] ?? FROST_BLUR_DIPS[DEFAULT_SETTINGS.glass.frostThickness];
-}
-export function grainOpacity(grain: number): number {
-  return (grain / SETTINGS_CONSTRAINTS.grain.maximum) * GRAIN_MAXIMUM_OPACITY;
-}
 export function resolveGlassPreset(glass: GlassSettings): GlassPreset | 'custom' {
   for (const name of GLASS_PRESET_NAMES) {
     const value = GLASS_PRESETS[name];
@@ -324,10 +258,7 @@ export function isSettings(value: unknown): value is Settings {
     record(value.glass) &&
     exactObjectKeys(value.glass, GLASS_SETTING_KEYS) &&
     typeof value.glass.enabled === 'boolean' &&
-    validConstrainedField('frostThickness', value.glass.frostThickness) &&
-    validConstrainedField('opacity', value.glass.opacity) &&
-    validConstrainedField('tone', value.glass.tone) &&
-    validConstrainedField('grain', value.glass.grain)
+    validConstrainedField('blurDips', value.glass.blurDips)
   );
 }
 
@@ -352,15 +283,9 @@ export function isSettingsPatch(value: unknown): value is SettingsPatch {
     if (value.glass.enabled !== undefined && !(typeof value.glass.enabled === 'boolean'))
       return false;
     if (
-      value.glass.frostThickness !== undefined &&
-      !validConstrainedField('frostThickness', value.glass.frostThickness)
+      value.glass.blurDips !== undefined &&
+      !validConstrainedField('blurDips', value.glass.blurDips)
     )
-      return false;
-    if (value.glass.opacity !== undefined && !validConstrainedField('opacity', value.glass.opacity))
-      return false;
-    if (value.glass.tone !== undefined && !validConstrainedField('tone', value.glass.tone))
-      return false;
-    if (value.glass.grain !== undefined && !validConstrainedField('grain', value.glass.grain))
       return false;
   }
   return true;
@@ -374,29 +299,6 @@ export function isWindowRuntimeState(value: unknown): value is WindowRuntimeStat
     typeof value.fullscreen === 'boolean' &&
     typeof value.active === 'boolean'
   );
-}
-
-export function isGlassRegion(value: unknown): value is GlassRegion {
-  if (
-    !record(value) ||
-    !exactObjectKeys(value, ['id', 'x', 'y', 'width', 'height', 'radii', 'role'])
-  )
-    return false;
-  if (
-    !asciiId(value.id) ||
-    !finite(value.x, -100000, 100000) ||
-    !finite(value.y, -100000, 100000) ||
-    !finite(value.width, 0, 100000) ||
-    !finite(value.height, 0, 100000)
-  )
-    return false;
-  if (
-    !Array.isArray(value.radii) ||
-    value.radii.length !== 4 ||
-    !value.radii.every((item) => finite(item, 0, 512))
-  )
-    return false;
-  return enumValue(GLASS_ROLES, value.role);
 }
 
 function isCommit(value: unknown, buffers: number): value is BufferCommit {
@@ -439,15 +341,6 @@ export function isWebToNativeMessage(value: unknown): value is WebToNativeMessag
       return isCommit(payload, 2);
     case 'terminal.output.ack':
       return isCommit(payload, 4);
-    case 'glass.layout.set':
-      return (
-        exactObjectKeys(payload, ['revision', 'regions']) &&
-        integerInRange(payload.revision, 0, 0xffffffff) &&
-        Array.isArray(payload.regions) &&
-        payload.regions.length <= LIMITS.maxGlassRegions &&
-        payload.regions.every(isGlassRegion) &&
-        new Set(payload.regions.map((region) => region.id)).size === payload.regions.length
-      );
     case 'settings.preview':
     case 'settings.apply':
       return (

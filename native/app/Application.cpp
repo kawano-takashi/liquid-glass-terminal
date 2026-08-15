@@ -1,6 +1,5 @@
 #include "app/Application.h"
 
-#include "composition/GlassMaterial.h"
 
 #include <shellapi.h>
 #include <winternl.h>
@@ -151,13 +150,10 @@ HRESULT Application::InitializeWebView() {
   initializingWebView_ = true;
   ++webViewInitializationAttempts_;
   UpdateLayout();
-  const auto& settings = settingsStore_.Effective();
   const bool opaque = !compositionMode_ ||
                       composition_.State() != composition::AppearanceState::Glass;
   if (opaque) {
-    const std::uint32_t background = policy_.highContrast
-                                         ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
-                                         : composition::ToneRgb(settings.glass.tone);
+    const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
     webView_.SetOpaqueBackground(background);
   } else {
     webView_.SetTransparentBackground();
@@ -320,9 +316,7 @@ void Application::ApplySettings(const settings::Settings& settings) {
   if (compositionMode_) composition_.SetAppearance(settings, policy_);
   const bool opaque = !compositionMode_ || composition_.State() != composition::AppearanceState::Glass;
   if (opaque) {
-    const std::uint32_t background =
-        policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
-                             : composition::ToneRgb(settings.glass.tone);
+    const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
     webView_.SetOpaqueBackground(background);
   }
   else webView_.SetTransparentBackground();
@@ -336,10 +330,7 @@ void Application::SyncCompositionFailure(composition::AppearanceState previousSt
       composition_.State() != composition::AppearanceState::Safe) {
     return;
   }
-  const auto& settings = settingsStore_.Effective();
-  const std::uint32_t background =
-      policy_.highContrast ? RgbFromColorRef(GetSysColor(COLOR_WINDOW))
-                           : composition::ToneRgb(settings.glass.tone);
+  const std::uint32_t background = RgbFromColorRef(GetSysColor(COLOR_WINDOW));
   webView_.SetOpaqueBackground(background);
   logger_.Write(diagnostics::Level::Error, L"composition.update.safe-mode");
   if (bridge_) {

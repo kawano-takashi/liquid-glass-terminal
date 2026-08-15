@@ -3,7 +3,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,11 +10,9 @@ import {
 } from 'react';
 import {
   DEFAULT_SETTINGS,
-  LIMITS,
   UI_METRICS,
   type AppearanceState,
   type Capabilities,
-  type GlassRegion,
   type Settings,
   type SettingsPatch,
   type WindowRuntimeState,
@@ -93,7 +90,6 @@ export function App() {
   const draftRef = useRef<Settings>(INITIAL_SETTINGS);
   const settingsRef = useRef<Settings>(INITIAL_SETTINGS);
   const clipboardRequests = useRef(new Map<string, (text?: string) => void>());
-  const layoutRevision = useRef(0);
   const noticeSequence = useRef(1);
   const [accepted, setAccepted] = useState(false);
   const [settings, setSettings] = useState<Settings>(INITIAL_SETTINGS);
@@ -151,40 +147,6 @@ export function App() {
     },
     [bridge],
   );
-
-  const sendLayout = useCallback(() => {
-    if (!accepted || !appRoot.current) return;
-    const regions: GlassRegion[] = [];
-    if (capabilities.glass) {
-      const surfaces = appRoot.current.querySelectorAll<HTMLElement>('[data-glass-id]');
-      for (const surface of surfaces) {
-        const id = surface.dataset.glassId;
-        if (!id || regions.length >= LIMITS.maxGlassRegions) break;
-        const rect = surface.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) continue;
-        const style = getComputedStyle(surface);
-        const radius = (value: string) => {
-          const parsed = Number.parseFloat(value);
-          return Number.isFinite(parsed) ? parsed : 0;
-        };
-        regions.push({
-          id,
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-          radii: [
-            radius(style.borderTopLeftRadius),
-            radius(style.borderTopRightRadius),
-            radius(style.borderBottomRightRadius),
-            radius(style.borderBottomLeftRadius),
-          ],
-          role: 'overlay',
-        });
-      }
-    }
-    bridge.setGlassLayout(++layoutRevision.current, regions);
-  }, [accepted, bridge, capabilities.glass]);
 
   useEffect(() => {
     bridge.connect();
@@ -320,38 +282,6 @@ export function App() {
     const retry = window.setInterval(() => bridge.ready(), 500);
     return () => window.clearInterval(retry);
   }, [accepted, bridge]);
-
-  useLayoutEffect(() => {
-    if (!accepted || !appRoot.current) return;
-    let frame = 0;
-    const schedule = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(sendLayout);
-    };
-    const observer = new ResizeObserver(schedule);
-    observer.observe(document.documentElement);
-    for (const surface of appRoot.current.querySelectorAll<HTMLElement>('[data-glass-id]')) {
-      observer.observe(surface);
-    }
-    window.addEventListener('resize', schedule);
-    schedule();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', schedule);
-      cancelAnimationFrame(frame);
-    };
-  }, [
-    accepted,
-    appearance,
-    capabilities.glass,
-    context,
-    draft.uiScale,
-    notices,
-    pasteCandidate,
-    sendLayout,
-    settingsOpen,
-    windowState.fullscreen,
-  ]);
 
   const copy = useCallback(() => {
     const selection = terminal.current?.getSelection() ?? '';
@@ -489,6 +419,7 @@ export function App() {
     '--chrome-font-size': `${12 / zoom}px`,
     '--chrome-inline-gap': `${8 / zoom}px`,
     '--surface-inset': `${12 / zoom}px`,
+    '--material-duration': '0ms',
     '--motion-duration': motionEnabled ? '140ms' : '0ms',
   } as CSSProperties;
 
@@ -587,13 +518,7 @@ export function App() {
 
         <div className="toast-region" aria-live="polite">
           {notices.map((notice) => (
-            <div
-              className="toast"
-              data-level={notice.level}
-              data-glass-id={`toast-${notice.id}`}
-              data-glass-radius="10"
-              key={notice.id}
-            >
+            <div className="toast" data-level={notice.level} key={notice.id}>
               {notice.message}
             </div>
           ))}

@@ -2,7 +2,6 @@ import {
   LIMITS,
   PROTOCOL_VERSION,
   type BufferCommit,
-  type GlassRegion,
   isNativeToWebMessage,
   type NativeToWebMessage,
   type SettingsPatch,
@@ -88,10 +87,6 @@ export class NativeBridge {
 
   acknowledge(commit: BufferCommit): void {
     this.post('terminal.output.ack', commit);
-  }
-
-  setGlassLayout(revision: number, regions: GlassRegion[]): void {
-    this.post('glass.layout.set', { revision, regions });
   }
 
   previewSettings(transactionId: string, patch: SettingsPatch): void {

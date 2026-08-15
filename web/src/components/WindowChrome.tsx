@@ -39,13 +39,7 @@ export function WindowChrome({
       aria-label={labels.appName}
     >
       {accepted && appearance !== 'glass' ? (
-        <div
-          className="appearance-status"
-          data-glass-id="appearance-status"
-          data-glass-radius="9"
-          role="status"
-          aria-label={statusDetail}
-        >
+        <div className="appearance-status" role="status" aria-label={statusDetail}>
           <span aria-hidden="true">{statusLabel}</span>
         </div>
       ) : null}

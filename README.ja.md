@@ -9,10 +9,10 @@
 ## 0.3で変更した構成
 
 - Win32の`HWND`と`WS_EX_NOREDIRECTIONBITMAP`がトップレベルウィンドウを所有し、リサイズ、最大化／復元、Snap Layout、システムメニュー、DPI、フルスクリーンを維持します。
-- Windows.UI.Compositionが、ウィンドウ全面で共有する1本の`HostBackdropBrush → Gaussian blur → saturation`グラフを描画します。OverlayはTone、Grain、境界、影だけをMaskで重ね、タイトルバーからTerminalまでを連続した一枚のGlassに保ちます。
+- Windows.UI.Compositionが、ウィンドウ描画前のDesktop合成結果を常にGaussian Effectへ入力し、`glass.blurDips`で2〜74 DIPのぼかし量を選べます。処理済みの全画面Glass LayerのOpacityは常に1です。未加工のHostBackdrop出力は描画せず、アプリからPixelを読み取りまたは保存することもできません。
 - `CoreWebView2CompositionController`により、透明なReact UIをネイティブVisualツリーへ直接配置します。マウス、ホイール、Pointer、Touch／Pen、Cursor、Focus、DPI、Drag & Drop、IMEに関係する入力はネイティブ側で転送します。
 - C++20のConPTYホストが、kill-on-close Job Object内でローカルシェルを起動します。ターミナルデータは、上限付きQueue、Sequence検証、ACK、Recovery Generationを備えたWebView2 Shared Bufferで転送します。
-- Clear／Regular／Denseプリセットは、Frost thickness、Glass の不透明度、無彩色Tone、Grainをまとめて設定します。Glass の不透明度はBackdrop blur、Tone、Grain、Panel濃度、受動的なUI装飾に共通する係数で、0%では文字と操作フィードバックを残して完全に透過します。各値は個別にも調整でき、CSSでデスクトップをCaptureまたはBlurしません。
+- Clear／Regular／Denseプリセットは、ぼかし量を6／30／55 DIPに設定します。CSSはDesktopをCaptureまたは画像処理せず、Glassの装飾はぼかし量に連動しません。
 - High Contrast、透明効果無効、Remote Desktop、省電力、Composition障害、ユーザーによる無効化では、操作可能な単色表示へ切り替えます。可能な限りシェルを維持したままWebView2とGPUを復旧します。
 - WebViewは同梱ファイルを`https://app.liquid-glass-terminal.invalid/`からのみ読み込みます。Navigation、Download、Permission、New Window、Remote Request、Host Object、およびRelease BuildのDevToolsは拒否します。
 
@@ -85,7 +85,7 @@ Release用Stageは`build/package/LiquidGlassTerminal/`、`npm run make`で生成
 
 56 DIPのCustom Headerは操作ボタン以外をDragできます。最大化ボタンではWindows 11のSnap Layoutを維持し、FullscreenではHeader全体を非表示にします。
 
-Settings v2、Window State v2、WebView2 Profile、Rotation付きDiagnostic Logは`%LOCALAPPDATA%\Liquid Glass Terminal`の下だけに保存します。Version 1の設定と配置ファイルは変更せず、移行にも使用しません。Telemetry、Analytics、Update Check、Runtime Content Downloadは行いません。
+Settings v6、Window State v2、WebView2 Profile、Rotation付きDiagnostic Logは`%LOCALAPPDATA%\Liquid Glass Terminal`の下だけに保存します。以前のSettingsとVersion 1の配置ファイルは変更せず、移行にも使用しません。Telemetry、Analytics、Update Check、Runtime Content Downloadは行いません。
 
 ## Release状況
 

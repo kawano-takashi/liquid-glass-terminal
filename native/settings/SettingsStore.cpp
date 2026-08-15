@@ -125,7 +125,7 @@ const Settings& SettingsStore::Current() const noexcept { return current_; }
 Settings SettingsStore::Effective() const noexcept { return preview_.value_or(current_); }
 
 void SettingsStore::Load() {
-  const auto path = dataDirectory_ / L"settings-v2.json";
+  const auto path = dataDirectory_ / L"settings-v6.json";
   if (!std::filesystem::exists(path)) return;
   try {
     const auto parsed = Parse(ReadText(path));
@@ -139,7 +139,7 @@ void SettingsStore::Load() {
 
 bool SettingsStore::Save(const Settings& value) {
   if (!protocol::IsValid(value) ||
-      !AtomicWrite(dataDirectory_ / L"settings-v2.json", Serialize(value))) return false;
+      !AtomicWrite(dataDirectory_ / L"settings-v6.json", Serialize(value))) return false;
   current_ = value;
   preview_.reset();
   previewTransaction_.clear();
@@ -222,10 +222,7 @@ bool SettingsStore::SaveWindowState(const WindowState& state) const {
 std::wstring SettingsStore::Serialize(const Settings& value) {
   JsonObject glass;
   glass.Insert(L"enabled", winrt::Windows::Data::Json::JsonValue::CreateBooleanValue(value.glass.enabled));
-  glass.Insert(L"frostThickness", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.frostThickness));
-  glass.Insert(L"opacity", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.opacity));
-  glass.Insert(L"tone", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.tone));
-  glass.Insert(L"grain", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.grain));
+  glass.Insert(L"blurDips", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(value.glass.blurDips));
   JsonObject root;
   root.Insert(L"schemaVersion", winrt::Windows::Data::Json::JsonValue::CreateNumberValue(
                                     protocol::kSettingsSchemaVersion));
@@ -247,7 +244,7 @@ std::optional<Settings> SettingsStore::Parse(std::wstring_view json) {
         root.GetNamedNumber(L"schemaVersion") != protocol::kSettingsSchemaVersion ||
         root.GetNamedValue(L"glass").ValueType() != JsonValueType::Object) return std::nullopt;
     const auto glass = root.GetNamedObject(L"glass");
-    if (!ExactKeys(glass, {L"enabled", L"frostThickness", L"opacity", L"tone", L"grain"})) {
+    if (!ExactKeys(glass, {L"enabled", L"blurDips"})) {
       return std::nullopt;
     }
     Settings result;
@@ -255,12 +252,8 @@ std::optional<Settings> SettingsStore::Parse(std::wstring_view json) {
     const auto foreground = protocol::ParseForeground(root.GetNamedString(L"foreground"));
     if (!locale || !foreground || !Boolean(glass, L"enabled", result.glass.enabled) ||
         !Boolean(root, L"animations", result.animations)) return std::nullopt;
-    if (!ConstrainedInteger(glass, L"frostThickness", protocol::kFrostThicknessConstraint,
-                            result.glass.frostThickness) ||
-        !ConstrainedInteger(glass, L"opacity", protocol::kOpacityConstraint,
-                            result.glass.opacity) ||
-        !ConstrainedInteger(glass, L"tone", protocol::kToneConstraint, result.glass.tone) ||
-        !ConstrainedInteger(glass, L"grain", protocol::kGrainConstraint, result.glass.grain) ||
+    if (!ConstrainedInteger(glass, L"blurDips", protocol::kBlurDipsConstraint,
+                            result.glass.blurDips) ||
         !ConstrainedInteger(root, L"uiScale", protocol::kUiScaleConstraint, result.uiScale)) {
       return std::nullopt;
     }

@@ -1,39 +1,31 @@
 {
   "name": "LiquidGlassTerminalProtocol",
-  "version": 2,
+  "version": 6,
   "origin": "https://app.liquid-glass-terminal.invalid/",
   "uiMetrics": {
     "titlebarHeightDip": 56,
     "captionButtonWidthDip": 46
   },
   "settings": {
-    "schemaVersion": 2,
+    "schemaVersion": 6,
     "defaults": {
       "locale": "system",
       "glass": {
         "enabled": true,
-        "frostThickness": 10,
-        "opacity": 35,
-        "tone": 92,
-        "grain": 0
+        "blurDips": 30
       },
       "foreground": "auto",
       "animations": true,
       "uiScale": 100
     },
     "constraints": {
-      "frostThickness": { "minimum": 0, "maximum": 13, "step": 1 },
-      "opacity": { "minimum": 0, "maximum": 100, "step": 5 },
-      "tone": { "minimum": 0, "maximum": 100, "step": 1 },
-      "grain": { "minimum": 0, "maximum": 100, "step": 1 },
+      "blurDips": { "minimum": 2, "maximum": 74, "step": 1 },
       "uiScale": { "minimum": 80, "maximum": 200, "step": 10 }
     },
-    "grainMaximumOpacity": 0.03,
-    "frostBlurDips": [0, 2, 3, 4, 5, 6, 9, 12, 16, 22, 30, 41, 55, 74],
     "presets": {
-      "clear": { "frostThickness": 5, "opacity": 20, "tone": 92, "grain": 0 },
-      "regular": { "frostThickness": 10, "opacity": 35, "tone": 92, "grain": 0 },
-      "dense": { "frostThickness": 12, "opacity": 50, "tone": 92, "grain": 0 }
+      "clear": { "blurDips": 6 },
+      "regular": { "blurDips": 30 },
+      "dense": { "blurDips": 55 }
     }
   },
   "windowState": {
@@ -42,14 +34,12 @@
     "constraints": { "minimumWidth": 480, "minimumHeight": 320, "maximumExtent": 16384 }
   },
   "limits": {
-    "maxGlassRegions": 32,
     "maxTerminalChunkBytes": 65536,
     "maxTerminalOutstandingBytes": 262144,
     "resumeTerminalBelowBytes": 65536,
     "maxClipboardBytes": 1048576
   },
   "enums": {
-    "glassRole": ["terminal", "overlay", "decorative"],
     "glassPreset": ["clear", "regular", "dense"],
     "settingsOperation": ["preview", "apply", "cancel"],
     "foreground": ["auto", "light", "dark"],
@@ -62,7 +52,6 @@
       "terminal.resize",
       "terminal.input.commit",
       "terminal.output.ack",
-      "glass.layout.set",
       "settings.preview",
       "settings.apply",
       "settings.cancel",

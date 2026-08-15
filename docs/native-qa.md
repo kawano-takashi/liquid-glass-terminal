@@ -1,6 +1,6 @@
 # Windows 11 native acceptance checklist
 
-Automated tests cover protocol validation, settings persistence/rollback, foreground contrast, bridge/shared-buffer behavior, shell quoting, clipboard boundaries, real ConPTY startup, packaging integrity, and basic packaged interaction. Backdrop quality, IME placement, compositor timing, monitor transitions, and accessibility behavior still require an interactive Windows 11 client.
+Automated tests cover protocol validation, settings persistence/rollback, foreground color policy, bridge/shared-buffer behavior, shell quoting, clipboard boundaries, real ConPTY startup, packaging integrity, and basic packaged interaction. Glass blur quality, IME placement, compositor timing, monitor transitions, and accessibility behavior still require an interactive Windows 11 client.
 
 For each run record the application version, Windows build/edition, WebView2 Runtime, GPU and driver, monitor layout, DPI and refresh rates, HDR state, power state, accessibility settings, and result. Attach `%LOCALAPPDATA%\Liquid Glass Terminal\logs\app.log` for failures.
 
@@ -25,21 +25,19 @@ For each run record the application version, Windows build/edition, WebView2 Run
 
 ## Glass material
 
-- [ ] Desktop wallpaper and another application behind the window are blurred live without a capture/recording prompt.
+- [ ] Desktop wallpaper and another application remain live and are visibly frosted beneath the window without a capture/recording prompt.
 - [ ] The 56-DIP header and terminal form one continuous full-window Glass sheet without an inset terminal card or seam.
-- [ ] Settings, context menu, paste confirmation, notices, and toasts use overlay masks only; opening/closing them leaves no stale mask or second blur pass.
-- [ ] Nonuniform corner radii render without clipping gaps or crashes.
-- [ ] Clear, Regular, and Dense are visibly distinct and switch without restarting or losing terminal output.
-- [ ] Frost thickness 0–13, Glass opacity 0–100, grayscale tone 0–100, and grain 0–100 preview and persist at every boundary.
-- [ ] With `tests/fixtures/frosted-backdrop.html` behind the terminal, Glass opacity 0 leaves fine text, checker edges, and large colors crisp and unshifted through empty areas from the title bar to the terminal; no blur, tone, grain, panel density, or passive border remains.
-- [ ] Sweeping Glass opacity through 0, 5, 20, 35, 50, and 100 changes blur contribution, grain, panel density, and passive UI decoration without a discontinuity; the configured Frost radius does not change.
-- [ ] At Glass opacity 0, settings, menus, dialogs, and toasts lose passive fills, separators, shadows, and modal scrims while text, focus, hover, selected, checked, and error states remain visible.
-- [ ] Grain 0 is visually smooth and does not allocate the noise surface; grain 100 adds only fine high-frequency texture.
-- [ ] Saturation remains 1.0, so large backdrop colors do not shift when Glass is enabled.
-- [ ] Multiple panels do not multiply blur cost; GPU traces show exactly one backdrop/blur graph.
-- [ ] With `tests/fixtures/frosted-backdrop.html` behind the terminal, large colors and shapes remain identifiable while the checker and fine text are unreadable.
-- [ ] Automatic and explicit light/dark foreground choices retain at least 4.5:1 against the nominal Tone; extreme transparency/background combinations are inspected separately and are not corrected with a dynamic opacity floor.
-- [ ] Deactivating and reactivating the window transitions smoothly when motion is enabled and changes immediately when it is reduced.
+- [ ] Settings, context menu, paste confirmation, notices, and toasts remain usable as ordinary WebView content above the shared full-window blur; no native overlay-mask messages or stale geometry remain.
+- [ ] Clear, Regular, and Dense select 6, 30, and 55 DIP and switch without restarting or losing terminal output.
+- [ ] `blurDips` accepts 2–74 DIP in one-DIP steps, previews immediately, persists after Apply/restart, and has no Opacity, Intensity, Tone, Frost, or Grain control.
+- [ ] With `tests/fixtures/glass-transparency-background.html` behind the terminal, 2 DIP visibly preserves more fine detail than 74 DIP while the full Glass layer remains at opacity 1.
+- [ ] Sweeping blur through 2, 6, 30, 55, and 74 DIP changes only the Gaussian blur amount; CSS decoration, shadows, and control styling do not change with the blur value.
+- [ ] Saturated backdrop colors remain identifiable and no white or neutral DWM surface appears at 2, 30, or 74 DIP, including after rapid changes and restart.
+- [ ] Rapid 2 ↔ 30 ↔ 74 changes retain the same Composition HostBackdrop/Gaussian graph and show no raw HostBackdrop output or mode-switch flash.
+- [ ] When Composition effects are unavailable, reported slow, or fail to initialize, the app switches to an opaque system-color Solid surface; no Tone-only or raw HostBackdrop fallback is visible.
+- [ ] GPU traces show one shared HostBackdrop feeding only one Gaussian graph whose `Blur.BlurAmount` changes from 2 to 74 DIP; no sharp output branch or ArithmeticComposite exists.
+- [ ] Auto foreground follows the Windows system text color after a live theme change; explicit Light/Dark use their fixed colors, and xterm keeps its 4.5:1 minimum contrast setting.
+- [ ] Deactivating and reactivating the window keeps the material stable; settings changes take effect immediately regardless of the motion preference.
 - [ ] DWM uses standard rounded corners and its external shadow normally, with square corners while maximized, snapped, or fullscreen.
 
 ## WebView2 and input
@@ -65,14 +63,14 @@ For each run record the application version, Windows build/edition, WebView2 Run
 
 ## Policy and accessibility
 
-- [ ] Turning Windows transparency off selects a solid surface and automatically restores Glass when re-enabled.
-- [ ] Disabling Advanced Effects selects Solid without creating the backdrop graph and restores Glass when re-enabled.
+- [ ] Turning Windows transparency off selects an opaque solid surface and automatically restores Glass when re-enabled.
+- [ ] Disabling Advanced Effects selects opaque Solid without creating blur resources and restores Glass when re-enabled.
 - [ ] High contrast uses opaque Windows system window/text colors and retains keyboard/screen-reader operability.
 - [ ] Remote Desktop and energy saver select the solid fallback and restore Glass after the condition clears.
 - [ ] Disabling Glass in settings selects a solid surface without changing the information hierarchy.
 - [ ] Reduced client-area animations or an active screen reader suppresses decorative transitions and cursor blinking.
 - [ ] Narrator reads terminal content in xterm screen-reader mode and does not lose focus when settings or paste confirmation closes.
-- [ ] Windows light/dark preference does not silently override the user-selected Tone and foreground policy.
+- [ ] Windows light/dark preference updates Auto foreground without silently overriding explicit foreground policy.
 
 ## Recovery
 

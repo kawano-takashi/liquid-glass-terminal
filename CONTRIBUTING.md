@@ -42,7 +42,7 @@ Set `LGT_CLIPBOARD_E2E=1` only intentionally. That test temporarily replaces and
 
 - `contracts/protocol.idl.json` is the only editable protocol definition. Run `npm run contracts:generate` after changing it and commit both generated outputs.
 - Test accepted and rejected inputs whenever changing ConPTY framing, shared buffers, Web Messages, settings validation, URL/path validation, permissions, clipboard, or file-drop quoting.
-- Keep Glass effects in Windows Composition. React reports bounded geometry and settings; it must not manipulate native visuals or create desktop blur in CSS.
+- Keep Glass effects in Windows Composition. React owns its content layout and settings; it must not manipulate native visuals or capture or process desktop pixels in CSS. Never draw an unprocessed HostBackdrop directly.
 - Do not expose COM, Win32, WebView host objects, arbitrary executables, or arguments to the web layer.
 - Do not add remote navigation, remote fonts, analytics, update checks, or runtime content delivery.
 - Preserve shell state across WebView and composition recovery paths. Solid/safe fallback must remain fully operable.

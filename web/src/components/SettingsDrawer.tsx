@@ -3,7 +3,6 @@ import { forwardRef, useEffect, useRef } from 'react';
 import {
   GLASS_PRESETS,
   SETTINGS_CONSTRAINTS,
-  frostBlurDip,
   type Settings,
 } from '../../../contracts/generated/protocol';
 import { matchingGlassPreset, withGlassPreset, type NamedGlassPreset } from '../appearance';
@@ -83,8 +82,6 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
       ref={ref}
       className="settings-drawer"
       data-open={open}
-      data-glass-id={open ? 'settings' : undefined}
-      data-glass-radius="20"
       aria-hidden={!open}
       aria-busy={pending}
       aria-label={labels.settings}
@@ -147,46 +144,15 @@ export const SettingsDrawer = forwardRef<HTMLElement, SettingsDrawerProps>(funct
             </fieldset>
 
             <RangeSetting
-              label={labels.frostThickness}
-              value={value.glass.frostThickness}
-              output={`${value.glass.frostThickness} · ${frostBlurDip(value.glass.frostThickness)} DIP`}
-              minimum={SETTINGS_CONSTRAINTS.frostThickness.minimum}
-              maximum={SETTINGS_CONSTRAINTS.frostThickness.maximum}
-              step={SETTINGS_CONSTRAINTS.frostThickness.step}
+              label={labels.blur}
+              value={value.glass.blurDips}
+              output={`${value.glass.blurDips} DIP`}
+              minimum={SETTINGS_CONSTRAINTS.blurDips.minimum}
+              maximum={SETTINGS_CONSTRAINTS.blurDips.maximum}
+              step={SETTINGS_CONSTRAINTS.blurDips.step}
               disabled={pending}
-              onChange={(frostThickness) => updateGlass({ frostThickness })}
+              onChange={(blurDips) => updateGlass({ blurDips })}
             />
-            <RangeSetting
-              label={labels.opacity}
-              value={value.glass.opacity}
-              output={`${value.glass.opacity}%`}
-              minimum={SETTINGS_CONSTRAINTS.opacity.minimum}
-              maximum={SETTINGS_CONSTRAINTS.opacity.maximum}
-              step={SETTINGS_CONSTRAINTS.opacity.step}
-              disabled={pending}
-              onChange={(opacity) => updateGlass({ opacity })}
-            />
-            <RangeSetting
-              label={labels.tone}
-              value={value.glass.tone}
-              output={`${value.glass.tone}`}
-              minimum={SETTINGS_CONSTRAINTS.tone.minimum}
-              maximum={SETTINGS_CONSTRAINTS.tone.maximum}
-              step={SETTINGS_CONSTRAINTS.tone.step}
-              disabled={pending}
-              onChange={(tone) => updateGlass({ tone })}
-            />
-            <RangeSetting
-              label={labels.grain}
-              value={value.glass.grain}
-              output={`${value.glass.grain}%`}
-              minimum={SETTINGS_CONSTRAINTS.grain.minimum}
-              maximum={SETTINGS_CONSTRAINTS.grain.maximum}
-              step={SETTINGS_CONSTRAINTS.grain.step}
-              disabled={pending}
-              onChange={(grain) => updateGlass({ grain })}
-            />
-
             <button
               type="button"
               className="button reset-button"

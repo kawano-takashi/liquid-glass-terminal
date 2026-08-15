@@ -79,13 +79,25 @@ void SystemPolicyMonitor::Start(HWND window) noexcept {
       WTSRegisterSessionNotification(window_, NOTIFY_FOR_THIS_SESSION) != FALSE;
   try {
     settings_ = winrt::Windows::UI::ViewManagement::UISettings();
+  } catch (...) {
+    settings_ = nullptr;
+    return;
+  }
+  try {
     advancedEffectsToken_ = settings_.AdvancedEffectsEnabledChanged(
         [window](const auto&, const auto&) {
           if (window && IsWindow(window)) PostMessageW(window, kSystemPolicyChangedMessage, 0, 0);
         });
   } catch (...) {
-    settings_ = nullptr;
     advancedEffectsToken_ = {};
+  }
+  try {
+    colorValuesToken_ = settings_.ColorValuesChanged(
+        [window](const auto&, const auto&) {
+          if (window && IsWindow(window)) PostMessageW(window, kSystemPolicyChangedMessage, 0, 0);
+        });
+  } catch (...) {
+    colorValuesToken_ = {};
   }
 }
 
@@ -94,9 +106,13 @@ void SystemPolicyMonitor::Reset() noexcept {
     if (settings_ && advancedEffectsToken_.value != 0) {
       settings_.AdvancedEffectsEnabledChanged(advancedEffectsToken_);
     }
+    if (settings_ && colorValuesToken_.value != 0) {
+      settings_.ColorValuesChanged(colorValuesToken_);
+    }
   } catch (...) {
   }
   advancedEffectsToken_ = {};
+  colorValuesToken_ = {};
   settings_ = nullptr;
   if (sessionNotificationRegistered_ && window_) {
     WTSUnRegisterSessionNotification(window_);

@@ -41,6 +41,7 @@ class SystemPolicyMonitor final {
   bool sessionNotificationRegistered_ = false;
   winrt::Windows::UI::ViewManagement::UISettings settings_{nullptr};
   winrt::event_token advancedEffectsToken_{};
+  winrt::event_token colorValuesToken_{};
 };
 
 [[nodiscard]] PolicySnapshot QuerySystemPolicy() noexcept;

@@ -54,8 +54,6 @@ export const PasteDialog = forwardRef<HTMLElement, PasteDialogProps>(function Pa
         role="dialog"
         aria-modal="true"
         aria-labelledby="paste-title"
-        data-glass-id="paste-dialog"
-        data-glass-radius="18"
         onKeyDown={containFocus}
       >
         <h2 id="paste-title">{labels.pasteTitle}</h2>

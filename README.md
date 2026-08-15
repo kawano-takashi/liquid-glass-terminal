@@ -9,10 +9,10 @@ A local-first terminal for Windows 11 whose window, Glass material, input routin
 ## What changed in 0.3
 
 - A Win32 `HWND` with `WS_EX_NOREDIRECTIONBITMAP` owns the top-level window and preserves resize, maximize/restore, Snap Layout, system-menu, DPI, and fullscreen behavior.
-- Windows.UI.Composition renders one full-window `HostBackdropBrush → Gaussian blur → saturation` graph. Overlay masks add only tone, grain, borders, and shadows, so the title bar and terminal remain one continuous sheet of Glass.
+- Windows.UI.Composition always feeds one shared pre-window desktop composite through a Gaussian effect, with `glass.blurDips` selectable from 2–74 DIP. The processed full-window Glass layer stays at opacity 1; no raw HostBackdrop output is drawn, and the app cannot read or store its pixels.
 - `CoreWebView2CompositionController` places the transparent React UI directly in the native visual tree. Native code routes mouse, wheel, pointer, touch/pen, cursor, focus, DPI, drag/drop, and IME-sensitive input.
 - A C++20 ConPTY host starts the local shell in a kill-on-close Job Object. WebView2 shared buffers carry terminal data with bounded queues, sequence validation, acknowledgements, and recovery generations.
-- Clear, Regular, and Dense presets set frost thickness, Glass opacity, grayscale tone, and grain together. Glass opacity is the master contribution for backdrop blur, tone, grain, panel density, and passive UI decoration; 0% is fully transparent while text and interaction feedback remain visible. Each value can also be adjusted independently, and CSS never captures or blurs the desktop.
+- Clear, Regular, and Dense presets set blur to 6, 30, and 55 DIP. CSS never captures or processes the desktop, and Glass decoration is not coupled to the blur amount.
 - High contrast, disabled transparency, Remote Desktop, energy saver, composition failure, and user opt-out switch to an operable solid fallback. WebView2 and GPU recovery keep the shell alive where possible.
 - The WebView loads only bundled files from `https://app.liquid-glass-terminal.invalid/`. Navigation, downloads, permissions, new windows, remote requests, host objects, and release-build DevTools are denied.
 
@@ -85,7 +85,7 @@ The staged release package is written to `build/package/LiquidGlassTerminal/`. `
 
 The custom 56-DIP header is draggable except for its controls. The maximize control retains Windows 11 Snap Layout, and fullscreen hides the entire header.
 
-Settings v2, window state v2, the WebView2 profile, and rotating diagnostic logs stay under `%LOCALAPPDATA%\Liquid Glass Terminal`. Version 1 settings and placement files are left untouched and are not imported. No telemetry, analytics, update checks, or runtime content downloads are performed.
+Settings v6, window state v2, the WebView2 profile, and rotating diagnostic logs stay under `%LOCALAPPDATA%\Liquid Glass Terminal`. Earlier settings files and version 1 placement files are left untouched and are not imported. No telemetry, analytics, update checks, or runtime content downloads are performed.
 
 ## Release status
 

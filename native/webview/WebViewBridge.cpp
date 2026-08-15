@@ -78,11 +78,7 @@ bool Integer(const JsonObject& object, std::wstring_view name, std::uint32_t min
 JsonObject SettingsJson(const settings::Settings& settings) {
   JsonObject glass;
   glass.Insert(L"enabled", JsonValue::CreateBooleanValue(settings.glass.enabled));
-  glass.Insert(L"frostThickness",
-               JsonValue::CreateNumberValue(settings.glass.frostThickness));
-  glass.Insert(L"opacity", JsonValue::CreateNumberValue(settings.glass.opacity));
-  glass.Insert(L"tone", JsonValue::CreateNumberValue(settings.glass.tone));
-  glass.Insert(L"grain", JsonValue::CreateNumberValue(settings.glass.grain));
+  glass.Insert(L"blurDips", JsonValue::CreateNumberValue(settings.glass.blurDips));
   JsonObject result;
   result.Insert(L"locale", JsonValue::CreateStringValue(settings::ToString(settings.locale)));
   result.Insert(L"glass", glass);
@@ -184,7 +180,6 @@ bool WebViewBridge::Dispatch(const JsonObject& envelope) {
   if (type == L"terminal.input.commit" || type == L"terminal.output.ack") {
     return HandleBufferCommit(type, payload);
   }
-  if (type == L"glass.layout.set") return HandleGlassLayout(payload);
   if (type.starts_with(L"settings.")) return HandleSettings(type, payload);
   if (type.starts_with(L"clipboard.")) return HandleClipboard(type, payload);
   return false;
@@ -252,62 +247,6 @@ bool WebViewBridge::HandleBufferCommit(std::wstring_view type, const JsonObject&
   return transport_.AcknowledgeOutput(commit);
 }
 
-bool WebViewBridge::HandleGlassLayout(const JsonObject& payload) {
-  if (!ExactKeys(payload, {L"revision", L"regions"}) ||
-      payload.GetNamedValue(L"regions").ValueType() != JsonValueType::Array) return false;
-  std::uint32_t revision = 0;
-  if (!Integer(payload, L"revision", 0, UINT32_MAX, revision)) {
-    return false;
-  }
-  if (revision <= layoutRevision_) return true;
-  const auto regionsJson = payload.GetNamedArray(L"regions");
-  if (regionsJson.Size() > protocol::kMaxGlassRegions) return false;
-  std::set<std::wstring> ids;
-  std::vector<composition::GlassRegion> regions;
-  for (const auto& value : regionsJson) {
-    if (value.ValueType() != JsonValueType::Object) return false;
-    const auto object = value.GetObject();
-    if (!ExactKeys(object, {L"id", L"x", L"y", L"width", L"height", L"radii", L"role"}) ||
-        object.GetNamedValue(L"id").ValueType() != JsonValueType::String ||
-        object.GetNamedValue(L"role").ValueType() != JsonValueType::String ||
-        object.GetNamedValue(L"radii").ValueType() != JsonValueType::Array) return false;
-    composition::GlassRegion region;
-    region.id = object.GetNamedString(L"id");
-    if (!AsciiId(region.id) || !ids.insert(region.id).second) return false;
-    double x = 0, y = 0, width = 0, height = 0;
-    if (!FiniteNumber(object, L"x", -100000, 100000, x) ||
-        !FiniteNumber(object, L"y", -100000, 100000, y) ||
-        !FiniteNumber(object, L"width", 0, 100000, width) ||
-        !FiniteNumber(object, L"height", 0, 100000, height)) return false;
-    region.x = static_cast<float>(x);
-    region.y = static_cast<float>(y);
-    region.width = static_cast<float>(width);
-    region.height = static_cast<float>(height);
-    const auto radii = object.GetNamedArray(L"radii");
-    if (radii.Size() != 4) return false;
-    for (std::uint32_t index = 0; index < 4; ++index) {
-      if (radii.GetAt(index).ValueType() != JsonValueType::Number) return false;
-      const double radius = radii.GetNumberAt(index);
-      if (!std::isfinite(radius) || radius < 0 || radius > 512) return false;
-      region.radii[index] = static_cast<float>(radius);
-    }
-    const std::wstring role(object.GetNamedString(L"role"));
-    if (role == L"terminal") region.role = composition::GlassRole::Terminal;
-    else if (role == L"overlay") region.role = composition::GlassRole::Overlay;
-    else if (role == L"decorative") region.role = composition::GlassRole::Decorative;
-    else return false;
-    regions.push_back(std::move(region));
-  }
-  layoutRevision_ = revision;
-  compositionHost_.SetRegions(regions);
-  if (host_ && host_->CompositionMode() &&
-      compositionHost_.State() == composition::AppearanceState::Safe) {
-    PostNotice(L"error", L"composition.update.failed");
-    PostAppearance();
-  }
-  return true;
-}
-
 bool WebViewBridge::ParseSettingsPatch(const JsonObject& object,
                                        settings::Settings& value) const {
   if (!ExactKeys(object, {}, KeySet(protocol::kSettingsKeys)) ||
@@ -339,11 +278,8 @@ bool WebViewBridge::ParseSettingsPatch(const JsonObject& object,
       target = parsed;
       return true;
     };
-    if (!parseGlassNumber(L"frostThickness", protocol::kFrostThicknessConstraint,
-                          value.glass.frostThickness) ||
-        !parseGlassNumber(L"opacity", protocol::kOpacityConstraint, value.glass.opacity) ||
-        !parseGlassNumber(L"tone", protocol::kToneConstraint, value.glass.tone) ||
-        !parseGlassNumber(L"grain", protocol::kGrainConstraint, value.glass.grain)) {
+    if (!parseGlassNumber(L"blurDips", protocol::kBlurDipsConstraint,
+                          value.glass.blurDips)) {
       return false;
     }
   }

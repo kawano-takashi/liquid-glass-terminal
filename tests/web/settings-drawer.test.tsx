@@ -33,13 +33,15 @@ describe('SettingsDrawer', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
-    expect(screen.getByRole('slider', { name: 'Frost thickness' })).toHaveAttribute('max', '13');
-    expect(screen.getByRole('slider', { name: 'Glass opacity' })).toHaveAttribute('step', '5');
-    expect(screen.getByRole('slider', { name: 'Tone' })).toHaveAttribute('step', '1');
-    expect(screen.getByRole('slider', { name: 'Grain' })).toHaveAttribute('max', '100');
+    expect(screen.getByRole('slider', { name: 'Blur' })).toHaveAttribute('step', '1');
+    expect(screen.getByRole('slider', { name: 'Blur' })).toHaveAttribute(
+      'aria-valuetext',
+      '30 DIP',
+    );
+    expect(screen.getAllByRole('slider')).toHaveLength(2);
   });
 
-  it('applies all four preset values while preserving enabled', () => {
+  it('applies both preset values while preserving enabled', () => {
     const onChange = vi.fn();
     const value = settings();
     value.glass.enabled = false;
@@ -58,7 +60,7 @@ describe('SettingsDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dense' }));
     expect(onChange).toHaveBeenCalledWith({
       ...value,
-      glass: { enabled: false, frostThickness: 12, opacity: 50, tone: 92, grain: 0 },
+      glass: { enabled: false, blurDips: 55 },
     });
   });
 
@@ -67,7 +69,7 @@ describe('SettingsDrawer', () => {
     const value = settings();
     value.locale = 'ja';
     value.uiScale = 140;
-    value.glass = { enabled: true, frostThickness: 7, opacity: 40, tone: 60, grain: 12 };
+    value.glass = { enabled: true, blurDips: 31 };
     render(
       <SettingsDrawer
         open
@@ -81,18 +83,18 @@ describe('SettingsDrawer', () => {
     );
 
     expect(screen.getByText('Custom')).toHaveAttribute('aria-current', 'true');
-    fireEvent.change(screen.getByRole('slider', { name: 'Glass opacity' }), {
+    fireEvent.change(screen.getByRole('slider', { name: 'Blur' }), {
       target: { value: '45' },
     });
     expect(onChange).toHaveBeenCalledWith({
       ...value,
-      glass: { ...value.glass, opacity: 45 },
+      glass: { ...value.glass, blurDips: 45 },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset Glass' }));
     expect(onChange).toHaveBeenLastCalledWith({
       ...value,
-      glass: { enabled: true, frostThickness: 10, opacity: 35, tone: 92, grain: 0 },
+      glass: { enabled: true, blurDips: 30 },
     });
   });
 });

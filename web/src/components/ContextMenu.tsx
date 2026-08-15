@@ -50,8 +50,6 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(function
       className="context-menu"
       role="menu"
       style={{ left: x, top: y }}
-      data-glass-id="context"
-      data-glass-radius="12"
       onKeyDown={moveFocus}
     >
       <button type="button" role="menuitem" disabled={!canCopy} onClick={onCopy}>

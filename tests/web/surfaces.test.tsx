@@ -4,7 +4,7 @@ import { WindowChrome } from '../../web/src/components/WindowChrome';
 import { messages } from '../../web/src/i18n';
 import { describe, expect, it, vi } from 'vitest';
 
-describe('frosted UI surfaces', () => {
+describe('Glass UI surfaces', () => {
   it('keeps the real settings action outside the draggable Chrome region', () => {
     const openSettings = vi.fn();
     const { container } = render(
@@ -44,7 +44,6 @@ describe('frosted UI surfaces', () => {
     expect(screen.getByRole('status', { name: messages.en.glassDisabled })).toHaveTextContent(
       'Solid',
     );
-    expect(screen.getByRole('status')).toHaveAttribute('data-glass-id', 'appearance-status');
 
     rerender(
       <WindowChrome
@@ -73,7 +72,6 @@ describe('frosted UI surfaces', () => {
     const dialog = screen.getByRole('dialog', { name: messages.en.pasteTitle });
     const cancelButton = screen.getByRole('button', { name: 'Cancel' });
     const pasteButton = screen.getByRole('button', { name: 'Paste' });
-    expect(dialog).toHaveAttribute('data-glass-id', 'paste-dialog');
     expect(cancelButton).toHaveFocus();
 
     pasteButton.focus();

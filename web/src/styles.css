@@ -73,10 +73,6 @@ select:focus-visible {
   user-select: none;
 }
 
-.app[data-appearance='glass'] {
-  --decoration-opacity: var(--glass-opacity);
-}
-
 .app[data-appearance='solid'],
 .app[data-appearance='safe'] {
   background: var(--surface-solid);
@@ -130,7 +126,7 @@ select:focus-visible {
   background: transparent;
   transform: translateY(-50%);
   transition:
-    background-color var(--motion-duration) ease,
+    background-color var(--material-duration) linear,
     opacity var(--motion-duration) ease;
   -webkit-app-region: no-drag;
 }

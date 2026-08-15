@@ -25,6 +25,34 @@ interface PixelProbe {
   hidden: number[];
 }
 
+interface RgbColor {
+  red: number;
+  green: number;
+  blue: number;
+}
+
+function decodeColorRef(value: number): RgbColor {
+  return {
+    red: value & 0xff,
+    green: (value >> 8) & 0xff,
+    blue: (value >> 16) & 0xff,
+  };
+}
+
+function expectBackdropColorPreserved(
+  probe: PixelProbe,
+  maximumRed: number,
+  minimumBlueRedDifference: number,
+): void {
+  for (let index = 0; index < probe.visible.length; index += 1) {
+    const visible = decodeColorRef(probe.visible[index]);
+    const hidden = decodeColorRef(probe.hidden[index]);
+    expect(hidden.blue - hidden.red).toBeGreaterThan(100);
+    expect(visible.red).toBeLessThan(maximumRed);
+    expect(visible.blue - visible.red).toBeGreaterThan(minimumBlueRedDifference);
+  }
+}
+
 interface StartOptions {
   resetProfile?: boolean;
   forceCompositionFailure?: boolean;
@@ -79,6 +107,21 @@ $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.WindowState = [System.Windows.Forms.FormWindowState]::Maximized
 $form.TopMost = $true
 $form.BackColor = [System.Drawing.Color]::FromArgb(31, 93, 157)
+$form.Add_Paint({
+  param($sender, $paintEvent)
+  $stripeWidth = 64
+  $dark = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(24, 76, 140))
+  $light = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(72, 132, 212))
+  try {
+    for ($x = 0; $x -lt $sender.ClientSize.Width; $x += $stripeWidth) {
+      $brush = if (([int]($x / $stripeWidth) % 2) -eq 0) { $dark } else { $light }
+      $paintEvent.Graphics.FillRectangle($brush, $x, 0, $stripeWidth, $sender.ClientSize.Height)
+    }
+  } finally {
+    $dark.Dispose()
+    $light.Dispose()
+  }
+})
 [System.Windows.Forms.Application]::Run($form)
 `;
   const backdropProcess = spawn(
@@ -148,10 +191,15 @@ $rect = New-Object LgtPixelProbe+RECT
 if (-not [LgtPixelProbe]::GetWindowRect($handle, [ref]$rect)) { exit 3 }
 $width = $rect.Right - $rect.Left
 $height = $rect.Bottom - $rect.Top
+$anchor = [int]($rect.Left + $width * 0.24)
+$boundary = [int]([Math]::Ceiling($anchor / 64.0) * 64)
 $points = @(
-  @([int]($rect.Left + $width * 0.22), [int]($rect.Top + $height * 0.48)),
-  @([int]($rect.Left + $width * 0.45), [int]($rect.Top + $height * 0.72)),
-  @([int]($rect.Left + $width * 0.24), [int]($rect.Top + $height * 0.84))
+  @([int]($boundary - 12), [int]($rect.Top + $height * 0.48)),
+  @([int]($boundary + 12), [int]($rect.Top + $height * 0.48)),
+  @([int]($boundary - 12), [int]($rect.Top + $height * 0.70)),
+  @([int]($boundary + 12), [int]($rect.Top + $height * 0.70)),
+  @([int]($boundary - 12), [int]($rect.Top + $height * 0.84)),
+  @([int]($boundary + 12), [int]($rect.Top + $height * 0.84))
 )
 [LgtPixelProbe]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x53) | Out-Null
 [LgtPixelProbe]::DwmFlush() | Out-Null
@@ -323,7 +371,7 @@ test.describe.serial('native WebView2 application', () => {
             window.chrome.webview.postMessage({
               v: version,
               type: 'settings.apply',
-              payload: { transactionId, patch: { glass: { opacity: 33 } } },
+              payload: { transactionId, patch: { glass: { blurDips: 75 } } },
             });
           };
           const listener = (event: WebViewMessageEvent) => {
@@ -358,7 +406,7 @@ test.describe.serial('native WebView2 application', () => {
           window.chrome.webview.postMessage({
             v: version,
             type: 'settings.preview',
-            payload: { transactionId, patch: { glass: { opacity: 35 } } },
+            payload: { transactionId, patch: { glass: { blurDips: 30 } } },
           });
         }),
       PROTOCOL_VERSION,
@@ -400,7 +448,7 @@ test.describe.serial('native WebView2 application', () => {
           window.chrome.webview.postMessage({
             v: version,
             type: 'settings.preview',
-            payload: { transactionId, patch: { glass: { opacity: 35 } } },
+            payload: { transactionId, patch: { glass: { blurDips: 30 } } },
           });
         }),
       PROTOCOL_VERSION,
@@ -408,24 +456,37 @@ test.describe.serial('native WebView2 application', () => {
     expect(nextTransaction).toMatchObject({ operation: 'cancel', ok: true });
   });
 
-  test('renders zero-opacity Glass as true native transparency and persists it', async () => {
+  test('renders the selected Gaussian blur DIP without a CSS opacity path', async () => {
     const appSurface = page.locator('.app');
     test.skip(
       (await appSurface.getAttribute('data-appearance')) !== 'glass',
       'Requires Glass to be allowed by the local Windows policy.',
     );
 
+    await page.waitForTimeout(200);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
+
     await page.locator('.settings-trigger').click();
     const drawer = page.locator('.settings-drawer');
-    const opacity = drawer
+    const materialRanges = drawer
       .locator('.settings-section')
       .first()
-      .locator('input[type="range"]')
-      .nth(1);
-    await opacity.fill('0');
+      .locator('input[type="range"]');
+    const blur = materialRanges.nth(0);
+    await expect(materialRanges).toHaveCount(1);
+    await expect(blur).toHaveAttribute('min', '2');
+    await expect(blur).toHaveAttribute('max', '74');
+    await expect(blur).toHaveAttribute('step', '1');
+
+    for (const value of [2, 6, 30, 55, 74]) {
+      await blur.fill(String(value));
+      await expect(blur).toHaveValue(String(value));
+      await expect(appSurface).not.toHaveCSS('--glass-intensity', /.+/);
+      await page.waitForTimeout(50);
+      expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
+    }
 
     await expect(appSurface).toHaveAttribute('data-appearance', 'glass');
-    await expect(appSurface).toHaveCSS('--glass-opacity', '0');
     const decoration = await page.evaluate(() => {
       const passive = document.querySelector<HTMLElement>('.segmented');
       const active = document.querySelector<HTMLElement>('.segment-status[data-active="true"]');
@@ -437,28 +498,11 @@ test.describe.serial('native WebView2 application', () => {
         panelShadow: getComputedStyle(panel).boxShadow,
       };
     });
-    expect(decoration.passiveBackground).toBe('rgba(0, 0, 0, 0)');
+    expect(decoration.passiveBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(decoration.activeBackground).not.toBe('rgba(0, 0, 0, 0)');
-    expect(decoration.panelShadow).toContain('rgba(0, 0, 0, 0)');
+    expect(decoration.panelShadow).not.toBe('none');
 
-    await page.waitForTimeout(250);
-    const firstZeroProbe = probeWindowPixels();
-    expect(firstZeroProbe.visible).toEqual(firstZeroProbe.hidden);
-
-    await opacity.fill('5');
-    await expect(appSurface).toHaveCSS('--glass-opacity', '0.05');
-    await page.waitForTimeout(250);
-    const nonzeroProbe = probeWindowPixels();
-    expect(nonzeroProbe.visible.some((pixel, index) => pixel !== nonzeroProbe.hidden[index])).toBe(
-      true,
-    );
-
-    await opacity.fill('0');
-    await expect(appSurface).toHaveCSS('--glass-opacity', '0');
-    await page.waitForTimeout(250);
-    const secondZeroProbe = probeWindowPixels();
-    expect(secondZeroProbe.visible).toEqual(secondZeroProbe.hidden);
-
+    await blur.fill('30');
     await drawer.locator('footer .button.primary').click();
     await expect(drawer).toHaveAttribute('data-open', 'false');
 
@@ -466,23 +510,47 @@ test.describe.serial('native WebView2 application', () => {
     await startApplication();
     const restartedSurface = page.locator('.app');
     await expect(restartedSurface).toHaveAttribute('data-appearance', 'glass');
-    await expect(restartedSurface).toHaveCSS('--glass-opacity', '0');
-    await page.waitForTimeout(250);
-    const restartedProbe = probeWindowPixels();
-    expect(restartedProbe.visible).toEqual(restartedProbe.hidden);
+    await expect(restartedSurface).not.toHaveCSS('--glass-intensity', /.+/);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
 
     await page.locator('.settings-trigger').click();
     const restartedDrawer = page.locator('.settings-drawer');
-    const restartedOpacity = restartedDrawer
+    const restartedBlur = restartedDrawer
       .locator('.settings-section')
       .first()
       .locator('input[type="range"]')
-      .nth(1);
-    await expect(restartedOpacity).toHaveValue('0');
-    await restartedOpacity.fill('35');
+      .nth(0);
+    await expect(restartedBlur).toHaveValue('30');
+    await restartedBlur.fill('6');
     await restartedDrawer.locator('footer .button.primary').click();
     await expect(restartedDrawer).toHaveAttribute('data-open', 'false');
-    await expect(restartedSurface).toHaveCSS('--glass-opacity', '0.35');
+    await expect(restartedSurface).not.toHaveCSS('--glass-intensity', /.+/);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
+
+    await stopApplication();
+    await startApplication();
+    const fivePercentSurface = page.locator('.app');
+    await expect(fivePercentSurface).toHaveAttribute('data-appearance', 'glass');
+    await expect(fivePercentSurface).not.toHaveCSS('--glass-intensity', /.+/);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
+
+    await page.locator('.settings-trigger').click();
+    const fivePercentDrawer = page.locator('.settings-drawer');
+    const fivePercentBlur = fivePercentDrawer
+      .locator('.settings-section')
+      .first()
+      .locator('input[type="range"]')
+      .nth(0);
+    await expect(fivePercentBlur).toHaveValue('6');
+    await fivePercentBlur.fill('74');
+    await expect(fivePercentBlur).toHaveValue('74');
+    await expect(fivePercentSurface).not.toHaveCSS('--glass-intensity', /.+/);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
+    await fivePercentBlur.fill('30');
+    await fivePercentDrawer.locator('footer .button.primary').click();
+    await expect(fivePercentDrawer).toHaveAttribute('data-open', 'false');
+    await expect(fivePercentSurface).not.toHaveCSS('--glass-intensity', /.+/);
+    expectBackdropColorPreserved(probeWindowPixels(), 120, 75);
   });
 
   test('carries terminal input and output through the native ConPTY bridge', async () => {
@@ -521,11 +589,9 @@ test.describe.serial('native WebView2 application', () => {
       'true',
     );
     const glassRanges = drawer.locator('.settings-section').first().locator('input[type="range"]');
-    await expect(glassRanges.nth(0)).toHaveValue('12');
-    await expect(glassRanges.nth(1)).toHaveValue('50');
-    await expect(glassRanges.nth(2)).toHaveValue('92');
-    await expect(glassRanges.nth(3)).toHaveValue('0');
-    await glassRanges.nth(1).fill('45');
+    await expect(glassRanges.nth(0)).toHaveValue('55');
+    await expect(glassRanges).toHaveCount(1);
+    await glassRanges.nth(0).fill('45');
     await expect(drawer.locator('.segment-status')).toHaveAttribute('data-active', 'true');
     await drawer.locator('footer .button.ghost').click();
 
@@ -550,10 +616,8 @@ test.describe.serial('native WebView2 application', () => {
       .locator('.settings-section')
       .first()
       .locator('input[type="range"]');
-    await expect(restartedRanges.nth(0)).toHaveValue('12');
-    await expect(restartedRanges.nth(1)).toHaveValue('50');
-    await expect(restartedRanges.nth(2)).toHaveValue('92');
-    await expect(restartedRanges.nth(3)).toHaveValue('0');
+    await expect(restartedRanges.nth(0)).toHaveValue('55');
+    await expect(restartedRanges).toHaveCount(1);
     await restartedDrawer.locator('footer .button.ghost').click();
   });
 

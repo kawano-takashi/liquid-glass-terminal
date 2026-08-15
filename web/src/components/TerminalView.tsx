@@ -9,7 +9,7 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
 import type { Capabilities, Settings } from '../../../contracts/generated/protocol';
-import { resolveForeground, toneToHex } from '../appearance';
+import { resolveForeground } from '../appearance';
 import { useBridge } from '../bridge/context';
 
 export interface TerminalViewHandle {
@@ -36,19 +36,20 @@ function terminalTheme(settings: Settings, capabilities: Capabilities, host: HTM
       selectionBackground: '#80808080',
     };
   }
-  const foreground = resolveForeground(settings.glass.tone, settings.foreground);
-  const transparentTone = `${toneToHex(settings.glass.tone)}00`;
-  return foreground.mode === 'light'
+  const resolved = resolveForeground(settings.foreground);
+  const foreground =
+    settings.foreground === 'auto' && host ? getComputedStyle(host).color : resolved.color;
+  return resolved.mode === 'light'
     ? {
-        background: transparentTone,
-        foreground: foreground.color,
-        cursor: foreground.color,
+        background: '#00000000',
+        foreground,
+        cursor: foreground,
         selectionBackground: '#ffffff38',
       }
     : {
-        background: transparentTone,
-        foreground: foreground.color,
-        cursor: foreground.color,
+        background: '#00000000',
+        foreground,
+        cursor: foreground,
         selectionBackground: '#0000002f',
       };
 }
@@ -147,7 +148,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.options.theme = terminalTheme(settings, capabilities, host.current);
-  }, [capabilities, settings.foreground, settings.glass.tone]);
+  }, [capabilities, settings.foreground]);
 
   useEffect(() => {
     const terminal = terminalRef.current;

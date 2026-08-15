@@ -2,7 +2,7 @@
   "name": "liquid-glass-terminal",
   "productName": "Liquid Glass Terminal",
   "version": "0.3.0",
-  "description": "A local-first frosted-glass terminal for Windows 11 x64.",
+  "description": "A local-first frosted Glass terminal for Windows 11 x64.",
   "private": true,
   "packageManager": "npm@11.17.0",
   "type": "module",

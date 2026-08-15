@@ -10,9 +10,8 @@ Win32 HWND (C++20)
 ├─ Windows.UI.Composition / DesktopWindowTarget
 │  └─ Root ContainerVisual
 │     ├─ opaque safe-mode surface
-│     ├─ one full-client HostBackdrop effect visual
-│     ├─ full-client grayscale tone and optional grain
-│     ├─ overlay tone, grain, border, and shadow masks
+│     ├─ shared processed HostBackdrop Gaussian blur visual
+│     ├─ native border visual
 │     ├─ WebView2 composition visual
 │     └─ native title-bar glyphs and hit-test overlay
 │
@@ -38,33 +37,26 @@ The top-level window is always a C++ Win32 `HWND`. Composition mode uses `WS_EX_
 The renderer uses `Windows.UI.Composition` rather than CSS or a captured image:
 
 ```text
-HostBackdropBrush
+HostBackdropBrush (one shared source; no raw output branch)
       ↓
-GaussianBlurEffect
+GaussianBlurEffect (shared graph; Blur.BlurAmount = glass.blurDips)
       ↓
-SaturationEffect (fixed at 1.0)
-      ↓
-one full-client SpriteVisual
+full-client blur SpriteVisual (opacity 1)
+      ├── native borders and title-bar glyphs
+      └── transparent WebView2 content visual
 ```
 
-Blur and saturation execute once for the entire client. Glass opacity linearly controls the contribution of that blurred visual while retaining the Frost-selected blur radius. The base grayscale tone uses the same opacity, grain alpha is multiplied by it, and overlay density is a proportional 1.18× boost. Settings, context menus, paste confirmation, notices, and toasts report WebView-local geometry so native masks can add density and borders without another blur pass. Uniform rounded rectangles use `CompositionRoundedRectangleGeometry`; nonuniform corner radii use a Direct2D geometry exposed through `CompositionPath`. The protocol accepts at most 32 unique overlay regions.
+The Gaussian effect samples the DWM-composited colors behind the window before this window is drawn. The application cannot read the source pixels, and the raw HostBackdrop is never an effect output or assigned to a visual. The shared graph is created once and its `Blur.BlurAmount` property is updated for previews. HostBackdrop is enabled with `DWMWA_USE_HOSTBACKDROPBRUSH` only while Glass is active, and disabled for Solid/Safe. The HostBackdrop source can be translucent by platform design; no extra opaque backing is inserted in Glass. If effects are unsupported, reported slow, or fail to initialize, the renderer uses an opaque system-color Solid surface and never exposes Tone-only or raw HostBackdrop output.
 
-Frost thickness selects one of the COSMIC-compatible blur values below. Presets are exact tuples and become `Custom` in the UI when any value differs.
+Presets are exact tuples and become `Custom` in the UI when the blur value differs.
 
-```text
-index:     0  1  2  3  4  5  6   7   8   9  10  11  12  13
-blur DIP:  0  2  3  4  5  6  9  12  16  22  30  41  55  74
-```
+| Preset  |   Blur |
+| ------- | -----: |
+| Clear   |  6 DIP |
+| Regular | 30 DIP |
+| Dense   | 55 DIP |
 
-| Preset  | Frost | Opacity | Tone | Grain |
-| ------- | ----: | ------: | ---: | ----: |
-| Clear   |     5 |     20% |   92 |     0 |
-| Regular |    10 |     35% |   92 |     0 |
-| Dense   |    12 |     50% |   92 |     0 |
-
-Tone 0–100 maps to equal sRGB channels; grain 0–100 maps to 0–3% alpha before Glass opacity is applied. At 0%, the backdrop, tint, grain, overlay masks, and passive borders are hidden and their unnecessary resources are released. The full-client DWM frame extension is also removed at that exact boundary so the transparent Composition target reveals the desktop instead of the DWM frame surface; it is restored before nonzero Glass is shown. At 100%, the opaque tone suppresses backdrop sampling. React scales only passive control surfaces, separators, scrollbars, shadows, and modal scrims by the same value. Text, terminal glyphs, focus, hover, selection, and error feedback remain visible, and CSS never creates a desktop effect. Regions are converted from WebView CSS coordinates to physical Composition coordinates in one native path. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
-
-The DWM host-backdrop attribute and `CreateHostBackdropBrush()` provide the pixels already owned by desktop composition. The application never captures, copies, stores, or replays pixels belonging to the desktop or another process.
+`blurDips` accepts integer values from 2 through 74 and is applied immediately without temporal animation. The Glass layer remains at opacity 1 for every blur value. Text, terminal glyphs, focus, hover, selection, and error feedback remain visible, and CSS never creates a desktop effect. There is no WebView geometry measurement or native overlay-mask protocol; panels are ordinary WebView content above the shared full-window blur. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
 
 ## Window and input
 
@@ -89,12 +81,12 @@ React owns ordinary application UI, localization, layout, settings, paste confir
 
 ## Native/web protocol
 
-`contracts/protocol.idl.json` is the source of truth for protocol messages, settings fields and bounds, defaults, preset tuples, blur values, and shared chrome metrics. `npm run contracts:generate` creates both:
+`contracts/protocol.idl.json` is the source of truth for protocol messages, settings fields and bounds, defaults, preset tuples, material constants, and shared chrome metrics. `npm run contracts:generate` creates both:
 
 - `contracts/generated/protocol.ts` with discriminated unions and exact validators;
 - `native/contracts/generated/Protocol.generated.h` with message names, bounds, settings metadata, material tables, and validation helpers.
 
-Every envelope contains protocol version, type, and a type-specific payload. Unknown keys, invalid enum values, stale layout revisions, invalid buffer sequences, out-of-range terminal sizes, duplicate region IDs, oversized clipboard content, and messages from any other source are rejected.
+Every envelope contains protocol version, type, and a type-specific payload. Unknown keys, invalid enum values, removed layout messages, invalid buffer sequences, out-of-range terminal sizes, oversized clipboard content, and messages from any other source are rejected.
 
 Low-frequency control traffic uses JSON Web Messages. Terminal bytes do not:
 
@@ -127,11 +119,11 @@ Dropped paths are accepted only from the native OLE drop target and are quoted f
 Settings and window state live under `%LOCALAPPDATA%\Liquid Glass Terminal`. The settings drawer starts a native transaction:
 
 1. preview applies an in-memory candidate;
-2. apply writes a temporary file and atomically replaces `settings-v2.json`;
+2. apply writes a temporary file and atomically replaces `settings-v6.json`;
 3. cancel restores the committed value;
 4. invalid persisted JSON is isolated with an `.invalid-*` suffix.
 
-Window placement uses `window-state-v2.json`; v1 files are neither imported nor deleted. The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
+The incompatible `settings-v5.json` shape is neither imported nor deleted. Window placement uses `window-state-v2.json`; v1 files are also ignored. The same directory contains the WebView2 profile and rotating `logs/app.log` files. No application state is synchronized or uploaded.
 
 ## Policy and fallback
 
@@ -144,13 +136,13 @@ Window placement uses `window-state-v2.json`; v1 files are neither imported nor 
 - Remote Desktop;
 - energy saver.
 
-Disabled transparency, high contrast, Remote Desktop, energy saver, or user opt-out selects a solid surface without changing saved Glass preferences. High contrast uses Windows system window/text colors. Reduced animation and screen-reader state stop decorative motion and cursor blinking. Policy changes are sent to React through `capabilities.changed`.
+Disabled transparency, high contrast, Remote Desktop, energy saver, user opt-out, unsupported/slow effects, or effect initialization failure selects an opaque Solid surface without changing saved Glass preferences. High contrast and Auto foreground use Windows system colors; explicit Light/Dark use fixed application colors. `UISettings.ColorValuesChanged` and policy changes are observed while running and sent to React through `capabilities.changed`.
 
 Three runtime appearance states are exposed:
 
 | State   | Meaning                                                                           |
 | ------- | --------------------------------------------------------------------------------- |
-| `glass` | Host backdrop and native material are active.                                     |
+| `glass` | Native HostBackdrop Gaussian blur is active at opacity 1.                         |
 | `solid` | Expected policy/user fallback; application remains fully usable.                  |
 | `safe`  | Composition update or device recovery failed; opaque emergency surface is active. |
 

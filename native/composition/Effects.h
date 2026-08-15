@@ -92,7 +92,7 @@ class GaussianBlurEffect final : public EffectBase {
         case D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION:
           return factory->CreateSingle(blurAmount_, reinterpret_cast<IInspectable**>(value));
         case D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION:
-          return factory->CreateUInt32(D2D1_GAUSSIANBLUR_OPTIMIZATION_QUALITY,
+          return factory->CreateUInt32(D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED,
                                        reinterpret_cast<IInspectable**>(value));
         case D2D1_GAUSSIANBLUR_PROP_BORDER_MODE:
           return factory->CreateUInt32(D2D1_BORDER_MODE_HARD,
@@ -112,39 +112,7 @@ class GaussianBlurEffect final : public EffectBase {
   }
 
  private:
-  float blurAmount_ = 16.0F;
-};
-
-class SaturationEffect final : public EffectBase {
-  InspectableClass(L"LiquidGlassTerminal.SaturationEffect", BaseTrust);
-
- public:
-  void Saturation(float value) { saturation_ = value; }
-  IFACEMETHODIMP GetEffectId(GUID* value) override {
-    *value = CLSID_D2D1Saturation;
-    return S_OK;
-  }
-  IFACEMETHODIMP GetPropertyCount(UINT* value) override {
-    *value = 1;
-    return S_OK;
-  }
-  IFACEMETHODIMP GetProperty(UINT index, PropertyValue** value) override {
-    if (index != D2D1_SATURATION_PROP_SATURATION) return E_INVALIDARG;
-    return WithPropertyFactory([&](PropertyValueStatics* factory) {
-      return factory->CreateSingle(saturation_, reinterpret_cast<IInspectable**>(value));
-    });
-  }
-  IFACEMETHODIMP GetNamedPropertyMapping(LPCWSTR name, UINT* index,
-                                         PropertyMapping* mapping) override {
-    static constexpr NamedProperty properties[] = {
-        {L"Saturation", D2D1_SATURATION_PROP_SATURATION,
-         abi::Graphics::Effects::GRAPHICS_EFFECT_PROPERTY_MAPPING_DIRECT},
-    };
-    return FindNamedProperty(properties, ARRAYSIZE(properties), name, index, mapping);
-  }
-
- private:
-  float saturation_ = 1.1F;
+  float blurAmount_ = 30.0F;
 };
 
 }  // namespace lgt::composition::effects

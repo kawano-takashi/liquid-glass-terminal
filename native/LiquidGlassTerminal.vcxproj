@@ -116,7 +116,6 @@
     <ClInclude Include="app\Application.h" />
     <ClInclude Include="composition\CompositionHost.h" />
     <ClInclude Include="composition\Effects.h" />
-    <ClInclude Include="composition\GeometrySource.h" />
     <ClInclude Include="composition\GlassMaterial.h" />
     <ClInclude Include="contracts\generated\Protocol.generated.h" />
     <ClInclude Include="diagnostics\Logger.h" />

@@ -49,7 +49,6 @@ class WebViewBridge final {
   bool HandleResize(const winrt::Windows::Data::Json::JsonObject& payload);
   bool HandleBufferCommit(std::wstring_view type,
                           const winrt::Windows::Data::Json::JsonObject& payload);
-  bool HandleGlassLayout(const winrt::Windows::Data::Json::JsonObject& payload);
   bool HandleSettings(std::wstring_view type,
                       const winrt::Windows::Data::Json::JsonObject& payload);
   bool HandleClipboard(std::wstring_view type,
@@ -87,7 +86,6 @@ class WebViewBridge final {
   bool windowActive_ = true;
   short columns_ = 0;
   short rows_ = 0;
-  std::uint32_t layoutRevision_ = 0;
   std::wstring settingsTransaction_;
 };
 

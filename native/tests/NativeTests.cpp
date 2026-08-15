@@ -49,20 +49,17 @@ void TestSettings() {
   Settings source;
   source.locale = Locale::Japanese;
   source.glass.enabled = false;
-  source.glass.frostThickness = 12;
-  source.glass.opacity = 50;
-  source.glass.tone = 72;
-  source.glass.grain = 36;
+  source.glass.blurDips = 48;
   source.foreground = Foreground::Dark;
   source.animations = false;
   source.uiScale = 140;
   const auto parsed = SettingsStore::Parse(SettingsStore::Serialize(source));
   Expect(parsed == source, "settings must round-trip exactly");
   Expect(!SettingsStore::Parse(
-             LR"({"schemaVersion":2,"locale":"en","glass":{"enabled":true,"frostThickness":10,"opacity":35,"tone":92,"grain":0},"foreground":"auto","animations":true,"uiScale":105})"),
+             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":105})"),
          "settings must reject a scale outside the ten-percent step");
   Expect(!SettingsStore::Parse(
-             LR"({"schemaVersion":2,"locale":"en","glass":{"enabled":true,"frostThickness":10,"opacity":35,"tone":92,"grain":0},"foreground":"auto","animations":true,"uiScale":100,"extra":true})"),
+             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":100,"extra":true})"),
          "settings must reject unknown fields");
   Expect(!SettingsStore::Parse(LR"({"schemaVersion":1})"),
          "settings must reject unknown schemas");
@@ -81,15 +78,16 @@ void TestSettings() {
   if (!error) {
     const auto legacyDirectory = testDirectory / L"legacy";
     std::filesystem::create_directories(legacyDirectory, error);
-    WriteText(legacyDirectory / L"settings-v1.json", R"({"schemaVersion":1})");
+    WriteText(legacyDirectory / L"settings-v5.json",
+              R"({"schemaVersion":5,"locale":"en","glass":{"enabled":true,"opacity":35,"tone":92,"frost":50},"foreground":"auto","animations":true,"uiScale":100})");
     WriteText(legacyDirectory / L"window-state-v1.json", R"({"schemaVersion":1})");
     SettingsStore legacy(legacyDirectory);
     legacy.Load();
-    Expect(legacy.Current() == Settings{}, "v1 settings must be ignored");
+    Expect(legacy.Current() == Settings{}, "v5 settings must be ignored");
     Expect(legacy.LoadWindowState() == WindowState{}, "v1 window state must be ignored");
-    Expect(std::filesystem::exists(legacyDirectory / L"settings-v1.json") &&
+    Expect(std::filesystem::exists(legacyDirectory / L"settings-v5.json") &&
                std::filesystem::exists(legacyDirectory / L"window-state-v1.json"),
-           "ignored v1 persistence files must remain untouched");
+           "ignored persistence files must remain untouched");
 
     const auto persistedDirectory = testDirectory / L"persisted";
     std::filesystem::create_directories(persistedDirectory, error);
@@ -114,14 +112,14 @@ void TestSettings() {
 
     const auto invalidSettingsDirectory = testDirectory / L"invalid-settings";
     std::filesystem::create_directories(invalidSettingsDirectory, error);
-    const auto invalidSettingsPath = invalidSettingsDirectory / L"settings-v2.json";
+    const auto invalidSettingsPath = invalidSettingsDirectory / L"settings-v6.json";
     WriteText(invalidSettingsPath, R"({"schemaVersion":1})");
     SettingsStore invalidSettings(invalidSettingsDirectory);
     invalidSettings.Load();
     Expect(invalidSettings.Current() == Settings{} &&
                !std::filesystem::exists(invalidSettingsPath) &&
                HasInvalidCopy(invalidSettingsPath),
-           "invalid settings v2 must be isolated and reset to defaults");
+           "invalid settings v6 must be isolated and reset to defaults");
 
     const auto invalidWindowDirectory = testDirectory / L"invalid-window";
     std::filesystem::create_directories(invalidWindowDirectory, error);
@@ -137,12 +135,12 @@ void TestSettings() {
     std::filesystem::create_directories(transactionDirectory, error);
     SettingsStore transactions(transactionDirectory);
     Settings preview = transactions.Current();
-    preview.glass.opacity = 50;
+    preview.glass.blurDips = 50;
     transactions.BeginPreview(L"transaction-preview");
     Expect(transactions.Preview(L"transaction-preview", preview),
            "valid settings preview must be accepted");
     Settings invalidPreview = preview;
-    invalidPreview.glass.opacity = 33;
+    invalidPreview.glass.blurDips = 75;
     Expect(!transactions.Preview(L"transaction-preview", invalidPreview) &&
                transactions.Effective() == preview &&
                transactions.Cancel(L"transaction-preview") &&
@@ -161,7 +159,7 @@ void TestSettings() {
     std::ofstream(blocker).put('x');
     SettingsStore unwritable(blocker / L"child");
     Settings changed = unwritable.Current();
-    changed.glass.opacity = 50;
+    changed.glass.blurDips = 50;
     unwritable.BeginPreview(L"transaction-1");
     Expect(unwritable.Preview(L"transaction-1", changed), "settings preview must begin");
     Expect(!unwritable.Apply(L"transaction-1", changed), "failed settings writes must report failure");
@@ -173,51 +171,15 @@ void TestSettings() {
 
 void TestMaterials() {
   using namespace lgt::composition;
-  for (std::size_t index = 0; index < lgt::protocol::kFrostBlurDips.size(); ++index) {
-    Expect(FrostBlurDips(static_cast<std::uint32_t>(index)) ==
-               lgt::protocol::kFrostBlurDips[index],
-           "every frost thickness must use its generated blur value");
-    if (index == 0) continue;
-    Expect(lgt::protocol::kFrostBlurDips[index - 1] <= lgt::protocol::kFrostBlurDips[index],
-           "frost blur steps must remain ordered");
+  for (const std::uint32_t blurDips : {2U, 30U, 74U}) {
+    Expect(GlassBlurDips(blurDips) == blurDips,
+           "Glass blur must accept every public boundary value");
   }
-  Expect(FrostBlurDips(0) == 0.0F && FrostBlurDips(10) == 30.0F &&
-             FrostBlurDips(13) == 74.0F,
-         "frost thickness must use the generated COSMIC-inspired table");
-  Expect(ToneRgb(0) == 0x000000 && ToneRgb(92) == 0xEBEBEB &&
-             ToneRgb(100) == 0xFFFFFF,
-         "tone conversion must be deterministic grayscale");
-  for (std::uint32_t tone = 0; tone <= 100; ++tone) {
-    const auto channel = (tone * 255U + 50U) / 100U;
-    Expect(ToneChannel(tone) == channel &&
-               ToneRgb(tone) == ((channel << 16U) | (channel << 8U) | channel),
-           "every tone must use the exact generated grayscale formula");
-  }
-  Expect(MaterialOpacity(0) == 0.0F && MaterialOpacity(100) == 1.0F &&
-             OverlayOpacity(0) == 0.0F && OverlayOpacity(100) == 1.0F &&
-             OverlayAdditionalOpacity(0) == 0.0F && OverlayAdditionalOpacity(100) == 0.0F,
-         "zero opacity must remove every material contribution");
-  Expect(std::abs(MaterialOpacity(35) - 0.35F) < 0.0001F &&
-             std::abs(OverlayOpacity(35) - 0.413F) < 0.0001F,
-         "overlay opacity must add eighteen percent proportionally");
-  Expect(std::abs((1.0F - MaterialOpacity(35)) *
-                      (1.0F - OverlayAdditionalOpacity(35)) -
-                  (1.0F - OverlayOpacity(35))) < 0.0001F,
-         "overlay tint must compose to the proportional target opacity");
-  Expect(GrainOpacity(0) == 0.0F &&
-             std::abs(GrainOpacity(100) - kMaximumGrainOpacity) < 0.0001F,
-         "grain must map linearly to three percent alpha");
-  Expect(MaterialGrainOpacity(100, 0) == 0.0F &&
-             std::abs(MaterialGrainOpacity(100, 35) - kMaximumGrainOpacity * 0.35F) <
-                 0.0001F &&
-             std::abs(MaterialGrainOpacity(100, 100) - kMaximumGrainOpacity) < 0.0001F,
-         "grain contribution must follow material opacity");
-  Expect(!NeedsGrainSurface(0, 35) && !NeedsGrainSurface(1, 0) &&
-             NeedsGrainSurface(1, 5) && NeedsGrainSurface(100, 100),
-         "zero material or grain opacity must skip lazy noise allocation");
-  Expect(!NeedsExtendedDwmFrame(true, 0) && NeedsExtendedDwmFrame(true, 5) &&
-             NeedsExtendedDwmFrame(true, 100) && NeedsExtendedDwmFrame(false, 0),
-         "only zero-opacity Glass must remove the extended DWM frame");
+  Expect(GlassBlurDips(1) == 2 && GlassBlurDips(75) == 74,
+         "Glass blur must clamp values outside the public range");
+  Expect(!CanRenderGlassBlur(false, true) && !CanRenderGlassBlur(true, false) &&
+             CanRenderGlassBlur(true, true),
+         "Glass blur eligibility must depend only on effect capability and speed");
 }
 
 void TestWindowMetrics() {

@@ -49,7 +49,7 @@ function envelope(type: string, payload: unknown) {
   return { v: PROTOCOL_VERSION, type, payload };
 }
 
-describe('App frosted layout and settings transaction', () => {
+describe('App Glass settings transaction', () => {
   let host: WebViewMock;
   let frames: Map<number, FrameRequestCallback>;
   let nextFrame: number;
@@ -97,7 +97,7 @@ describe('App frosted layout and settings transaction', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps Chrome at 56 DIP, batches preview, and reports only overlay regions', async () => {
+  it('keeps Chrome at 56 DIP, batches blur previews, and sends no overlay layout', async () => {
     const { container } = render(<App />);
     act(() => {
       host.emit('message', {
@@ -120,17 +120,17 @@ describe('App frosted layout and settings transaction', () => {
 
     const app = container.querySelector<HTMLElement>('.app');
     expect(app?.style.getPropertyValue('--chrome-height')).toBe('56px');
-    expect(app?.style.getPropertyValue('--glass-opacity')).toBe('0.35');
+    expect(app?.style.getPropertyValue('--glass-intensity')).toBe('');
     fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
     const initialPreviews = host.posted.filter(
       (message) => (message as { type?: string }).type === 'settings.preview',
     );
     expect(initialPreviews).toHaveLength(1);
 
-    const opacity = screen.getByRole('slider', { name: 'Glass opacity' });
-    fireEvent.change(opacity, { target: { value: '40' } });
-    fireEvent.change(opacity, { target: { value: '45' } });
-    expect(app?.style.getPropertyValue('--glass-opacity')).toBe('0.45');
+    const blur = screen.getByRole('slider', { name: 'Blur' });
+    fireEvent.change(blur, { target: { value: '40' } });
+    fireEvent.change(blur, { target: { value: '45' } });
+    expect(app?.style.getPropertyValue('--glass-intensity')).toBe('');
     act(() => {
       host.emit('message', {
         data: envelope('settings.snapshot', {
@@ -140,7 +140,7 @@ describe('App frosted layout and settings transaction', () => {
         }),
       });
     });
-    expect(opacity).toHaveValue('45');
+    expect(blur).toHaveValue('45');
     expect(
       host.posted.filter((message) => (message as { type?: string }).type === 'settings.preview'),
     ).toHaveLength(1);
@@ -148,9 +148,9 @@ describe('App frosted layout and settings transaction', () => {
 
     const previews = host.posted.filter(
       (message) => (message as { type?: string }).type === 'settings.preview',
-    ) as Array<{ payload: { patch: { glass: { opacity: number } } } }>;
+    ) as Array<{ payload: { patch: { glass: { blurDips: number } } } }>;
     expect(previews).toHaveLength(2);
-    expect(previews[1].payload.patch.glass.opacity).toBe(45);
+    expect(previews[1].payload.patch.glass.blurDips).toBe(45);
 
     fireEvent.change(screen.getByRole('slider', { name: 'UI scale' }), {
       target: { value: '200' },
@@ -160,11 +160,8 @@ describe('App frosted layout and settings transaction', () => {
 
     const layouts = host.posted.filter(
       (message) => (message as { type?: string }).type === 'glass.layout.set',
-    ) as Array<{ payload: { regions: Array<{ id: string; role: string }> } }>;
-    expect(layouts.at(-1)?.payload.regions).toContainEqual(
-      expect.objectContaining({ id: 'settings', role: 'overlay' }),
     );
-    expect(layouts.at(-1)?.payload.regions.some(({ id }) => id === 'terminal')).toBe(false);
+    expect(layouts).toHaveLength(0);
 
     const transactionId = (initialPreviews[0] as { payload: { transactionId: string } }).payload
       .transactionId;
@@ -196,7 +193,7 @@ describe('App frosted layout and settings transaction', () => {
     });
     expect(drawer).toHaveAttribute('data-open', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(screen.getByRole('slider', { name: 'Glass opacity' })).toHaveValue('35');
+    expect(screen.getByRole('slider', { name: 'Blur' })).toHaveValue('30');
   });
 
   it('removes all DOM Chrome when native fullscreen state changes', async () => {

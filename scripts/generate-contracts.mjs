@@ -32,7 +32,6 @@ const pascal = (value) =>
     .join('');
 const cppEnumMember = (value) =>
   value === 'en' ? 'English' : value === 'ja' ? 'Japanese' : pascal(value);
-const cppFloat = (value) => `${Number(value).toFixed(Number.isInteger(value) ? 1 : 3)}F`;
 const tsTypeForSetting = (name, value) => {
   if (name === 'locale') return 'Locale';
   if (name === 'foreground') return 'Foreground';
@@ -80,7 +79,7 @@ invariant(
   'settings defaults have unexpected keys',
 );
 invariant(
-  exactKeys(settingsIdl.defaults.glass, ['enabled', 'frostThickness', 'opacity', 'tone', 'grain']),
+  exactKeys(settingsIdl.defaults.glass, ['enabled', 'blurDips']),
   'glass defaults have unexpected keys',
 );
 invariant(
@@ -119,18 +118,6 @@ for (const name of settingNames) {
     `${name} default is outside its constraint`,
   );
 }
-invariant(
-  Array.isArray(settingsIdl.frostBlurDips) &&
-    settingsIdl.frostBlurDips.length === settingsIdl.constraints.frostThickness.maximum + 1 &&
-    settingsIdl.frostBlurDips.every((value) => integer(value) && value >= 0),
-  'frostBlurDips must cover every frostThickness index',
-);
-invariant(
-  typeof settingsIdl.grainMaximumOpacity === 'number' &&
-    settingsIdl.grainMaximumOpacity >= 0 &&
-    settingsIdl.grainMaximumOpacity <= 1,
-  'grainMaximumOpacity must be between zero and one',
-);
 invariant(idl.enums.locale.includes(settingsIdl.defaults.locale), 'default locale is invalid');
 invariant(
   idl.enums.foreground.includes(settingsIdl.defaults.foreground),
@@ -247,10 +234,7 @@ const ts =
   `export const SETTINGS_KEYS = [${quoted(settingsRootNames)}] as const;\n` +
   `export const GLASS_SETTING_KEYS = [${quoted(glassSettingNames)}] as const;\n` +
   `export const GLASS_VALUE_KEYS = [${quoted(glassValueNames)}] as const;\n` +
-  `export const FROST_BLUR_DIPS = ${JSON.stringify(settingsIdl.frostBlurDips)} as const;\n` +
-  `export const GRAIN_MAXIMUM_OPACITY = ${settingsIdl.grainMaximumOpacity} as const;\n` +
   `export const LIMITS = ${JSON.stringify(idl.limits, null, 2)} as const;\n\n` +
-  `export const GLASS_ROLES = [${quoted(idl.enums.glassRole)}] as const;\n` +
   `export const GLASS_PRESET_NAMES = [${quoted(presetNames)}] as const;\n` +
   `export const SETTINGS_OPERATIONS = [${quoted(idl.enums.settingsOperation)}] as const;\n` +
   `export const FOREGROUNDS = [${quoted(idl.enums.foreground)}] as const;\n` +
@@ -258,7 +242,6 @@ const ts =
   `export const APPEARANCE_STATES = [${quoted(idl.enums.appearanceState)}] as const;\n` +
   `export const WEB_TO_NATIVE_TYPES = [${quoted(idl.messages.webToNative)}] as const;\n` +
   `export const NATIVE_TO_WEB_TYPES = [${quoted(idl.messages.nativeToWeb)}] as const;\n\n` +
-  `export type GlassRole = (typeof GLASS_ROLES)[number];\n` +
   `export type GlassPreset = (typeof GLASS_PRESET_NAMES)[number];\n` +
   `export type SettingsOperation = (typeof SETTINGS_OPERATIONS)[number];\n` +
   `export type Foreground = (typeof FOREGROUNDS)[number];\n` +
@@ -275,9 +258,6 @@ const ts =
   `export const DEFAULT_PERSISTED_WINDOW_STATE = ${JSON.stringify(windowStateIdl.defaults, null, 2)} as const satisfies PersistedWindowState;\n\n` +
   `export const GLASS_PRESETS = ${JSON.stringify(settingsIdl.presets, null, 2)} as const satisfies Record<GlassPreset, GlassValues>;\n` +
   `export const DEFAULT_SETTINGS = ${JSON.stringify(settingsIdl.defaults, null, 2)} as const satisfies Settings;\n\n` +
-  `export interface GlassRegion {\n` +
-  `  id: string;\n  x: number;\n  y: number;\n  width: number;\n  height: number;\n` +
-  `  radii: readonly [number, number, number, number];\n  role: GlassRole;\n}\n\n` +
   `export interface Envelope<TType extends string = string, TPayload = unknown> {\n` +
   `  v: typeof PROTOCOL_VERSION;\n  type: TType;\n  id?: string;\n  payload: TPayload;\n}\n\n` +
   `export type WebToNativeMessage =\n` +
@@ -285,7 +265,6 @@ const ts =
   `  | Envelope<'terminal.resize', { cols: number; rows: number }>\n` +
   `  | Envelope<'terminal.input.commit', BufferCommit>\n` +
   `  | Envelope<'terminal.output.ack', BufferCommit>\n` +
-  `  | Envelope<'glass.layout.set', { revision: number; regions: GlassRegion[] }>\n` +
   `  | Envelope<'settings.preview', { transactionId: string; patch: SettingsPatch }>\n` +
   `  | Envelope<'settings.apply', { transactionId: string; patch: SettingsPatch }>\n` +
   `  | Envelope<'settings.cancel', { transactionId: string }>\n` +
@@ -318,10 +297,6 @@ const ts =
   `const boundedString = (value: unknown, max: number): value is string => typeof value === 'string' && value.length <= max;\n` +
   `const utf8Within = (value: string, max: number): boolean => new TextEncoder().encode(value).byteLength <= max;\n\n` +
   `const validConstrainedField = (name: keyof typeof SETTINGS_CONSTRAINTS, value: unknown): value is number => constrainedInteger(value, SETTINGS_CONSTRAINTS[name]);\n\n` +
-  `export function toneToChannel(tone: number): number { return Math.floor((tone * 255 + 50) / 100); }\n` +
-  `export function toneToHex(tone: number): string { const channel = toneToChannel(tone).toString(16).padStart(2, '0').toUpperCase(); return \`#\${channel}\${channel}\${channel}\`; }\n` +
-  `export function frostBlurDip(frostThickness: number): number { return FROST_BLUR_DIPS[frostThickness] ?? FROST_BLUR_DIPS[DEFAULT_SETTINGS.glass.frostThickness]; }\n` +
-  `export function grainOpacity(grain: number): number { return (grain / SETTINGS_CONSTRAINTS.grain.maximum) * GRAIN_MAXIMUM_OPACITY; }\n` +
   `export function resolveGlassPreset(glass: GlassSettings): GlassPreset | 'custom' { for (const name of GLASS_PRESET_NAMES) { const value = GLASS_PRESETS[name]; if (GLASS_VALUE_KEYS.every((field) => value[field] === glass[field])) return name; } return 'custom'; }\n\n` +
   `export function isSettings(value: unknown): value is Settings {\n` +
   `  if (!record(value) || !exactObjectKeys(value, SETTINGS_KEYS) || !(${tsSettingsValidators})) return false;\n` +
@@ -337,11 +312,6 @@ const ts =
   `export function isWindowRuntimeState(value: unknown): value is WindowRuntimeState {\n` +
   `  return record(value) && exactObjectKeys(value, ['maximized', 'fullscreen', 'active']) && typeof value.maximized === 'boolean' && typeof value.fullscreen === 'boolean' && typeof value.active === 'boolean';\n` +
   `}\n\n` +
-  `export function isGlassRegion(value: unknown): value is GlassRegion {\n` +
-  `  if (!record(value) || !exactObjectKeys(value, ['id', 'x', 'y', 'width', 'height', 'radii', 'role'])) return false;\n` +
-  `  if (!asciiId(value.id) || !finite(value.x, -100000, 100000) || !finite(value.y, -100000, 100000) || !finite(value.width, 0, 100000) || !finite(value.height, 0, 100000)) return false;\n` +
-  `  if (!Array.isArray(value.radii) || value.radii.length !== 4 || !value.radii.every((item) => finite(item, 0, 512))) return false;\n` +
-  `  return enumValue(GLASS_ROLES, value.role);\n}\n\n` +
   `function isCommit(value: unknown, buffers: number): value is BufferCommit {\n` +
   `  return record(value) && exactObjectKeys(value, ['buffer', 'generation', 'sequence', 'length']) && integerInRange(value.buffer, 0, buffers - 1) && integerInRange(value.generation, 0, 0xffffffff) && integerInRange(value.sequence, 0, 0xffffffff) && integerInRange(value.length, 0, LIMITS.maxTerminalChunkBytes);\n}\n\n` +
   `export function isWebToNativeMessage(value: unknown): value is WebToNativeMessage {\n` +
@@ -351,7 +321,6 @@ const ts =
   `    case 'terminal.resize': return exactObjectKeys(payload, ['cols', 'rows']) && integerInRange(payload.cols, 2, 500) && integerInRange(payload.rows, 1, 300);\n` +
   `    case 'terminal.input.commit': return isCommit(payload, 2);\n` +
   `    case 'terminal.output.ack': return isCommit(payload, 4);\n` +
-  `    case 'glass.layout.set': return exactObjectKeys(payload, ['revision', 'regions']) && integerInRange(payload.revision, 0, 0xffffffff) && Array.isArray(payload.regions) && payload.regions.length <= LIMITS.maxGlassRegions && payload.regions.every(isGlassRegion) && new Set(payload.regions.map((region) => region.id)).size === payload.regions.length;\n` +
   `    case 'settings.preview': case 'settings.apply': return exactObjectKeys(payload, ['transactionId', 'patch']) && asciiId(payload.transactionId) && isSettingsPatch(payload.patch);\n` +
   `    case 'settings.cancel': return exactObjectKeys(payload, ['transactionId']) && asciiId(payload.transactionId);\n` +
   `    case 'clipboard.read': return exactObjectKeys(payload, ['requestId']) && asciiId(payload.requestId);\n` +
@@ -448,12 +417,10 @@ const cpp =
   `inline constexpr std::wstring_view kAppOrigin = L"${idl.origin}";\n` +
   `inline constexpr std::uint32_t kTitlebarHeightDip = ${idl.uiMetrics.titlebarHeightDip};\n` +
   `inline constexpr std::uint32_t kCaptionButtonWidthDip = ${idl.uiMetrics.captionButtonWidthDip};\n` +
-  `inline constexpr std::size_t kMaxGlassRegions = ${idl.limits.maxGlassRegions};\n` +
   `inline constexpr std::size_t kTerminalChunkBytes = ${idl.limits.maxTerminalChunkBytes};\n` +
   `inline constexpr std::size_t kTerminalPauseBytes = ${idl.limits.maxTerminalOutstandingBytes};\n` +
   `inline constexpr std::size_t kTerminalResumeBytes = ${idl.limits.resumeTerminalBelowBytes};\n` +
   `inline constexpr std::size_t kMaxClipboardBytes = ${idl.limits.maxClipboardBytes};\n` +
-  `inline constexpr float kGrainMaximumOpacity = ${cppFloat(settingsIdl.grainMaximumOpacity)};\n\n` +
   cppEnum('GlassPreset', presetNames) +
   cppEnum('SettingsOperation', idl.enums.settingsOperation) +
   cppEnum('Foreground', idl.enums.foreground) +
@@ -479,7 +446,6 @@ const cpp =
   `\n\ninline constexpr std::array<std::wstring_view, ${settingsRootNames.length}> kSettingsKeys{${cppQuoted(settingsRootNames)}};\n` +
   `inline constexpr std::array<std::wstring_view, ${glassSettingNames.length}> kGlassSettingKeys{${cppQuoted(glassSettingNames)}};\n` +
   `inline constexpr std::array<std::wstring_view, ${glassValueNames.length}> kGlassValueKeys{${cppQuoted(glassValueNames)}};\n` +
-  `inline constexpr std::array<float, ${settingsIdl.frostBlurDips.length}> kFrostBlurDips{${settingsIdl.frostBlurDips.map(cppFloat).join(', ')}};\n\n` +
   `struct GlassValues {\n${cppGlassValueFields}\n  auto operator<=>(const GlassValues&) const = default;\n};\n\n` +
   `struct GlassSettings {\n${cppGlassSettingFields}\n  auto operator<=>(const GlassSettings&) const = default;\n};\n\n` +
   `${cppPresets}\n\n` +
@@ -499,10 +465,7 @@ const cpp =
   `constexpr bool IsValid(Locale value) noexcept { return !ToString(value).empty(); }\n` +
   `constexpr bool IsValid(Foreground value) noexcept { return !ToString(value).empty(); }\n` +
   `constexpr bool IsValid(const Settings& value) noexcept { return ${cppSettingsValidation}; }\n` +
-  `constexpr std::uint32_t ToneChannel(std::uint32_t tone) noexcept { return (tone * 255U + 50U) / 100U; }\n` +
-  `constexpr std::uint32_t ToneRgb(std::uint32_t tone) noexcept { const auto channel = ToneChannel(tone); return (channel << 16U) | (channel << 8U) | channel; }\n` +
-  `constexpr float FrostBlurDip(std::uint32_t frostThickness) noexcept { return frostThickness < kFrostBlurDips.size() ? kFrostBlurDips[frostThickness] : kFrostBlurDips[kDefaultSettings.glass.frostThickness]; }\n` +
-  `constexpr float GrainOpacity(std::uint32_t grain) noexcept { return static_cast<float>(grain) / static_cast<float>(kGrainConstraint.maximum) * kGrainMaximumOpacity; }\n\n` +
+  `\n` +
   `inline constexpr std::array<std::wstring_view, ${idl.messages.webToNative.length}> kWebToNativeTypes{${cppQuoted(idl.messages.webToNative)}};\n` +
   `inline constexpr std::array<std::wstring_view, ${idl.messages.nativeToWeb.length}> kNativeToWebTypes{${cppQuoted(idl.messages.nativeToWeb)}};\n` +
   `inline constexpr std::array<std::wstring_view, ${allTypes.length}> kAllTypes{${cppQuoted(allTypes)}};\n\n` +
