@@ -11,6 +11,11 @@ import {
 import type { Capabilities, Settings } from '../../../contracts/generated/protocol';
 import { resolveForeground } from '../appearance';
 import { useBridge } from '../bridge/context';
+import {
+  AnsiBackgroundFilter,
+  installBackgroundOscSuppression,
+  writeFilteredTerminalOutput,
+} from '../terminal/AnsiBackgroundFilter';
 
 export interface TerminalViewHandle {
   clear(): void;
@@ -97,6 +102,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host.current);
+    const disposeBackgroundOscSuppression = installBackgroundOscSuppression(terminal.parser);
+    const backgroundFilter = new AnsiBackgroundFilter();
     let disposed = false;
     void import('@xterm/addon-webgl')
       .then(({ WebglAddon }) => {
@@ -111,9 +118,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     terminalRef.current = terminal;
     fitRef.current = fit;
 
+    const recovered = bridge.onMessage((message) => {
+      if (message.type === 'terminal.recovered') backgroundFilter.reset();
+    });
     const data = terminal.onData((value) => bridge.sendInput(value));
     const output = bridge.onOutput((value, commit) => {
-      terminal.write(value, () => bridge.acknowledge(commit));
+      writeFilteredTerminalOutput(terminal, backgroundFilter, value, commit, (acknowledged) =>
+        bridge.acknowledge(acknowledged),
+      );
     });
     let frame = 0;
     const resize = new ResizeObserver(() => {
@@ -136,8 +148,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       disposed = true;
       resize.disconnect();
       cancelAnimationFrame(frame);
+      recovered();
       data.dispose();
       output();
+      disposeBackgroundOscSuppression();
+      backgroundFilter.reset();
       terminal.dispose();
       terminalRef.current = undefined;
       fitRef.current = undefined;

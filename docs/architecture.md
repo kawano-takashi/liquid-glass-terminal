@@ -77,7 +77,7 @@ Keyboard and IME remain attached to the controller focus path. Input routing is 
 
 The host maps packaged `web/` assets to `https://app.liquid-glass-terminal.invalid/`. Only the exact `index.html` main-frame navigation is permitted. All other resource origins receive a synthetic 403 response. New windows, permissions, downloads, host objects, browser accelerator keys, default context menus, and release-build DevTools are disabled.
 
-React owns ordinary application UI, localization, layout, settings, paste confirmation, and xterm.js. It never receives Node.js, COM, Win32, or raw WebView2 objects.
+React owns ordinary application UI, localization, layout, settings, paste confirmation, and xterm.js. The xterm output path applies a stateful display-only filter before each write: SGR cell backgrounds and reverse video are removed, while foreground styling and terminal control sequences remain intact. OSC 11/111 background changes and queries are consumed by xterm.js so TUI applications cannot replace the transparent default surface. It never receives Node.js, COM, Win32, or raw WebView2 objects.
 
 ## Native/web protocol
 
