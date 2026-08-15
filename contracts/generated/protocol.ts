@@ -10,7 +10,7 @@ export const SETTINGS_SCHEMA_VERSION = 6 as const;
 export const WINDOW_STATE_SCHEMA_VERSION = 2 as const;
 export const SETTINGS_CONSTRAINTS = {
   blurDips: {
-    minimum: 2,
+    minimum: 0,
     maximum: 74,
     step: 1,
   },
@@ -115,7 +115,7 @@ export const DEFAULT_PERSISTED_WINDOW_STATE = {
 
 export const GLASS_PRESETS = {
   clear: {
-    blurDips: 6,
+    blurDips: 0,
   },
   regular: {
     blurDips: 30,

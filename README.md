@@ -9,11 +9,11 @@ A local-first terminal for Windows 11 whose window, Glass material, input routin
 ## What changed in 0.3
 
 - A Win32 `HWND` with `WS_EX_NOREDIRECTIONBITMAP` owns the top-level window and preserves resize, maximize/restore, Snap Layout, system-menu, DPI, and fullscreen behavior.
-- Windows.UI.Composition always feeds one shared pre-window desktop composite through a Gaussian effect, with `glass.blurDips` selectable from 2–74 DIP. The processed full-window Glass layer stays at opacity 1; no raw HostBackdrop output is drawn, and the app cannot read or store its pixels.
+- Windows.UI.Composition always feeds one shared pre-window desktop composite through a Gaussian effect, with `glass.blurDips` selectable from 0–74 DIP. At 0 DIP the Gaussian effect is disabled while the shared processed Glass path remains active. The full-window Glass layer stays at opacity 1; no raw HostBackdrop output is drawn, and the app cannot read or store its pixels.
 - `CoreWebView2CompositionController` places the transparent React UI directly in the native visual tree. Native code routes mouse, wheel, pointer, touch/pen, cursor, focus, DPI, drag/drop, and IME-sensitive input.
 - A C++20 ConPTY host starts the local shell in a kill-on-close Job Object. WebView2 shared buffers carry terminal data with bounded queues, sequence validation, acknowledgements, and recovery generations.
 - The xterm.js display path removes ANSI cell backgrounds and reverse-video attributes, including TUI fills emitted by Codex, while preserving foreground colors, cursor, and selection visuals over the transparent Glass surface.
-- Clear, Regular, and Dense presets set blur to 6, 30, and 55 DIP. CSS never captures or processes the desktop, and Glass decoration is not coupled to the blur amount.
+- Clear, Regular, and Dense presets set blur to 0, 30, and 55 DIP. CSS never captures or processes the desktop, and Glass decoration is not coupled to the blur amount.
 - High contrast, disabled transparency, Remote Desktop, energy saver, composition failure, and user opt-out switch to an operable solid fallback. WebView2 and GPU recovery keep the shell alive where possible.
 - The WebView loads only bundled files from `https://app.liquid-glass-terminal.invalid/`. Navigation, downloads, permissions, new windows, remote requests, host objects, and release-build DevTools are denied.
 

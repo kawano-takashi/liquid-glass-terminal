@@ -56,7 +56,7 @@ npm run verify:installer
 - Changes to ConPTY framing, shared-buffer transport, Web Messages, URL/path validation, permissions, CSP, clipboard, or file-drop quoting require tests for valid and rejected input.
 - Generate TypeScript and C++ contracts only from `contracts/protocol.idl.json` with `npm run contracts:generate`; never hand-edit generated files.
 - Keep Glass rendering in Windows Composition. CSS may style content but must not capture or process desktop pixels.
-- Use one shared processed HostBackdrop Gaussian blur surface; never draw the raw HostBackdrop directly. Keep the Glass layer opacity at 1, expose only `glass.blurDips` (2–74 DIP), and keep panel decoration independent from blur amount.
+- Use one shared processed HostBackdrop Gaussian blur surface; never draw the raw HostBackdrop directly. Keep the Glass layer opacity at 1, expose only `glass.blurDips` (0–74 DIP), and keep panel decoration independent from blur amount. At 0 DIP, retain the shared processed path with Gaussian blur disabled.
 - Keep terminal glyphs outside decorative distortion and preserve xterm's minimum contrast ratio of at least 4.5; do not promise arbitrary desktop-background contrast for Glass.
 - Preserve standard resize, maximize/restore, Snap Layout, system-menu, keyboard, DPI, mouse, pointer, touch/pen, and Japanese IME behavior.
 - Glass failure must retain terminal state and fall back to an opaque surface. Honor transparency, high-contrast, reduced-motion, screen-reader, Remote Desktop, and energy-saver policy changes.

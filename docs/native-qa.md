@@ -28,14 +28,14 @@ For each run record the application version, Windows build/edition, WebView2 Run
 - [ ] Desktop wallpaper and another application remain live and are visibly frosted beneath the window without a capture/recording prompt.
 - [ ] The 56-DIP header and terminal form one continuous full-window Glass sheet without an inset terminal card or seam.
 - [ ] Settings, context menu, paste confirmation, notices, and toasts remain usable as ordinary WebView content above the shared full-window blur; no native overlay-mask messages or stale geometry remain.
-- [ ] Clear, Regular, and Dense select 6, 30, and 55 DIP and switch without restarting or losing terminal output.
-- [ ] `blurDips` accepts 2–74 DIP in one-DIP steps, previews immediately, persists after Apply/restart, and has no Opacity, Intensity, Tone, Frost, or Grain control.
-- [ ] With `tests/fixtures/glass-transparency-background.html` behind the terminal, 2 DIP visibly preserves more fine detail than 74 DIP while the full Glass layer remains at opacity 1.
-- [ ] Sweeping blur through 2, 6, 30, 55, and 74 DIP changes only the Gaussian blur amount; CSS decoration, shadows, and control styling do not change with the blur value.
-- [ ] Saturated backdrop colors remain identifiable and no white or neutral DWM surface appears at 2, 30, or 74 DIP, including after rapid changes and restart.
-- [ ] Rapid 2 ↔ 30 ↔ 74 changes retain the same Composition HostBackdrop/Gaussian graph and show no raw HostBackdrop output or mode-switch flash.
+- [ ] Clear, Regular, and Dense select 0, 30, and 55 DIP and switch without restarting or losing terminal output.
+- [ ] `blurDips` accepts 0–74 DIP in one-DIP steps, previews immediately, persists after Apply/restart, and has no Opacity, Intensity, Tone, Frost, or Grain control.
+- [ ] With `tests/fixtures/glass-transparency-background.html` behind the terminal, 0 DIP visibly preserves more fine detail than 74 DIP while the full Glass layer remains at opacity 1.
+- [ ] Sweeping blur through 0, 6, 30, 55, and 74 DIP changes only the Gaussian blur amount; CSS decoration, shadows, and control styling do not change with the blur value.
+- [ ] Saturated backdrop colors remain identifiable and no white or neutral DWM surface appears at 0, 30, or 74 DIP, including after rapid changes and restart.
+- [ ] Rapid 0 ↔ 30 ↔ 74 changes retain the same Composition HostBackdrop/Gaussian graph and show no raw HostBackdrop output or mode-switch flash.
 - [ ] When Composition effects are unavailable, reported slow, or fail to initialize, the app switches to an opaque system-color Solid surface; no Tone-only or raw HostBackdrop fallback is visible.
-- [ ] GPU traces show one shared HostBackdrop feeding only one Gaussian graph whose `Blur.BlurAmount` changes from 2 to 74 DIP; no sharp output branch or ArithmeticComposite exists.
+- [ ] GPU traces show one shared HostBackdrop feeding only one Gaussian graph whose `Blur.BlurAmount` changes from 0 to 74 DIP; no sharp output branch or ArithmeticComposite exists.
 - [ ] Auto foreground follows the Windows system text color after a live theme change; explicit Light/Dark use their fixed colors, and xterm keeps its 4.5:1 minimum contrast setting.
 - [ ] Deactivating and reactivating the window keeps the material stable; settings changes take effect immediately regardless of the motion preference.
 - [ ] DWM uses standard rounded corners and its external shadow normally, with square corners while maximized, snapped, or fullscreen.

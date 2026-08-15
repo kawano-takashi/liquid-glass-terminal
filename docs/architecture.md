@@ -52,11 +52,11 @@ Presets are exact tuples and become `Custom` in the UI when the blur value diffe
 
 | Preset  |   Blur |
 | ------- | -----: |
-| Clear   |  6 DIP |
+| Clear   |  0 DIP |
 | Regular | 30 DIP |
 | Dense   | 55 DIP |
 
-`blurDips` accepts integer values from 2 through 74 and is applied immediately without temporal animation. The Glass layer remains at opacity 1 for every blur value. Text, terminal glyphs, focus, hover, selection, and error feedback remain visible, and CSS never creates a desktop effect. There is no WebView geometry measurement or native overlay-mask protocol; panels are ordinary WebView content above the shared full-window blur. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
+`blurDips` accepts integer values from 0 through 74 and is applied immediately without temporal animation. At 0 DIP, the Gaussian blur effect is disabled while the same shared processed HostBackdrop graph and full-window Glass visual remain active; the raw HostBackdrop is never assigned directly to a visual. The Glass layer remains at opacity 1 for every blur value. Text, terminal glyphs, focus, hover, selection, and error feedback remain visible, and CSS never creates a desktop effect. There is no WebView geometry measurement or native overlay-mask protocol; panels are ordinary WebView content above the shared full-window blur. Terminal glyphs remain in the WebView layer above Glass and are never passed through decorative distortion.
 
 ## Window and input
 

@@ -19,11 +19,11 @@
       "uiScale": 100
     },
     "constraints": {
-      "blurDips": { "minimum": 2, "maximum": 74, "step": 1 },
+      "blurDips": { "minimum": 0, "maximum": 74, "step": 1 },
       "uiScale": { "minimum": 80, "maximum": 200, "step": 10 }
     },
     "presets": {
-      "clear": { "blurDips": 6 },
+      "clear": { "blurDips": 0 },
       "regular": { "blurDips": 30 },
       "dense": { "blurDips": 55 }
     }

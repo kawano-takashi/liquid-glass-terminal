@@ -33,11 +33,11 @@ describe('generated protocol validators', () => {
     expect(SETTINGS_OPERATIONS).toEqual(['preview', 'apply', 'cancel']);
     expect(UI_METRICS).toEqual({ titlebarHeightDip: 56, captionButtonWidthDip: 46 });
     expect(SETTINGS_CONSTRAINTS).toEqual({
-      blurDips: { minimum: 2, maximum: 74, step: 1 },
+      blurDips: { minimum: 0, maximum: 74, step: 1 },
       uiScale: { minimum: 80, maximum: 200, step: 10 },
     });
     expect(GLASS_PRESETS).toEqual({
-      clear: { blurDips: 6 },
+      clear: { blurDips: 0 },
       regular: { blurDips: 30 },
       dense: { blurDips: 55 },
     });
@@ -46,15 +46,15 @@ describe('generated protocol validators', () => {
     expect(resolveGlassPreset({ ...DEFAULT_SETTINGS.glass, blurDips: 29 })).toBe('custom');
   });
 
-  it('accepts 2/30/74 DIP and rejects fractions, adjacent values, and old fields', () => {
+  it('accepts 0/30/74 DIP and rejects negatives, fractions, adjacent values, and old fields', () => {
     const withGlass = (
       patch: Partial<Settings['glass']>,
       root: Partial<Pick<Settings, 'uiScale'>> = {},
     ): Settings => ({ ...settings, ...root, glass: { ...settings.glass, ...patch } });
-    for (const blurDips of [2, 30, 74]) {
+    for (const blurDips of [0, 30, 74]) {
       expect(isSettings(withGlass({ blurDips }))).toBe(true);
     }
-    for (const blurDips of [1, 75, 2.5]) {
+    for (const blurDips of [-1, 75, 2.5]) {
       expect(isSettings(withGlass({ blurDips }))).toBe(false);
     }
     expect(isSettings(withGlass({ intensity: 35 } as never))).toBe(false);
@@ -79,9 +79,9 @@ describe('generated protocol validators', () => {
     expect(isSettings({ ...settings, extra: true })).toBe(false);
     expect(isSettings({ ...settings, glass: { ...settings.glass, extra: true } })).toBe(false);
     expect(isSettings({ ...settings, glass: null })).toBe(false);
-    expect(isSettingsPatch({ glass: { blurDips: 2 } })).toBe(true);
+    expect(isSettingsPatch({ glass: { blurDips: 0 } })).toBe(true);
     expect(isSettingsPatch({ glass: { blurDips: 74 } })).toBe(true);
-    expect(isSettingsPatch({ glass: { blurDips: 1 } })).toBe(false);
+    expect(isSettingsPatch({ glass: { blurDips: -1 } })).toBe(false);
     expect(isSettingsPatch({ glass: { blurDips: 2.5 } })).toBe(false);
     expect(isSettingsPatch({ glass: { intensity: 35 } })).toBe(false);
     expect(isSettingsPatch({ glass: { tone: 0 } })).toBe(false);

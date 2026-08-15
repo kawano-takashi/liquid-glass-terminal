@@ -88,7 +88,7 @@ constexpr std::optional<Locale> ParseLocale(std::wstring_view value) noexcept {
 }
 
 struct NumericConstraint { std::uint32_t minimum; std::uint32_t maximum; std::uint32_t step; };
-inline constexpr NumericConstraint kBlurDipsConstraint{2, 74, 1};
+inline constexpr NumericConstraint kBlurDipsConstraint{0, 74, 1};
 inline constexpr NumericConstraint kUiScaleConstraint{80, 200, 10};
 
 inline constexpr std::array<std::wstring_view, 5> kSettingsKeys{L"locale", L"glass", L"foreground", L"animations", L"uiScale"};
@@ -105,7 +105,7 @@ struct GlassSettings {
   auto operator<=>(const GlassSettings&) const = default;
 };
 
-inline constexpr GlassValues kClearGlassPreset{6};
+inline constexpr GlassValues kClearGlassPreset{0};
 inline constexpr GlassValues kRegularGlassPreset{30};
 inline constexpr GlassValues kDenseGlassPreset{55};
 

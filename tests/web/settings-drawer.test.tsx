@@ -41,7 +41,7 @@ describe('SettingsDrawer', () => {
     expect(screen.getAllByRole('slider')).toHaveLength(2);
   });
 
-  it('applies both preset values while preserving enabled', () => {
+  it('applies clear and dense preset values while preserving enabled', () => {
     const onChange = vi.fn();
     const value = settings();
     value.glass.enabled = false;
@@ -56,6 +56,12 @@ describe('SettingsDrawer', () => {
         pending={false}
       />,
     );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(onChange).toHaveBeenCalledWith({
+      ...value,
+      glass: { enabled: false, blurDips: 0 },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Dense' }));
     expect(onChange).toHaveBeenCalledWith({

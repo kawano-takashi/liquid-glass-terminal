@@ -474,11 +474,11 @@ test.describe.serial('native WebView2 application', () => {
       .locator('input[type="range"]');
     const blur = materialRanges.nth(0);
     await expect(materialRanges).toHaveCount(1);
-    await expect(blur).toHaveAttribute('min', '2');
+    await expect(blur).toHaveAttribute('min', '0');
     await expect(blur).toHaveAttribute('max', '74');
     await expect(blur).toHaveAttribute('step', '1');
 
-    for (const value of [2, 6, 30, 55, 74]) {
+    for (const value of [0, 6, 30, 55, 74]) {
       await blur.fill(String(value));
       await expect(blur).toHaveValue(String(value));
       await expect(appSurface).not.toHaveCSS('--glass-intensity', /.+/);
@@ -502,7 +502,7 @@ test.describe.serial('native WebView2 application', () => {
     expect(decoration.activeBackground).not.toBe('rgba(0, 0, 0, 0)');
     expect(decoration.panelShadow).not.toBe('none');
 
-    await blur.fill('30');
+    await blur.fill('0');
     await drawer.locator('footer .button.primary').click();
     await expect(drawer).toHaveAttribute('data-open', 'false');
 
@@ -520,7 +520,7 @@ test.describe.serial('native WebView2 application', () => {
       .first()
       .locator('input[type="range"]')
       .nth(0);
-    await expect(restartedBlur).toHaveValue('30');
+    await expect(restartedBlur).toHaveValue('0');
     await restartedBlur.fill('6');
     await restartedDrawer.locator('footer .button.primary').click();
     await expect(restartedDrawer).toHaveAttribute('data-open', 'false');

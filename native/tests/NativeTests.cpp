@@ -58,6 +58,13 @@ void TestSettings() {
   Expect(!SettingsStore::Parse(
              LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":105})"),
          "settings must reject a scale outside the ten-percent step");
+  const auto zeroBlur = SettingsStore::Parse(
+      LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":0},"foreground":"auto","animations":true,"uiScale":100})");
+  Expect(zeroBlur && zeroBlur->glass.blurDips == 0,
+         "settings must accept zero DIP blur");
+  Expect(!SettingsStore::Parse(
+             LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":-1},"foreground":"auto","animations":true,"uiScale":100})"),
+         "settings must reject negative blur");
   Expect(!SettingsStore::Parse(
              LR"({"schemaVersion":6,"locale":"en","glass":{"enabled":true,"blurDips":30},"foreground":"auto","animations":true,"uiScale":100,"extra":true})"),
          "settings must reject unknown fields");
@@ -171,11 +178,11 @@ void TestSettings() {
 
 void TestMaterials() {
   using namespace lgt::composition;
-  for (const std::uint32_t blurDips : {2U, 30U, 74U}) {
+  for (const std::uint32_t blurDips : {0U, 30U, 74U}) {
     Expect(GlassBlurDips(blurDips) == blurDips,
            "Glass blur must accept every public boundary value");
   }
-  Expect(GlassBlurDips(1) == 2 && GlassBlurDips(75) == 74,
+  Expect(GlassBlurDips(1) == 1 && GlassBlurDips(75) == 74,
          "Glass blur must clamp values outside the public range");
   Expect(!CanRenderGlassBlur(false, true) && !CanRenderGlassBlur(true, false) &&
              CanRenderGlassBlur(true, true),
